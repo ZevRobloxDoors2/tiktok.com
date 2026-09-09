@@ -1,0 +1,6 @@
+{
+  "name": "CentralTok",
+  "description": "A video sharing platform with a personalized algorithm, messaging, and real-time activity.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
