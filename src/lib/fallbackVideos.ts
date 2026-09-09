@@ -2,6 +2,7 @@ import { Video, User } from '../types';
 
 const FALLBACK_USER: User = {
   id: 'system_curator',
+  email: 'curator@centraltok.com',
   username: 'CentralTok Picks',
   handle: 'centraltok_picks',
   avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=central',

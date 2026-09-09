@@ -2,18 +2,20 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, ensureVideoInDB } from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
-import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, User as UserIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
 import { FALLBACK_VIDEOS } from '../lib/fallbackVideos';
 import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
+import { getReports, saveReports } from '../lib/db';
 
 export function Home() {
+  const { currentUser, introPhase, setIntroPhase } = useAppStore();
   const [videos, setVideos] = useState<(Video & { user: User; feedId: string })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [introPhase, setIntroPhase] = useState<'loading' | 'merging' | 'expanding' | 'done'>('loading');
   const [loadingBatch, setLoadingBatch] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ytPageToken, setYtPageToken] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -28,7 +30,23 @@ export function Home() {
       let fetchedYt: any[] = [];
       
       try {
-        const res = await fetch(`/api/youtube-shorts?pageToken=${currentToken}`);
+        let searchQuery = '#shorts';
+        const allDbVideos = await getVideos();
+        
+        // AI Logic: Collect tags from user's liked and favorited videos
+        if (currentUser) {
+          const userInteractedVideos = allDbVideos.filter(v => 
+            v.likes?.includes(currentUser.id) || currentUser.favorites?.includes(v.id)
+          );
+          const allTags = userInteractedVideos.flatMap(v => v.tags || []);
+          if (allTags.length > 0) {
+            // Pick a random tag the user likes to search for
+            const randomTag = allTags[Math.floor(Math.random() * allTags.length)];
+            searchQuery = `${randomTag} #shorts`;
+          }
+        }
+      
+        const res = await fetch(`/api/youtube-shorts?pageToken=${currentToken}&q=${encodeURIComponent(searchQuery)}`);
         if (res.ok) {
           const data = await res.json();
           setYtPageToken(data.nextPageToken || '');
@@ -65,7 +83,7 @@ export function Home() {
         console.warn("YouTube API not available or failed, using local fallbacks");
         fetchedYt = FALLBACK_VIDEOS.map((v, i) => ({
           ...v,
-          id: `${v.id}_${Date.now()}_${i}`
+          id: `${v.id}_fb_${i}`
         }));
       }
 
@@ -87,10 +105,21 @@ export function Home() {
 
       // Pick random UGVs to mix (up to 3)
       const selectedUgvs = [];
-      if (ugvs.length > 0) {
-        const mixCount = Math.min(ugvs.length, 3);
+      
+      // Filter out UGVs that the current user has already seen
+      let unseenUgvs = ugvs.filter(v => {
+        if (!v.viewedBy) return true;
+        let localViewed: string[] = [];
+        try { localViewed = JSON.parse(localStorage.getItem('viewedVideos') || '[]'); } catch(e) {}
+        return !(currentUser && v.viewedBy.includes(currentUser.id)) && !localViewed.includes(v.id);
+      });
+      
+      if (unseenUgvs.length > 0) {
+        const mixCount = Math.min(unseenUgvs.length, 3);
         for (let i = 0; i < mixCount; i++) {
-          selectedUgvs.push(ugvs[Math.floor(Math.random() * ugvs.length)]);
+          const rIndex = Math.floor(Math.random() * unseenUgvs.length);
+          selectedUgvs.push(unseenUgvs[rIndex]);
+          unseenUgvs.splice(rIndex, 1);
         }
       }
 
@@ -100,9 +129,17 @@ export function Home() {
 
       if (isRefresh) {
         setVideos(mixedWithFeedIds);
+        setHasMore(true);
       } else {
-        setVideos(prev => [...prev, ...mixedWithFeedIds]);
+        setVideos(prev => {
+          const newVideos = mixedWithFeedIds.filter(newVid => !prev.some(p => p.id === newVid.id));
+          if (newVideos.length === 0) setHasMore(false);
+          return [...prev, ...newVideos];
+        });
       }
+    } catch (err) {
+      console.error("fetchBatch error:", err);
+      setHasMore(false);
     } finally {
       setLoadingBatch(false);
       setLoading(false);
@@ -140,13 +177,13 @@ export function Home() {
   // Infinite Scroll Observer
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && videos.length > 0 && !loadingBatch) {
+      if (entries[0].isIntersecting && !loadingBatch && hasMore) {
         fetchBatch();
       }
     });
     if (endRef.current) observer.observe(endRef.current);
     return () => observer.disconnect();
-  }, [videos, loadingBatch]);
+  }, [loadingBatch, hasMore]);
 
   // Intro Animation progression
   useEffect(() => {
@@ -160,6 +197,32 @@ export function Home() {
       }, 1000); // 1s for merging
     }
   }, [loading, introPhase]);
+
+  const scrollUp = () => {
+    if (containerRef.current) {
+      containerRef.current.scrollBy({ top: -containerRef.current.clientHeight, behavior: 'smooth' });
+    }
+  };
+
+  const scrollDown = () => {
+    if (containerRef.current) {
+      containerRef.current.scrollBy({ top: containerRef.current.clientHeight, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        scrollUp();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        scrollDown();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   if (introPhase !== 'done') {
     return (
@@ -207,40 +270,72 @@ export function Home() {
   }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 1 }}
-      ref={containerRef}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative"
-    >
-      {refreshing && (
-        <div className="absolute top-4 left-0 right-0 flex justify-center z-50">
-          <div className="bg-white dark:bg-zinc-800 p-2 rounded-full shadow-lg text-pink-600 animate-spin">
-            <Loader2 size={24} />
+    <div className="relative h-full w-full flex justify-center bg-black md:bg-zinc-950">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1 }}
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative bg-black"
+      >
+        {refreshing && (
+          <div className="absolute top-4 left-0 right-0 flex justify-center z-50">
+            <div className="bg-white dark:bg-zinc-800 p-2 rounded-full shadow-lg text-pink-600 animate-spin">
+              <Loader2 size={24} />
+            </div>
           </div>
-        </div>
-      )}
-      {videos.map((video) => (
-        <VideoItem key={video.feedId} video={video} />
-      ))}
-      <div ref={endRef} className="h-20 snap-start flex items-center justify-center bg-black shrink-0">
-        <Loader2 size={32} className="animate-spin text-zinc-500" />
+        )}
+        {videos.map((video, index) => (
+          <VideoItem 
+            key={video.feedId} 
+            video={video} 
+          />
+        ))}
+        {hasMore ? (
+          <div ref={endRef} className="h-20 snap-start flex items-center justify-center bg-black shrink-0">
+            <Loader2 size={32} className="animate-spin text-zinc-500" />
+          </div>
+        ) : (
+          <div className="h-20 snap-start flex items-center justify-center bg-black shrink-0 text-zinc-500 text-sm pb-8">
+            You've caught up for now!
+          </div>
+        )}
+      </motion.div>
+      
+      {/* Desktop Navigation Arrows */}
+      <div className="hidden md:flex absolute right-8 top-1/2 -translate-y-1/2 flex-col gap-4">
+        <button 
+          onClick={scrollUp}
+          className="p-4 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-full transition-colors drop-shadow-xl"
+        >
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+        <button 
+          onClick={scrollDown}
+          className="p-4 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-full transition-colors drop-shadow-xl"
+        >
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-export function VideoItem({ video }: { video: Video & { user: User; feedId: string } }) {
+export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string } }> = ({ video }) => {
   const { currentUser, setCurrentUser } = useAppStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const ytPlayerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const [isLiked, setIsLiked] = useState(video.likes?.includes(currentUser?.id || '') || false);
   const [likesCount, setLikesCount] = useState(video.likes?.length || 0);
   const [isFavorited, setIsFavorited] = useState(currentUser?.favorites?.includes(video.id) || false);
@@ -248,21 +343,28 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
   const [hasViewed, setHasViewed] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportSubmitted, setReportSubmitted] = useState(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          if (video.isYouTube && ytPlayerRef.current) {
-            ytPlayerRef.current.playVideo();
-          } else if (videoRef.current) {
+          if (video.isYouTube && ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === 'function') {
+            try {
+              ytPlayerRef.current.playVideo();
+            } catch (err) {}
+          } else if (videoRef.current && typeof videoRef.current.play === 'function') {
             videoRef.current.play().catch(() => {});
           }
           setIsPlaying(true);
+          setIsActive(true);
           
           if (!hasViewed) {
             setHasViewed(true);
-            const localViewed: string[] = JSON.parse(localStorage.getItem('viewedVideos') || '[]');
+            let localViewed: string[] = [];
+            try { localViewed = JSON.parse(localStorage.getItem('viewedVideos') || '[]'); } catch (e) {}
             
             if (currentUser) {
               if (!video.viewedBy?.includes(currentUser.id)) {
@@ -282,12 +384,13 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
             }
           }
         } else {
-          if (video.isYouTube && ytPlayerRef.current) {
+          if (video.isYouTube && ytPlayerRef.current && typeof ytPlayerRef.current.pauseVideo === 'function') {
             ytPlayerRef.current.pauseVideo();
-          } else if (videoRef.current) {
+          } else if (videoRef.current && typeof videoRef.current.pause === 'function') {
             videoRef.current.pause();
           }
           setIsPlaying(false);
+          setIsActive(false);
         }
       });
     }, { threshold: 0.6 });
@@ -296,23 +399,39 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
     return () => observer.disconnect();
   }, [hasViewed, video.id, currentUser, video.isYouTube]);
 
-  const onReady = (e: YouTubeEvent) => {
+  const handleYtReady = (e: YouTubeEvent) => {
     ytPlayerRef.current = e.target;
-    if (isPlaying) {
-      e.target.playVideo();
+    if (isPlaying && typeof e.target.playVideo === 'function') {
+      try { e.target.playVideo(); } catch (err) {}
     }
   };
 
   const togglePlay = () => {
     if (video.isYouTube && ytPlayerRef.current) {
-      if (isPlaying) ytPlayerRef.current.pauseVideo();
-      else ytPlayerRef.current.playVideo();
+      if (isPlaying && typeof ytPlayerRef.current.pauseVideo === 'function') {
+        try { ytPlayerRef.current.pauseVideo(); } catch (err) {}
+      } else if (!isPlaying && typeof ytPlayerRef.current.playVideo === 'function') {
+        try { ytPlayerRef.current.playVideo(); } catch (err) {}
+      }
     } else if (videoRef.current) {
-      if (isPlaying) videoRef.current.pause();
-      else videoRef.current.play().catch(() => {});
+      if (isPlaying && typeof videoRef.current.pause === 'function') videoRef.current.pause();
+      else if (!isPlaying && typeof videoRef.current.play === 'function') videoRef.current.play().catch(() => {});
     }
     setIsPlaying(!isPlaying);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (isActive && e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, isPlaying, togglePlay]);
 
   const handleLike = async () => {
     if (!currentUser) return;
@@ -376,6 +495,26 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
     }
   };
 
+  const submitReport = async () => {
+    if (!currentUser || !reportReason) return;
+    const reports = await getReports();
+    reports.push({
+      id: `rep_${Date.now()}`,
+      videoId: video.id,
+      reporterId: currentUser.id,
+      reason: reportReason,
+      status: 'pending',
+      timestamp: Date.now()
+    });
+    await saveReports(reports);
+    setReportSubmitted(true);
+    setTimeout(() => {
+      setShowReport(false);
+      setReportSubmitted(false);
+      setReportReason('');
+    }, 2000);
+  };
+
   const handleTimeUpdate = () => {
     if (videoRef.current && !video.isYouTube) {
       setProgress((videoRef.current.currentTime / videoRef.current.duration) * 100);
@@ -414,12 +553,12 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
           <YouTube 
             videoId={video.youtubeId} 
             opts={opts} 
-            onReady={onReady} 
+            onReady={handleYtReady} 
             className="w-full h-full" 
             iframeClassName="w-full h-full object-contain" 
           />
         </div>
-      ) : video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:') ? (
+      ) : video.videoUrl && (video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:')) ? (
         <video 
           ref={videoRef}
           src={video.videoUrl}
@@ -429,9 +568,13 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
           onClick={togglePlay}
           onTimeUpdate={handleTimeUpdate}
         />
-      ) : (
+      ) : video.videoUrl ? (
         <div className="w-full h-full bg-black flex items-center justify-center" onClick={togglePlay}>
           <img src={video.videoUrl} alt="Video fallback" className={`w-full h-full object-contain opacity-50 ${video.filter || ''}`} />
+        </div>
+      ) : (
+        <div className="w-full h-full bg-zinc-900 flex items-center justify-center" onClick={togglePlay}>
+          <Loader2 size={32} className="text-pink-600 animate-spin" />
         </div>
       )}
       
@@ -448,8 +591,14 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
       {/* Right Action Bar */}
       <div className="absolute right-4 bottom-24 md:bottom-20 flex flex-col items-center gap-5 z-20 transition-opacity">
         <div className="relative mb-2">
-          <Link to={`/profile/${video.user?.handle}`}>
-            <img src={video.user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${video.userId}`} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white bg-zinc-800 object-cover" />
+          <Link to={`/profile/${video.user?.handle || ''}`}>
+            {video.user?.avatarUrl ? (
+              <img src={video.user.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white bg-zinc-800 object-cover" />
+            ) : (
+              <div className="w-12 h-12 rounded-full border-2 border-white bg-zinc-800 flex items-center justify-center">
+                <UserIcon size={24} className="text-zinc-500" />
+              </div>
+            )}
           </Link>
           <button className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-pink-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-lg font-bold pb-0.5">
             +
@@ -483,6 +632,15 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
           </div>
           <span className="text-xs font-semibold">Share</span>
         </button>
+
+        {currentUser && (
+          <button className="flex flex-col items-center gap-1 text-white drop-shadow-md mt-2" onClick={() => setShowReport(true)}>
+            <div className="p-2 rounded-full bg-zinc-800/40 text-zinc-300 hover:text-red-500 transition-colors">
+              <Flag size={22} />
+            </div>
+            <span className="text-[10px] font-semibold">Report</span>
+          </button>
+        )}
       </div>
 
       {/* Bottom Info */}
@@ -529,6 +687,45 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
           <div className="absolute inset-0 bg-black/50 z-30 pointer-events-auto" onClick={() => setShowComments(false)} />
           <Comments video={video} onClose={() => setShowComments(false)} />
         </>
+      )}
+
+      {showReport && (
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 pointer-events-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold mb-4 dark:text-white">Report Video</h3>
+            {reportSubmitted ? (
+              <div className="text-center py-8 text-green-600 font-medium">
+                Thank you. Your report has been submitted for review.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Please select a reason for reporting this video.</p>
+                <select 
+                  className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-transparent dark:text-white"
+                  value={reportReason}
+                  onChange={e => setReportReason(e.target.value)}
+                >
+                  <option value="" disabled>Select a reason...</option>
+                  <option value="Spam or misleading">Spam or misleading</option>
+                  <option value="Inappropriate content">Inappropriate content</option>
+                  <option value="Harassment or bullying">Harassment or bullying</option>
+                  <option value="Harmful or dangerous acts">Harmful or dangerous acts</option>
+                  <option value="Copyright violation">Copyright violation</option>
+                </select>
+                <div className="flex gap-2 mt-6">
+                  <button onClick={() => setShowReport(false)} className="flex-1 py-3 rounded-xl font-semibold bg-zinc-100 dark:bg-zinc-800 dark:text-white">Cancel</button>
+                  <button 
+                    onClick={submitReport} 
+                    disabled={!reportReason}
+                    className="flex-1 py-3 rounded-xl font-semibold bg-pink-600 text-white disabled:opacity-50"
+                  >
+                    Submit Report
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

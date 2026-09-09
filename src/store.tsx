@@ -8,12 +8,15 @@ type AppState = {
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   isLoading: boolean;
+  introPhase: 'loading' | 'merging' | 'expanding' | 'done';
+  setIntroPhase: (phase: 'loading' | 'merging' | 'expanding' | 'done') => void;
 };
 
 const StoreContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [introPhase, setIntroPhase] = useState<'loading' | 'merging' | 'expanding' | 'done'>('loading');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
   });
@@ -58,7 +61,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <StoreContext.Provider value={{ currentUser, setCurrentUser: handleSetUser, theme, toggleTheme, isLoading }}>
+    <StoreContext.Provider value={{ currentUser, setCurrentUser: handleSetUser, theme, toggleTheme, isLoading, introPhase, setIntroPhase }}>
       {children}
     </StoreContext.Provider>
   );

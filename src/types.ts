@@ -9,6 +9,42 @@ export type User = {
   followers: string[]; // User IDs
   favorites?: string[]; // Video IDs
   isPrivate: boolean;
+  role?: 'user' | 'staff' | 'owner';
+  banStatus?: {
+    type: 'temp' | 'perm' | 'hwid';
+    until?: number; // timestamp for temp ban
+    linkedAccount?: string; // for hwid evasion links
+    reason?: string;
+  };
+};
+
+export type Report = {
+  id: string;
+  videoId: string;
+  reporterId: string;
+  reason: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  adminNotes?: string;
+  timestamp: number;
+};
+
+export type Appeal = {
+  id: string;
+  userId: string;
+  reason: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  adminNotes?: string;
+  timestamp: number;
+};
+
+export type AuditLog = {
+  id: string;
+  action: string;
+  adminId: string;
+  targetId: string; // userId or videoId
+  details: string;
+  timestamp: number;
+  reverted?: boolean;
 };
 
 export type Video = {

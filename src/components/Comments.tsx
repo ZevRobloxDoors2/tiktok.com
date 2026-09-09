@@ -57,7 +57,11 @@ export function Comments({ video, onClose }: { video: Video, onClose: () => void
           const replies = getReplies(c.id);
           return (
             <div key={c.id} className="flex gap-3">
-              <img src={user?.avatarUrl} className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover" />
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold">{user?.username.charAt(0) || '?'}</div>
+              )}
               <div className="flex-1">
                 <p className="text-xs text-zinc-500 font-semibold">{user?.username}</p>
                 <p className="text-sm mt-0.5">{c.text}</p>
@@ -72,7 +76,11 @@ export function Comments({ video, onClose }: { video: Video, onClose: () => void
                       const rUser = users.find(u => u.id === r.userId);
                       return (
                         <div key={r.id} className="flex gap-3">
-                          <img src={rUser?.avatarUrl} className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover" />
+                          {rUser?.avatarUrl ? (
+                            <img src={rUser.avatarUrl} className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold text-xs">{rUser?.username.charAt(0) || '?'}</div>
+                          )}
                           <div>
                             <p className="text-xs text-zinc-500 font-semibold">{rUser?.username}</p>
                             <p className="text-sm mt-0.5">{r.text}</p>

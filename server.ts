@@ -23,10 +23,11 @@ async function startServer() {
       // Note: Getting random shorts repeatedly can be tricky with a single search.
       // We pass a pageToken if provided to allow paginating through results.
       const pageToken = req.query.pageToken as string || '';
+      const searchQuery = req.query.q as string || '#shorts';
       const queryParams = new URLSearchParams({
         part: 'snippet',
         maxResults: '10',
-        q: '#shorts',
+        q: searchQuery,
         type: 'video',
         videoDuration: 'short',
         key: apiKey

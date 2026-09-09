@@ -108,7 +108,11 @@ export function Explore() {
           <div className="flex flex-col gap-3">
             {usersList.map(user => (
               <Link to={`/profile/${user.handle}`} key={user.id} className="flex items-center gap-3 px-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 p-2 rounded-lg transition-colors">
-                <img src={user.avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold">{user.username.charAt(0)}</div>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="font-bold truncate">{user.username}</p>
                   <p className="text-sm text-zinc-500 truncate">@{user.handle}</p>
@@ -129,10 +133,14 @@ export function Explore() {
                 className={`w-full h-full object-cover ${video.filter || ''}`} 
                 alt="YouTube thumbnail"
               />
-            ) : video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:') ? (
+            ) : video.videoUrl && (video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:')) ? (
               <video src={video.videoUrl} className={`w-full h-full object-cover ${video.filter || ''}`} />
-            ) : (
+            ) : video.videoUrl ? (
               <img src={video.videoUrl} className={`w-full h-full object-cover ${video.filter || ''}`} alt="Thumbnail" />
+            ) : (
+              <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+                <Loader2 size={24} className="text-zinc-600 animate-spin" />
+              </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 text-white">
               <p className="font-bold text-sm truncate">@{video.user.username}</p>

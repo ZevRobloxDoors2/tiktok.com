@@ -1,5 +1,5 @@
 import { get, set } from 'idb-keyval';
-import { User, Video, Message, Notification } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog } from '../types';
 
 export const initDb = async () => {
   const users = await get<User[]>('users');
@@ -8,6 +8,9 @@ export const initDb = async () => {
     await set('videos', []);
     await set('messages', []);
     await set('notifications', []);
+    await set('reports', []);
+    await set('appeals', []);
+    await set('auditLogs', []);
   }
 };
 
@@ -71,9 +74,21 @@ export const saveMessages = async (messages: Message[]) => await set('messages',
 export const getNotifications = async () => (await get<Notification[]>('notifications')) || [];
 export const saveNotifications = async (notifications: Notification[]) => await set('notifications', notifications);
 
+export const getReports = async () => (await get<Report[]>('reports')) || [];
+export const saveReports = async (reports: Report[]) => await set('reports', reports);
+
+export const getAppeals = async () => (await get<Appeal[]>('appeals')) || [];
+export const saveAppeals = async (appeals: Appeal[]) => await set('appeals', appeals);
+
+export const getAuditLogs = async () => (await get<AuditLog[]>('auditLogs')) || [];
+export const saveAuditLogs = async (logs: AuditLog[]) => await set('auditLogs', logs);
+
 export const clearDb = async () => {
   await set('users', []);
   await set('videos', []);
   await set('messages', []);
   await set('notifications', []);
+  await set('reports', []);
+  await set('appeals', []);
+  await set('auditLogs', []);
 };

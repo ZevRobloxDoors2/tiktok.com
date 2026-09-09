@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getUsers, getVideos, saveUsers } from '../lib/db';
 import { User, Video } from '../types';
 import { useAppStore } from '../store';
-import { Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag } from 'lucide-react';
+import { Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag, Hammer, Wrench, LogOut, Check } from 'lucide-react';
 import { VideoItem } from './Home';
 
 export function Profile() {
@@ -17,11 +17,14 @@ export function Profile() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'favorites'>('videos');
   const [showEdit, setShowEdit] = useState(false);
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   useEffect(() => {
     const loadProfile = async () => {
       const users = await getUsers();
+      setAllUsers(users);
       const user = users.find(u => u.handle === handle);
       if (user) {
         setProfileUser(user);
@@ -82,10 +85,36 @@ export function Profile() {
         
         {/* Profile Header */}
         <div className="px-4 pt-12 pb-6 flex flex-col md:flex-row items-center md:items-start gap-6 border-b border-zinc-200 dark:border-zinc-800">
-          <img src={profileUser.avatarUrl} alt={profileUser.username} className="w-28 h-28 rounded-full border-2 border-zinc-200 dark:border-zinc-800 object-cover" />
+          {profileUser.avatarUrl ? (
+            <img src={profileUser.avatarUrl} alt={profileUser.username} className="w-28 h-28 rounded-full border-2 border-zinc-200 dark:border-zinc-800 object-cover" />
+          ) : (
+            <div className="w-28 h-28 rounded-full border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-800 flex items-center justify-center">
+              <span className="text-zinc-500 font-bold text-2xl">{profileUser.username.charAt(0)}</span>
+            </div>
+          )}
           
           <div className="flex-1 text-center md:text-left">
-            <h1 className="text-2xl font-bold">{profileUser.username}</h1>
+            <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+              <h1 
+                className={`text-2xl font-bold ${isOwnProfile ? 'cursor-pointer hover:underline' : ''}`}
+                onClick={() => isOwnProfile && setShowAccountSwitcher(true)}
+                title={isOwnProfile ? 'Switch accounts' : ''}
+              >
+                {profileUser.username}
+              </h1>
+              {profileUser.role === 'owner' && (
+                <div className="flex gap-0.5 text-red-500" title="Owner">
+                  <Hammer size={20} />
+                  <Wrench size={20} />
+                </div>
+              )}
+              {profileUser.role === 'staff' && (
+                <div className="flex gap-0.5 text-blue-500" title="Staff">
+                  <Hammer size={20} />
+                  <Wrench size={20} />
+                </div>
+              )}
+            </div>
             <p className="text-zinc-500 font-semibold mb-4">@{profileUser.handle}</p>
             
             <div className="flex items-center justify-center md:justify-start gap-6 mb-4">
@@ -190,6 +219,41 @@ export function Profile() {
         <EditProfileModal user={currentUser} onClose={() => setShowEdit(false)} />
       )}
 
+      {showAccountSwitcher && currentUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h2 className="text-xl font-bold">Switch Account</h2>
+              <button onClick={() => setShowAccountSwitcher(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full"><X size={20} /></button>
+            </div>
+            <div className="p-2">
+              {allUsers.map(u => (
+                <div 
+                  key={u.id}
+                  onClick={() => {
+                    setCurrentUser(u);
+                    setShowAccountSwitcher(false);
+                    window.location.hash = `#/profile/${u.handle}`;
+                  }}
+                  className="flex items-center gap-3 p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition-colors"
+                >
+                  {u.avatarUrl ? (
+                    <img src={u.avatarUrl} alt="" className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold">{u.username.charAt(0)}</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold truncate">{u.username}</p>
+                    <p className="text-sm text-zinc-500 truncate">@{u.handle}</p>
+                  </div>
+                  {currentUser.id === u.id && <Check size={20} className="text-pink-600 shrink-0" />}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Video Playback Modal */}
       {selectedVideo && (
         <div className="fixed inset-0 z-50 bg-black flex items-center justify-center animate-in fade-in duration-200">
@@ -252,7 +316,11 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
         <div className="p-6 space-y-6">
           <div className="flex flex-col items-center">
             <div className="relative group cursor-pointer" onClick={() => fileRef.current?.click()}>
-              <img src={avatarUrl} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-700" />
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-700" />
+              ) : (
+                <div className="w-24 h-24 rounded-full border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold text-2xl">{username.charAt(0)}</div>
+              )}
               <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
                 <Upload size={24} />
               </div>
@@ -293,9 +361,21 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
           </div>
         </div>
         
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
-          <button onClick={handleSave} className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg transition-colors">Save</button>
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-between gap-3">
+          <button 
+            onClick={() => {
+              setCurrentUser(null);
+              onClose();
+              window.location.href = '#/';
+            }} 
+            className="px-4 py-2 flex items-center gap-2 text-red-500 font-semibold hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+          >
+            <LogOut size={18} /> Log out
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
+            <button onClick={handleSave} className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg transition-colors">Save</button>
+          </div>
         </div>
       </div>
     </div>
