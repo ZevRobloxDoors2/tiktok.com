@@ -33,16 +33,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const loadData = async () => {
-      await initDb();
-      const currentUserId = localStorage.getItem('currentUserId');
-      if (currentUserId) {
-        const users = await getUsers();
-        const user = users.find(u => u.id === currentUserId);
-        if (user) {
-          setCurrentUser(user);
+      try {
+        await initDb();
+        const currentUserId = localStorage.getItem('currentUserId');
+        if (currentUserId) {
+          const users = await getUsers();
+          const user = users.find(u => u.id === currentUserId);
+          if (user) {
+            setCurrentUser(user);
+          }
         }
+      } catch (err) {
+        console.warn('Failed to load local database', err);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     loadData();
   }, []);
