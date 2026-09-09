@@ -28,9 +28,11 @@ jobs:
         with:
           node-version: 20
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build
-        run: npm run build
+        run: npx vite build
+      - name: Verify Pages artifact
+        run: test -s dist/index.html && test -d dist/assets
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
