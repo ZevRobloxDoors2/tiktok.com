@@ -4,6 +4,7 @@ import { Video, User } from '../types';
 import { useAppStore } from '../store';
 import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
 import { FALLBACK_VIDEOS } from '../lib/fallbackVideos';
 import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
@@ -11,6 +12,7 @@ import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
 export function Home() {
   const [videos, setVideos] = useState<(Video & { user: User; feedId: string })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [introPhase, setIntroPhase] = useState<'loading' | 'merging' | 'expanding' | 'done'>('loading');
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [ytPageToken, setYtPageToken] = useState('');
@@ -146,10 +148,69 @@ export function Home() {
     return () => observer.disconnect();
   }, [videos, loadingBatch]);
 
-  if (loading) return <div className="h-full flex items-center justify-center">Loading...</div>;
+  // Intro Animation progression
+  useEffect(() => {
+    if (!loading && introPhase === 'loading') {
+      setIntroPhase('merging');
+      setTimeout(() => {
+        setIntroPhase('expanding');
+        setTimeout(() => {
+          setIntroPhase('done');
+        }, 1000); // 1s for blackhole expansion
+      }, 1000); // 1s for merging
+    }
+  }, [loading, introPhase]);
+
+  if (introPhase !== 'done') {
+    return (
+      <div className="h-full w-full bg-zinc-900 flex items-center justify-center relative overflow-hidden">
+        {/* Black Hole */}
+        {introPhase === 'expanding' && (
+          <motion.div 
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 100, opacity: 1 }}
+            transition={{ duration: 1, ease: "easeInOut" }}
+            className="absolute z-50 w-10 h-10 bg-black rounded-full"
+            style={{ 
+              boxShadow: '0 0 100px 50px rgba(0,0,0,1)' 
+            }}
+          />
+        )}
+
+        <div className={`relative z-10 flex items-center justify-center transition-opacity duration-500 ${introPhase === 'expanding' ? 'opacity-0' : 'opacity-100'}`}>
+           {/* C Icon */}
+           <motion.div 
+             animate={introPhase === 'merging' ? { scale: 0, opacity: 0 } : {}}
+             transition={{ duration: 0.8 }}
+             className="text-6xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+           >
+             C
+           </motion.div>
+           
+           {/* T Icon Circling */}
+           <motion.div
+             animate={introPhase === 'loading' ? { rotate: 360 } : { rotate: 0 }}
+             transition={introPhase === 'loading' ? { duration: 1.5, repeat: Infinity, ease: "linear" } : { duration: 0 }}
+             className="absolute w-32 h-32 flex items-start justify-center"
+           >
+             <motion.div 
+               animate={introPhase === 'merging' ? { y: 64, scale: 0, opacity: 0 } : {}}
+               transition={{ duration: 0.8 }}
+               className="text-5xl font-black text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,0.8)]"
+             >
+               T
+             </motion.div>
+           </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div 
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1 }}
       ref={containerRef}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -169,7 +230,7 @@ export function Home() {
       <div ref={endRef} className="h-20 snap-start flex items-center justify-center bg-black shrink-0">
         <Loader2 size={32} className="animate-spin text-zinc-500" />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -349,28 +410,28 @@ export function VideoItem({ video }: { video: Video & { user: User; feedId: stri
   return (
     <div ref={containerRef} className="w-full h-full snap-start relative bg-black flex items-center justify-center group overflow-hidden">
       {video.isYouTube ? (
-        <div className="absolute inset-0 z-0 scale-150 pointer-events-none">
+        <div className="absolute inset-0 z-0 pointer-events-none">
           <YouTube 
             videoId={video.youtubeId} 
             opts={opts} 
             onReady={onReady} 
             className="w-full h-full" 
-            iframeClassName="w-full h-full object-cover" 
+            iframeClassName="w-full h-full object-contain" 
           />
         </div>
       ) : video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:') ? (
         <video 
           ref={videoRef}
           src={video.videoUrl}
-          className={`w-full h-full object-cover ${video.filter || ''}`}
+          className={`w-full h-full object-contain bg-black ${video.filter || ''}`}
           loop
           playsInline
           onClick={togglePlay}
           onTimeUpdate={handleTimeUpdate}
         />
       ) : (
-        <div className="w-full h-full bg-zinc-900 flex items-center justify-center" onClick={togglePlay}>
-          <img src={video.videoUrl} alt="Video fallback" className={`w-full h-full object-cover opacity-50 ${video.filter || ''}`} />
+        <div className="w-full h-full bg-black flex items-center justify-center" onClick={togglePlay}>
+          <img src={video.videoUrl} alt="Video fallback" className={`w-full h-full object-contain opacity-50 ${video.filter || ''}`} />
         </div>
       )}
       
