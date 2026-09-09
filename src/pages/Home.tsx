@@ -18,6 +18,7 @@ export function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ytPageToken, setYtPageToken] = useState('');
+  const seenFeedIds = useRef<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -35,8 +36,11 @@ export function Home() {
         
         // AI Logic: Collect tags from user's liked and favorited videos
         if (currentUser) {
-          const userInteractedVideos = allDbVideos.filter(v => 
-            v.likes?.includes(currentUser.id) || currentUser.favorites?.includes(v.id)
+          const commentedVideoIds = allDbVideos
+            .filter(video => video.comments?.some(comment => comment.userId === currentUser.id))
+            .map(video => video.id);
+          const userInteractedVideos = allDbVideos.filter(v =>
+            v.likes?.includes(currentUser.id) || currentUser.favorites?.includes(v.id) || commentedVideoIds.includes(v.id)
           );
           const allTags = userInteractedVideos.flatMap(v => v.tags || []);
           if (allTags.length > 0) {
@@ -46,7 +50,11 @@ export function Home() {
           }
         }
       
-        const res = await fetch(`/api/youtube-shorts?pageToken=${currentToken}&q=${encodeURIComponent(searchQuery)}`);
+        const youtubeParams = `pageToken=${encodeURIComponent(currentToken)}&q=${encodeURIComponent(searchQuery)}`;
+        const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
+          ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&videoDuration=short&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
+          : `/api/youtube-shorts?${youtubeParams}`;
+        const res = await fetch(youtubeUrl);
         if (res.ok) {
           const data = await res.json();
           setYtPageToken(data.nextPageToken || '');
@@ -103,15 +111,15 @@ export function Home() {
         user: allUsers.find(u => u.id === v.userId) || ({} as User)
       }));
 
-      // Pick random UGVs to mix (up to 3)
-      const selectedUgvs = [];
+      // Pick unseen local videos first. Once these are exhausted, external Shorts fill the feed.
+      const selectedUgvs: (Video & { user: User })[] = [];
+      let localViewed: string[] = [];
+      try { localViewed = JSON.parse(localStorage.getItem('viewedVideos') || '[]'); } catch (e) {}
       
       // Filter out UGVs that the current user has already seen
       let unseenUgvs = ugvs.filter(v => {
         if (!v.viewedBy) return true;
-        let localViewed: string[] = [];
-        try { localViewed = JSON.parse(localStorage.getItem('viewedVideos') || '[]'); } catch(e) {}
-        return !(currentUser && v.viewedBy.includes(currentUser.id)) && !localViewed.includes(v.id);
+        return !seenFeedIds.current.has(v.id) && !(currentUser && v.viewedBy.includes(currentUser.id)) && !localViewed.includes(v.id);
       });
       
       if (unseenUgvs.length > 0) {
@@ -123,9 +131,18 @@ export function Home() {
         }
       }
 
-      // Shuffle
-      const mixed = [...enrichedYt, ...selectedUgvs].sort(() => Math.random() - 0.5);
+      const unusedYt = enrichedYt.filter(video => !seenFeedIds.current.has(video.id));
+      const mixed: (Video & { user: User })[] = [];
+      const localPool = [...selectedUgvs];
+      const ytPool = [...unusedYt];
+      const pattern = ['short', 'short', 'video', 'short', 'video', 'video', 'short'];
+      for (let i = 0; i < Math.max(localPool.length, ytPool.length); i++) {
+        const preferred = pattern[i % pattern.length];
+        const next = preferred === 'short' ? ytPool.shift() || localPool.shift() : localPool.shift() || ytPool.shift();
+        if (next) mixed.push(next);
+      }
       const mixedWithFeedIds = mixed.map(v => ({ ...v, feedId: Math.random().toString(36).substring(2, 9) }));
+      mixedWithFeedIds.forEach(video => seenFeedIds.current.add(video.id));
 
       if (isRefresh) {
         setVideos(mixedWithFeedIds);
@@ -133,7 +150,6 @@ export function Home() {
       } else {
         setVideos(prev => {
           const newVideos = mixedWithFeedIds.filter(newVid => !prev.some(p => p.id === newVid.id));
-          if (newVideos.length === 0) setHasMore(false);
           return [...prev, ...newVideos];
         });
       }

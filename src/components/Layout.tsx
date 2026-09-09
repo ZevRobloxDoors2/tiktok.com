@@ -10,6 +10,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [showAuth, setShowAuth] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
+  const [supportType, setSupportType] = useState<'support' | 'bug' | null>(null);
   const [supportSent, setSupportSent] = useState(false);
   const location = useLocation();
   const isIntro = location.pathname === '/' && introPhase !== 'done';
@@ -22,18 +23,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
       id: `support_${Date.now()}`,
       videoId: 'general_support',
       reporterId: currentUser?.id || 'anonymous',
-      reason: 'Support Request / Bug Report',
+      reason: `${supportType === 'bug' ? 'Bug/Issue' : 'Support'}: ${supportMessage}`,
       timestamp: Date.now(),
-      status: 'pending'
+      status: 'pending',
+      category: supportType || 'support'
     });
-    // Add additional details directly into adminNotes or a new field, for now just append to reason
-    reports[reports.length - 1].reason = `Support/Bug Report: ${supportMessage}`;
     await saveReports(reports);
     setSupportSent(true);
     setTimeout(() => {
       setShowSupportModal(false);
       setSupportSent(false);
       setSupportMessage('');
+      setSupportType(null);
     }, 2000);
   };
 
@@ -174,9 +175,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 p-4 rounded-xl text-center font-medium">
                 Your report has been sent to the staff. Thank you!
               </div>
+            ) : !supportType ? (
+              <div className="space-y-3">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Choose a request type.</p>
+                <button onClick={() => setSupportType('support')} className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 rounded-xl">Support</button>
+                <button onClick={() => setSupportType('bug')} className="w-full bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 font-bold py-3 rounded-xl">Bugs/Issues</button>
+              </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">Describe the bug or issue you encountered in detail.</p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">State your issue, and wait until a staff replies.</p>
                 <textarea
                   value={supportMessage}
                   onChange={(e) => setSupportMessage(e.target.value)}
@@ -190,6 +197,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 >
                   Send to Staff
                 </button>
+                <button onClick={() => setSupportType(null)} className="w-full text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white">Back</button>
               </div>
             )}
           </div>

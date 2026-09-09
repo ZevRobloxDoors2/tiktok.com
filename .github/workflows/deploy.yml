@@ -30,6 +30,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
+        env:
+          VITE_YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: npx vite build
       - name: Verify Pages artifact
         run: test -s dist/index.html && test -d dist/assets

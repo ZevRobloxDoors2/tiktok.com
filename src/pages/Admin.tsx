@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos } from '../lib/db';
 import { User, Report, Appeal, AuditLog, Video } from '../types';
-import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw } from 'lucide-react';
+import { getDeviceId } from '../lib/utils';
 
 export function Admin() {
   const { currentUser } = useAppStore();
@@ -57,6 +58,42 @@ export function Admin() {
     setLogs(allLogs);
   };
 
+  const redoAuditAction = async (log: AuditLog) => {
+    if (!isOwner || log.reverted) return;
+    const allUsers = await getUsers();
+    const allReports = await getReports();
+    const allAppeals = await getAppeals();
+    const user = allUsers.find(item => item.id === log.targetId);
+    const report = allReports.find(item => item.id === log.targetId);
+    const appeal = allAppeals.find(item => item.id === log.targetId);
+
+    if (log.action === 'promote_staff' && user) user.role = 'staff';
+    if (log.action === 'remove_staff' && user) user.role = 'user';
+    if (log.action === 'ban_user' && user) {
+      const type = log.details.includes('(hwid)') ? 'hwid' : log.details.includes('(temp)') ? 'temp' : 'perm';
+      user.banStatus = { type, reason: `Redone by owner from audit log ${log.id}`, linkedAccount: type === 'hwid' ? user.handle : undefined };
+    }
+    if (log.action === 'report_accepted' && report) report.status = 'accepted';
+    if (log.action === 'report_rejected' && report) report.status = 'rejected';
+    if (log.action === 'appeal_accepted' && appeal) appeal.status = 'accepted';
+    if (log.action === 'appeal_rejected' && appeal) appeal.status = 'rejected';
+
+    if (user) await saveUsers(allUsers);
+    if (report) await saveReports(allReports);
+    if (appeal) await saveAppeals(allAppeals);
+    const allLogs = await getAuditLogs();
+    allLogs.push({
+      id: `log_${Date.now()}`,
+      action: 'redo_action',
+      adminId: currentUser!.id,
+      targetId: log.targetId,
+      details: `Redid ${log.action} from audit log ${log.id}`,
+      timestamp: Date.now()
+    });
+    await saveAuditLogs(allLogs);
+    await loadData();
+  };
+
   const executeWithConfirm = (title: string, action: (reason: string) => Promise<void>, requireReason = true) => {
     setConfirmModal({
       isOpen: true,
@@ -109,6 +146,7 @@ export function Admin() {
           reason,
           linkedAccount: type === 'hwid' ? user.handle : undefined
         };
+        if (type === 'hwid') allUsers[idx].deviceId = allUsers[idx].deviceId || getDeviceId();
         await saveUsers(allUsers);
         setUsers(allUsers);
         await logAction('ban_user', user.id, `Banned user (${type})${days ? ` for ${days} days` : ''}. Reason: ${reason}`);
@@ -178,7 +216,7 @@ export function Admin() {
           
           {activeTab === 'reports' && (
             <div className="space-y-4">
-              <h2 className="text-xl font-bold mb-4">Pending Reports</h2>
+              <h2 className="text-xl font-bold mb-4">Pending Reports and Support</h2>
               {reports.filter(r => r.status === 'pending').map(report => {
                 const vid = videos.find(v => v.id === report.videoId);
                 const repUser = users.find(u => u.id === report.reporterId);
@@ -194,7 +232,7 @@ export function Admin() {
                       </div>
                     )}
                     <div className="flex-1">
-                      <p className="font-semibold text-red-500 mb-1">Reason: {report.reason}</p>
+                      <p className="font-semibold text-red-500 mb-1">{report.category === 'support' ? 'Support Request' : report.category === 'bug' ? 'Bug / Issue' : 'Report'}: {report.reason}</p>
                       <p className="text-sm text-zinc-500 mb-2">Reported by: @{repUser?.handle}</p>
                       <p className="text-xs text-zinc-400 mb-4">{new Date(report.timestamp).toLocaleString()}</p>
                       <div className="flex gap-2">
@@ -292,6 +330,23 @@ export function Admin() {
                               )}
                             </>
                           )}
+                          {isOwner && u.role === 'staff' && (
+                            <button
+                              onClick={() => executeWithConfirm('Remove Staff Permissions', async (reason) => {
+                                const allUsers = await getUsers();
+                                const idx = allUsers.findIndex(user => user.id === u.id);
+                                if (idx !== -1) {
+                                  allUsers[idx].role = 'user';
+                                  await saveUsers(allUsers);
+                                  setUsers(allUsers);
+                                  await logAction('remove_staff', u.id, `Removed staff permissions. Reason: ${reason}`);
+                                }
+                              })}
+                              className="px-2 py-1 bg-orange-500/20 text-orange-600 dark:text-orange-400 font-semibold rounded text-xs hover:bg-orange-500/30"
+                            >
+                              Remove Staff
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -351,6 +406,13 @@ export function Admin() {
                       <div className="font-semibold w-full sm:w-32 truncate">@{admin?.handle || 'unknown'}</div>
                       <div className="font-mono text-xs bg-zinc-100 dark:bg-zinc-950 px-2 py-1 rounded w-max sm:w-32 my-2 sm:my-0">{log.action}</div>
                       <div className="flex-1">{log.details}</div>
+                      <button
+                        onClick={() => executeWithConfirm('Redo Audit Action', async () => redoAuditAction(log), false)}
+                        className="p-2 text-zinc-500 hover:text-pink-600"
+                        title="Redo action"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
                     </div>
                   );
                 })}

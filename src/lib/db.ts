@@ -1,5 +1,5 @@
 import { get, set } from 'idb-keyval';
-import { User, Video, Message, Notification, Report, Appeal, AuditLog } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment } from '../types';
 
 export const initDb = async () => {
   const users = await get<User[]>('users');
@@ -59,13 +59,21 @@ export const incrementVideoView = async (id: string, viewerId: string | null) =>
   }
 };
 
-export const addCommentToVideo = async (videoId: string, comment: any) => {
+export const addCommentToVideo = async (videoId: string, comment: Comment) => {
   const videos = await getVideos();
   const idx = videos.findIndex(v => v.id === videoId);
   if (idx !== -1) {
     videos[idx].comments = [...(videos[idx].comments || []), comment];
     await saveVideos(videos);
   }
+};
+
+export const updateVideo = async (videoId: string, update: (video: Video) => Video) => {
+  const videos = await getVideos();
+  const index = videos.findIndex(video => video.id === videoId);
+  if (index === -1) return;
+  videos[index] = update(videos[index]);
+  await saveVideos(videos);
 };
 
 export const getMessages = async () => (await get<Message[]>('messages')) || [];

@@ -4,6 +4,7 @@ import { getUsers, saveUsers } from '../lib/db';
 import { User } from '../types';
 import { signInWithGoogle } from '../lib/firebase';
 import { Loader2 } from 'lucide-react';
+import { getDeviceId } from '../lib/utils';
 
 export function AuthModal({ onClose }: { onClose: () => void }) {
   const { setCurrentUser } = useAppStore();
@@ -16,8 +17,13 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const syncUserToDb = async (email: string, displayName: string | null, photoURL: string | null) => {
     const users = await getUsers();
     const existingUser = users.find(u => u.email === email);
+    const deviceId = getDeviceId();
     
     if (existingUser) {
+      if (!existingUser.deviceId) {
+        existingUser.deviceId = deviceId;
+        await saveUsers(users);
+      }
       return existingUser;
     }
 
@@ -34,8 +40,18 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
       following: [],
       followers: [],
       isPrivate: false,
+      deviceId,
       role: isOwner || isFirstUser ? 'owner' : 'user'
     };
+
+    const linkedBan = users.find(user => user.deviceId === deviceId && user.banStatus);
+    if (linkedBan) {
+      newUser.banStatus = {
+        type: 'hwid',
+        linkedAccount: linkedBan.handle,
+        reason: 'This device is linked to a banned account.'
+      };
+    }
     
     await saveUsers([...users, newUser]);
     return newUser;

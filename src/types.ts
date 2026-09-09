@@ -9,6 +9,7 @@ export type User = {
   followers: string[]; // User IDs
   favorites?: string[]; // Video IDs
   isPrivate: boolean;
+  deviceId?: string;
   role?: 'user' | 'staff' | 'owner';
   banStatus?: {
     type: 'temp' | 'perm' | 'hwid';
@@ -26,6 +27,7 @@ export type Report = {
   status: 'pending' | 'accepted' | 'rejected';
   adminNotes?: string;
   timestamp: number;
+  category?: 'video' | 'support' | 'bug';
 };
 
 export type Appeal = {

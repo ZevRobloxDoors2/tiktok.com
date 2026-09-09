@@ -84,7 +84,11 @@ export function BanScreen() {
           </p>
         )}
 
-        {submitted ? (
+        {isHwid ? (
+          <div className="bg-red-900/30 border border-red-500/50 text-red-300 p-4 rounded-xl text-center font-medium mb-6">
+            Appeals can only be submitted from the originally banned account. Please contact Support if this enforcement is incorrect.
+          </div>
+        ) : submitted ? (
           <div className="bg-yellow-900/30 border border-yellow-500/50 text-yellow-400 p-4 rounded-xl text-center font-medium mb-6">
             You currently have a pending appeal. Please wait for staff review.
           </div>
