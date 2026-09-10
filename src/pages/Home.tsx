@@ -6,7 +6,6 @@ import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, User
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
-import { FALLBACK_VIDEOS } from '../lib/fallbackVideos';
 import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
 import { getReports, saveReports } from '../lib/db';
 
@@ -29,6 +28,7 @@ export function Home() {
     try {
       const currentToken = isRefresh ? '' : ytPageToken;
       let fetchedYt: any[] = [];
+      let nextYtPageToken = ytPageToken;
       
       try {
         let searchQuery = '#shorts';
@@ -52,12 +52,13 @@ export function Home() {
       
         const youtubeParams = `pageToken=${encodeURIComponent(currentToken)}&q=${encodeURIComponent(searchQuery)}`;
         const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
-          ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&videoDuration=short&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
+          ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
           : `/api/youtube-shorts?${youtubeParams}`;
         const res = await fetch(youtubeUrl);
         if (res.ok) {
           const data = await res.json();
-          setYtPageToken(data.nextPageToken || '');
+          nextYtPageToken = data.nextPageToken || '';
+          setYtPageToken(nextYtPageToken);
           if (data.items) {
             fetchedYt = data.items.map((item: any) => ({
               id: `yt_${item.id.videoId}`,
@@ -85,14 +86,11 @@ export function Home() {
             }));
           }
         } else {
-           throw new Error("API not ok");
+          throw new Error(`YouTube API request failed with ${res.status}`);
         }
       } catch (e) {
-        console.warn("YouTube API not available or failed, using local fallbacks");
-        fetchedYt = FALLBACK_VIDEOS.map((v, i) => ({
-          ...v,
-          id: `${v.id}_fb_${i}`
-        }));
+        console.warn('YouTube Shorts are unavailable; continuing with CentralTok videos only.', e);
+        fetchedYt = [];
       }
 
       const allDbVideos = await getVideos();
@@ -146,12 +144,13 @@ export function Home() {
 
       if (isRefresh) {
         setVideos(mixedWithFeedIds);
-        setHasMore(true);
+        setHasMore(Boolean(nextYtPageToken) || mixedWithFeedIds.length > 0);
       } else {
         setVideos(prev => {
           const newVideos = mixedWithFeedIds.filter(newVid => !prev.some(p => p.id === newVid.id));
           return [...prev, ...newVideos];
         });
+        if (!nextYtPageToken && mixedWithFeedIds.length === 0) setHasMore(false);
       }
     } catch (err) {
       console.error("fetchBatch error:", err);
