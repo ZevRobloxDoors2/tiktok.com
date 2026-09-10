@@ -14,7 +14,7 @@ async function startServer() {
 
   app.get("/api/youtube-shorts", async (req, res) => {
     try {
-      const apiKey = process.env.YOUTUBE_API_KEY;
+      const apiKey = process.env['YOUTUBE_API_KEY'];
       if (!apiKey) {
         return res.status(500).json({ error: "YOUTUBE_API_KEY environment variable is required" });
       }
@@ -53,7 +53,7 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env['NODE_ENV'] !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
