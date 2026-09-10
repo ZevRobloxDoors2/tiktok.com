@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
 import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
 import { getReports, saveReports } from '../lib/db';
+import { normalizeYoutubeShorts } from '../lib/feed';
 
 export function Home() {
   const { currentUser, introPhase, setIntroPhase } = useAppStore();
@@ -31,10 +32,10 @@ export function Home() {
       let nextYtPageToken = ytPageToken;
       
       try {
-        let searchQuery = '#shorts';
         const allDbVideos = await getVideos();
-        
-        // AI Logic: Collect tags from user's liked and favorited videos
+        const baseQueries = ['#shorts', 'shorts', 'funny short', 'viral short'];
+        let searchQuery = '#shorts';
+
         if (currentUser) {
           const commentedVideoIds = allDbVideos
             .filter(video => video.comments?.some(comment => comment.userId === currentUser.id))
@@ -44,49 +45,59 @@ export function Home() {
           );
           const allTags = userInteractedVideos.flatMap(v => v.tags || []);
           if (allTags.length > 0) {
-            // Pick a random tag the user likes to search for
             const randomTag = allTags[Math.floor(Math.random() * allTags.length)];
             searchQuery = `${randomTag} #shorts`;
           }
         }
-      
-        const youtubeParams = `pageToken=${encodeURIComponent(currentToken)}&q=${encodeURIComponent(searchQuery)}`;
-        const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
-          ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&videoDuration=short&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
-          : `/api/youtube-shorts?${youtubeParams}`;
-        const res = await fetch(youtubeUrl);
-        if (res.ok) {
+
+        const candidateQueries = Array.from(new Set([searchQuery, ...baseQueries]));
+        for (const query of candidateQueries) {
+          const youtubeParams = `pageToken=${encodeURIComponent(currentToken)}&q=${encodeURIComponent(query)}`;
+          const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
+            ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=25&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
+            : `/api/youtube-shorts?${youtubeParams}`;
+          const res = await fetch(youtubeUrl);
+          if (!res.ok) continue;
+
           const data = await res.json();
           nextYtPageToken = data.nextPageToken || '';
           setYtPageToken(nextYtPageToken);
+
           if (data.items) {
-            fetchedYt = data.items.map((item: any) => ({
-              id: `yt_${item.id.videoId}`,
-              userId: 'youtube_user',
-              videoUrl: '',
-              description: item.snippet.title,
-              tags: ['#shorts', '#youtube'],
-              likes: [],
-              comments: [],
-              timestamp: Date.now(),
-              views: 0,
-              filter: '',
-              isYouTube: true,
-              youtubeId: item.id.videoId,
-              user: {
-                id: 'youtube_user',
-                username: item.snippet.channelTitle,
-                handle: item.snippet.channelTitle.replace(/\s+/g, '').toLowerCase(),
-                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.snippet.channelId}`,
-                bio: 'YouTube Creator',
-                following: [],
-                followers: [],
-                isPrivate: false,
-              }
-            }));
+            const validItems = normalizeYoutubeShorts(data.items, seenFeedIds.current);
+            if (validItems.length > 0) {
+              fetchedYt = validItems.map((item: any) => ({
+                id: `yt_${item.id.videoId}`,
+                userId: 'youtube_user',
+                videoUrl: '',
+                description: item.snippet.title,
+                tags: ['#shorts', '#youtube'],
+                likes: [],
+                comments: [],
+                timestamp: Date.now(),
+                views: 0,
+                filter: '',
+                isYouTube: true,
+                youtubeId: item.id.videoId,
+                user: {
+                  id: 'youtube_user',
+                  username: item.snippet.channelTitle,
+                  handle: item.snippet.channelTitle.replace(/\s+/g, '').toLowerCase(),
+                  avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.snippet.channelId}`,
+                  bio: 'YouTube Creator',
+                  following: [],
+                  followers: [],
+                  isPrivate: false,
+                }
+              }));
+              break;
+            }
           }
-        } else {
-          throw new Error(`YouTube API request failed with ${res.status}`);
+        }
+
+        if (fetchedYt.length === 0) {
+          nextYtPageToken = '';
+          setYtPageToken('');
         }
       } catch (e) {
         console.warn('YouTube Shorts are unavailable; continuing with CentralTok videos only.', e);
@@ -554,6 +565,9 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
     width: '100%',
     playerVars: {
       autoplay: 0,
+      enablejsapi: 1,
+      origin: window.location.origin,
+      mute: 1,
       controls: 0,
       rel: 0,
       showinfo: 0,
