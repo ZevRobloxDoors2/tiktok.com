@@ -26,7 +26,7 @@ async function startServer() {
       const searchQuery = req.query.q as string || '#shorts';
       const queryParams = new URLSearchParams({
         part: 'snippet',
-        maxResults: '10',
+        maxResults: '1',
         q: searchQuery,
         type: 'video',
         videoDuration: 'short',

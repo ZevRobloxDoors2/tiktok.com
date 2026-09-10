@@ -132,7 +132,7 @@ export function Home() {
       });
       
       if (unseenUgvs.length > 0) {
-        const mixCount = Math.min(unseenUgvs.length, 3);
+        const mixCount = Math.min(unseenUgvs.length, 1);
         for (let i = 0; i < mixCount; i++) {
           const rIndex = Math.floor(Math.random() * unseenUgvs.length);
           selectedUgvs.push(unseenUgvs[rIndex]);
@@ -200,11 +200,16 @@ export function Home() {
 
   const handleTouchEnd = () => setPulling(false);
 
-  const handleFeedScroll = (event: React.UIEvent<HTMLDivElement>) => {
-    const target = event.currentTarget;
-    const reachedEnd = target.scrollTop > 0 && target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
-    if (reachedEnd && !loadingBatch && hasMore) fetchBatch();
-  };
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && !loadingBatch && hasMore) {
+        fetchBatch();
+      }
+    });
+    if (endRef.current) observer.observe(endRef.current);
+    return () => observer.disconnect();
+  }, [loadingBatch, hasMore]);
 
   // Intro Animation progression
   useEffect(() => {
@@ -300,7 +305,6 @@ export function Home() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onScroll={handleFeedScroll}
         className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative bg-black"
       >
         {refreshing && (
