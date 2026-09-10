@@ -11,7 +11,7 @@ import { getReports, saveReports } from '../lib/db';
 import { normalizeYoutubeShorts } from '../lib/feed';
 
 export function Home() {
-  const { currentUser, introPhase, setIntroPhase } = useAppStore();
+  const { currentUser, introPhase, setIntroPhase, isLoading } = useAppStore();
   const [videos, setVideos] = useState<(Video & { user: User; feedId: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingBatch, setLoadingBatch] = useState(false);
@@ -111,8 +111,13 @@ export function Home() {
   };
 
   useEffect(() => {
-    fetchBatch();
-  }, []);
+    if (isLoading) return;
+    seenFeedIds.current.clear();
+    setVideos([]);
+    setYtPageToken('');
+    setHasMore(true);
+    fetchBatch(true);
+  }, [currentUser?.id, isLoading]);
 
   // Pull to refresh logic
   const [startY, setStartY] = useState(0);
