@@ -54,7 +54,7 @@ export function Home() {
         for (const query of candidateQueries) {
           const youtubeParams = `pageToken=${encodeURIComponent(currentToken)}&q=${encodeURIComponent(query)}`;
           const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
-            ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=25&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
+            ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
             : `/api/youtube-shorts?${youtubeParams}`;
           const res = await fetch(youtubeUrl);
           if (!res.ok) continue;
@@ -200,16 +200,11 @@ export function Home() {
 
   const handleTouchEnd = () => setPulling(false);
 
-  // Infinite Scroll Observer
-  useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && !loadingBatch && hasMore) {
-        fetchBatch();
-      }
-    });
-    if (endRef.current) observer.observe(endRef.current);
-    return () => observer.disconnect();
-  }, [loadingBatch, hasMore]);
+  const handleFeedScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    const reachedEnd = target.scrollTop > 0 && target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
+    if (reachedEnd && !loadingBatch && hasMore) fetchBatch();
+  };
 
   // Intro Animation progression
   useEffect(() => {
@@ -305,6 +300,7 @@ export function Home() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onScroll={handleFeedScroll}
         className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative bg-black"
       >
         {refreshing && (
