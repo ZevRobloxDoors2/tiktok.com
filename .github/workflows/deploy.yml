@@ -32,7 +32,10 @@ jobs:
       - name: Build
         env:
           VITE_YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: npx vite build
+        run: |
+          test -n "$VITE_YOUTUBE_API_KEY"
+          npx vite build
+          grep -q "googleapis.com/youtube" dist/assets/*.js
       - name: Verify Pages artifact
         run: test -s dist/index.html && test -d dist/assets
       - name: Setup Pages
