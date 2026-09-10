@@ -53,13 +53,15 @@ export function Home() {
             video.comments?.some(comment => comment.userId === currentUser.id)
           ));
           const tags = interacted.flatMap(video => video.tags || []);
-          const query = tags.length ? `${tags[Math.floor(Math.random() * tags.length)]} #shorts` : '#shorts';
-          const youtubeParams = `pageToken=${encodeURIComponent(isRefresh ? '' : ytPageToken)}&q=${encodeURIComponent(query)}`;
-          const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
-            ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
-            : `/api/youtube-shorts?${youtubeParams}`;
-          const response = await fetch(youtubeUrl);
-          if (response.ok) {
+          const preferredQuery = tags.length ? `${tags[Math.floor(Math.random() * tags.length)]} shorts` : 'shorts';
+          const queries = Array.from(new Set([preferredQuery, 'youtube shorts', 'shorts']));
+          for (const query of queries) {
+            const youtubeParams = `pageToken=${encodeURIComponent(isRefresh ? '' : nextYtPageToken)}&q=${encodeURIComponent(query)}`;
+            const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
+              ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
+              : `/api/youtube-shorts?${youtubeParams}`;
+            const response = await fetch(youtubeUrl);
+            if (!response.ok) continue;
             const data = await response.json();
             nextYtPageToken = data.nextPageToken || '';
             const valid = normalizeYoutubeShorts(data.items || [], seenFeedIds.current)[0];
@@ -76,6 +78,7 @@ export function Home() {
                   bio: 'YouTube Creator', following: [], followers: [], isPrivate: false
                 }
               };
+              break;
             }
           }
         } catch (error) {
