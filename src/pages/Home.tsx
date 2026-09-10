@@ -27,141 +27,75 @@ export function Home() {
     setLoadingBatch(true);
     
     try {
-      const currentToken = isRefresh ? '' : ytPageToken;
-      let fetchedYt: any[] = [];
-      let nextYtPageToken = ytPageToken;
-      
-      try {
-        const allDbVideos = await getVideos();
-        const baseQueries = ['#shorts', 'shorts', 'funny short', 'viral short'];
-        let searchQuery = '#shorts';
-
-        if (currentUser) {
-          const commentedVideoIds = allDbVideos
-            .filter(video => video.comments?.some(comment => comment.userId === currentUser.id))
-            .map(video => video.id);
-          const userInteractedVideos = allDbVideos.filter(v =>
-            v.likes?.includes(currentUser.id) || currentUser.favorites?.includes(v.id) || commentedVideoIds.includes(v.id)
-          );
-          const allTags = userInteractedVideos.flatMap(v => v.tags || []);
-          if (allTags.length > 0) {
-            const randomTag = allTags[Math.floor(Math.random() * allTags.length)];
-            searchQuery = `${randomTag} #shorts`;
-          }
-        }
-
-        const candidateQueries = Array.from(new Set([searchQuery, ...baseQueries]));
-        for (const query of candidateQueries) {
-          const youtubeParams = `pageToken=${encodeURIComponent(currentToken)}&q=${encodeURIComponent(query)}`;
-          const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
-            ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
-            : `/api/youtube-shorts?${youtubeParams}`;
-          const res = await fetch(youtubeUrl);
-          if (!res.ok) continue;
-
-          const data = await res.json();
-          nextYtPageToken = data.nextPageToken || '';
-          setYtPageToken(nextYtPageToken);
-
-          if (data.items) {
-            const validItems = normalizeYoutubeShorts(data.items, seenFeedIds.current);
-            if (validItems.length > 0) {
-              fetchedYt = validItems.map((item: any) => ({
-                id: `yt_${item.id.videoId}`,
-                userId: 'youtube_user',
-                videoUrl: '',
-                description: item.snippet.title,
-                tags: ['#shorts', '#youtube'],
-                likes: [],
-                comments: [],
-                timestamp: Date.now(),
-                views: 0,
-                filter: '',
-                isYouTube: true,
-                youtubeId: item.id.videoId,
-                user: {
-                  id: 'youtube_user',
-                  username: item.snippet.channelTitle,
-                  handle: item.snippet.channelTitle.replace(/\s+/g, '').toLowerCase(),
-                  avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.snippet.channelId}`,
-                  bio: 'YouTube Creator',
-                  following: [],
-                  followers: [],
-                  isPrivate: false,
-                }
-              }));
-              break;
-            }
-          }
-        }
-
-        if (fetchedYt.length === 0) {
-          nextYtPageToken = '';
-          setYtPageToken('');
-        }
-      } catch (e) {
-        console.warn('YouTube Shorts are unavailable; continuing with CentralTok videos only.', e);
-        fetchedYt = [];
-      }
-
       const allDbVideos = await getVideos();
       const allUsers = await getUsers();
-
-      // Enrich fetched YT with DB stats if they exist
-      const enrichedYt = fetchedYt.map(ytv => {
-        const dbMatch = allDbVideos.find(v => v.id === ytv.id);
-        return dbMatch ? { ...dbMatch, user: allUsers.find(u => u.id === dbMatch.userId) || ytv.user } : ytv;
-      });
-
-      // Get UGVs
-      const ugvs = allDbVideos.filter(v => !v.isYouTube).map(v => ({
+      const localViewed = (() => {
+        try { return JSON.parse(localStorage.getItem('viewedVideos') || '[]') as string[]; }
+        catch { return []; }
+      })();
+      const unseenUgvs = allDbVideos.filter(video => {
+        if (video.isYouTube || seenFeedIds.current.has(video.id) || localViewed.includes(video.id)) return false;
+        return !currentUser || !(video.viewedBy || []).includes(currentUser.id);
+      }).map(v => ({
         ...v,
         videoUrl: v.videoData ? URL.createObjectURL(v.videoData) : v.videoUrl,
         user: allUsers.find(u => u.id === v.userId) || ({} as User)
       }));
 
-      // Pick unseen local videos first. Once these are exhausted, external Shorts fill the feed.
-      const selectedUgvs: (Video & { user: User })[] = [];
-      let localViewed: string[] = [];
-      try { localViewed = JSON.parse(localStorage.getItem('viewedVideos') || '[]'); } catch (e) {}
-      
-      // Filter out UGVs that the current user has already seen
-      let unseenUgvs = ugvs.filter(v => {
-        if (!v.viewedBy) return true;
-        return !seenFeedIds.current.has(v.id) && !(currentUser && v.viewedBy.includes(currentUser.id)) && !localViewed.includes(v.id);
-      });
-      
-      if (unseenUgvs.length > 0) {
-        const mixCount = Math.min(unseenUgvs.length, 1);
-        for (let i = 0; i < mixCount; i++) {
-          const rIndex = Math.floor(Math.random() * unseenUgvs.length);
-          selectedUgvs.push(unseenUgvs[rIndex]);
-          unseenUgvs.splice(rIndex, 1);
+      let nextVideo: Video & { user: User } | undefined = unseenUgvs[Math.floor(Math.random() * unseenUgvs.length)];
+      let nextYtPageToken = ytPageToken;
+
+      if (!nextVideo) {
+        try {
+          const interacted = allDbVideos.filter(video => currentUser && (
+            video.likes?.includes(currentUser.id) ||
+            currentUser.favorites?.includes(video.id) ||
+            video.comments?.some(comment => comment.userId === currentUser.id)
+          ));
+          const tags = interacted.flatMap(video => video.tags || []);
+          const query = tags.length ? `${tags[Math.floor(Math.random() * tags.length)]} #shorts` : '#shorts';
+          const youtubeParams = `pageToken=${encodeURIComponent(isRefresh ? '' : ytPageToken)}&q=${encodeURIComponent(query)}`;
+          const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
+            ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
+            : `/api/youtube-shorts?${youtubeParams}`;
+          const response = await fetch(youtubeUrl);
+          if (response.ok) {
+            const data = await response.json();
+            nextYtPageToken = data.nextPageToken || '';
+            const valid = normalizeYoutubeShorts(data.items || [], seenFeedIds.current)[0];
+            if (valid) {
+              nextVideo = {
+                id: `yt_${valid.id.videoId}`,
+                userId: 'youtube_user', videoUrl: '', description: valid.snippet.title,
+                tags: ['#shorts', '#youtube'], likes: [], comments: [], timestamp: Date.now(),
+                views: 0, filter: '', isYouTube: true, youtubeId: valid.id.videoId,
+                user: {
+                  id: 'youtube_user', email: `${valid.snippet.channelId}@youtube.local`, username: valid.snippet.channelTitle,
+                  handle: valid.snippet.channelTitle.replace(/\s+/g, '').toLowerCase(),
+                  avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${valid.snippet.channelId}`,
+                  bio: 'YouTube Creator', following: [], followers: [], isPrivate: false
+                }
+              };
+            }
+          }
+        } catch (error) {
+          console.warn('YouTube Shorts request failed', error);
         }
       }
 
-      const unusedYt = enrichedYt.filter(video => !seenFeedIds.current.has(video.id));
-      const mixed: (Video & { user: User })[] = [];
-      const localPool = [...selectedUgvs];
-      const ytPool = [...unusedYt];
-      const pattern = ['short', 'short', 'video', 'short', 'video', 'video', 'short'];
-      for (let i = 0; i < Math.max(localPool.length, ytPool.length); i++) {
-        const preferred = pattern[i % pattern.length];
-        const next = preferred === 'short' ? ytPool.shift() || localPool.shift() : localPool.shift() || ytPool.shift();
-        if (next) mixed.push(next);
-      }
-      const mixedWithFeedIds = mixed.map(v => ({ ...v, feedId: Math.random().toString(36).substring(2, 9) }));
+      setYtPageToken(nextYtPageToken);
+      const mixedWithFeedIds = nextVideo ? [{ ...nextVideo, feedId: Math.random().toString(36).substring(2, 9) }] : [];
       mixedWithFeedIds.forEach(video => seenFeedIds.current.add(video.id));
 
       if (isRefresh) {
         setVideos(mixedWithFeedIds);
-        setHasMore(Boolean(nextYtPageToken) || mixedWithFeedIds.length > 0);
+        setHasMore(Boolean(nextVideo) || Boolean(nextYtPageToken));
       } else {
         setVideos(prev => {
           const newVideos = mixedWithFeedIds.filter(newVid => !prev.some(p => p.id === newVid.id));
           return [...prev, ...newVideos];
         });
-        if (!nextYtPageToken && mixedWithFeedIds.length === 0) setHasMore(false);
+        setHasMore(Boolean(nextVideo) || Boolean(nextYtPageToken));
       }
     } catch (err) {
       console.error("fetchBatch error:", err);
