@@ -52,7 +52,7 @@ export function Home() {
       
         const youtubeParams = `pageToken=${encodeURIComponent(currentToken)}&q=${encodeURIComponent(searchQuery)}`;
         const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
-          ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
+          ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&videoDuration=short&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
           : `/api/youtube-shorts?${youtubeParams}`;
         const res = await fetch(youtubeUrl);
         if (res.ok) {
@@ -361,6 +361,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [youtubeError, setYoutubeError] = useState<number | null>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -373,7 +374,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
           } else if (videoRef.current && typeof videoRef.current.play === 'function') {
             videoRef.current.play().catch(() => {});
           }
-          setIsPlaying(true);
+          if (!video.isYouTube) setIsPlaying(true);
           setIsActive(true);
           
           if (!hasViewed) {
@@ -419,6 +420,10 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
     if (isPlaying && typeof e.target.playVideo === 'function') {
       try { e.target.playVideo(); } catch (err) {}
     }
+  };
+
+  const handleYtStateChange = (e: YouTubeEvent) => {
+    setIsPlaying(e.data === 1);
   };
 
   const togglePlay = () => {
@@ -564,15 +569,27 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   return (
     <div ref={containerRef} className="w-full h-full snap-start relative bg-black flex items-center justify-center group overflow-hidden">
       {video.isYouTube ? (
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <YouTube 
-            videoId={video.youtubeId} 
-            opts={opts} 
-            onReady={handleYtReady} 
-            className="w-full h-full" 
-            iframeClassName="w-full h-full object-contain" 
-          />
-        </div>
+        youtubeError ? (
+          <div className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-4 bg-zinc-950 p-6 text-center text-white">
+            <img src={`https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`} alt="YouTube Short thumbnail" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+            <div className="relative z-10">
+              <p className="font-semibold">This Short cannot be embedded.</p>
+              <a href={`https://www.youtube.com/shorts/${video.youtubeId}`} target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-lg bg-pink-600 px-4 py-2 font-semibold">Watch on YouTube</a>
+            </div>
+          </div>
+        ) : (
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <YouTube 
+              videoId={video.youtubeId} 
+              opts={opts} 
+              onReady={handleYtReady}
+              onStateChange={handleYtStateChange}
+              onError={(event) => setYoutubeError(event.data)}
+              className="w-full h-full" 
+              iframeClassName="w-full h-full object-contain" 
+            />
+          </div>
+        )
       ) : video.videoUrl && (video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:')) ? (
         <video 
           ref={videoRef}
