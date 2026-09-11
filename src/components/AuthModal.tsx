@@ -28,7 +28,6 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     }
 
     const isOwner = email === 'zaellacruze1@gmail.com';
-    const isFirstUser = users.length === 0;
     
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
@@ -41,7 +40,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
       followers: [],
       isPrivate: false,
       deviceId,
-      role: isOwner || isFirstUser ? 'owner' : 'user'
+      role: isOwner ? 'owner' : 'user'
     };
 
     const linkedBan = users.find(user => user.deviceId === deviceId && user.banStatus);

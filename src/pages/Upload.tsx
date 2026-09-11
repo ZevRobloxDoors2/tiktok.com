@@ -16,7 +16,7 @@ const FILTERS = [
 export function Upload() {
   const { currentUser } = useAppStore();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'upload' | 'record'>('upload');
+  const [mode, setMode] = useState<'upload' | 'record' | 'screen'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [description, setDescription] = useState('');
@@ -36,7 +36,7 @@ export function Upload() {
     return <div className="p-8 text-center">Please log in to upload videos.</div>;
   }
 
-  // Handle switching to camera
+  // Handle switching to camera or screen
   useEffect(() => {
     if (mode === 'record' && !stream) {
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
@@ -48,14 +48,28 @@ export function Upload() {
           alert('Could not access camera or microphone.');
           setMode('upload');
         });
+    } else if (mode === 'screen' && !stream) {
+      navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+        .then(s => {
+          setStream(s);
+          if (cameraRef.current) cameraRef.current.srcObject = s;
+          
+          // Stop stream when user stops sharing via browser UI
+          s.getVideoTracks()[0].onended = () => {
+            s.getTracks().forEach(track => track.stop());
+            setStream(null);
+            setMode('upload');
+          };
+        })
+        .catch(err => {
+          alert('Could not access screen recording.');
+          setMode('upload');
+        });
     } else if (mode === 'upload' && stream) {
       stream.getTracks().forEach(t => t.stop());
       setStream(null);
     }
-    return () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-    };
-  }, [mode]);
+  }, [mode, stream]);
 
   const startRecording = () => {
     if (!stream) return;
@@ -141,6 +155,12 @@ export function Upload() {
               >
                 <Camera size={18} /> Record
               </button>
+              <button 
+                onClick={() => setMode('screen')}
+                className={`px-4 py-1.5 rounded-md font-semibold flex items-center gap-2 ${mode === 'screen' ? 'bg-white dark:bg-zinc-700 shadow-sm' : 'text-zinc-500'}`}
+              >
+                <VideoIcon size={18} /> Screen
+              </button>
             </div>
           )}
         </div>
@@ -148,7 +168,7 @@ export function Upload() {
         <div className="flex flex-col md:flex-row gap-8">
           {/* Visual Area */}
           <div className="flex-1">
-            {mode === 'record' ? (
+            {mode === 'record' || mode === 'screen' ? (
               <div className="relative rounded-2xl overflow-hidden h-[500px] bg-black flex items-center justify-center">
                 <video ref={cameraRef} autoPlay muted playsInline className={`w-full h-full object-cover ${filter}`} />
                 <div className="absolute bottom-6 left-0 right-0 flex justify-center z-10">
@@ -189,7 +209,7 @@ export function Upload() {
             )}
 
             {/* Filters Row */}
-            {(mode === 'record' || file) && (
+            {(mode === 'record' || mode === 'screen' || file) && (
               <div className="mt-4">
                 <p className="text-sm font-semibold mb-2">Effects & Filters</p>
                 <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-2">
@@ -216,7 +236,7 @@ export function Upload() {
                 onChange={e => setDescription(e.target.value)}
                 className="w-full bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-zinc-300 dark:focus:border-zinc-600 rounded-lg p-3 outline-none min-h-[120px] resize-none"
                 placeholder="Description..."
-                disabled={mode === 'record'}
+                disabled={mode === 'record' || mode === 'screen'}
               />
             </div>
             
@@ -227,7 +247,7 @@ export function Upload() {
                 onChange={e => setHashtags(e.target.value)}
                 className="w-full bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-zinc-300 dark:focus:border-zinc-600 rounded-lg p-3 outline-none"
                 placeholder="funny trending dance (space separated)"
-                disabled={mode === 'record'}
+                disabled={mode === 'record' || mode === 'screen'}
               />
             </div>
             
@@ -240,7 +260,7 @@ export function Upload() {
               </button>
               <button 
                 onClick={handleUpload}
-                disabled={!file || isUploading || mode === 'record'}
+                disabled={!file || isUploading || mode === 'record' || mode === 'screen'}
                 className="flex-1 bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isUploading ? 'Posting...' : 'Post'}
