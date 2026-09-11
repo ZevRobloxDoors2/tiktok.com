@@ -14,9 +14,9 @@ async function startServer() {
 
   app.get("/api/youtube-shorts", async (req, res) => {
     try {
-      const apiKeys = Array.from({length: 5}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean) as string[];
+      const apiKeys = Array.from({length: 20}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean) as string[];
       if (apiKeys.length === 0) {
-        return res.status(500).json({ error: "YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_5 are required" });
+        return res.status(500).json({ error: "YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_20 are required" });
       }
 
       // We'll search for #shorts to get a list of YouTube Shorts.

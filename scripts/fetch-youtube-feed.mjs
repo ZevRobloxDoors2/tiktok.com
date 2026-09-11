@@ -1,7 +1,7 @@
 import {mkdir, writeFile} from 'node:fs/promises';
 
-const apiKeys = Array.from({length: 5}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean);
-if (apiKeys.length === 0) throw new Error('At least one YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_5 secret is required');
+const apiKeys = Array.from({length: 20}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean);
+if (apiKeys.length === 0) throw new Error('At least one YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_20 secret is required');
 
 const queries = ['shorts'];
 const videos = [];
