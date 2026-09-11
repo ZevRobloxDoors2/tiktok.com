@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X } from 'lucide-react';
 import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
-import { saveReports } from '../lib/db';
+import { saveReports, getMessages, getUsers } from '../lib/db';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { currentUser, theme, toggleTheme, introPhase } = useAppStore();
@@ -12,8 +12,37 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [supportMessage, setSupportMessage] = useState('');
   const [supportType, setSupportType] = useState<'support' | 'bug' | null>(null);
   const [supportSent, setSupportSent] = useState(false);
+  const [messageToast, setMessageToast] = useState<{username: string; avatarUrl: string; handle: string} | null>(null);
+  const knownMessageIds = useRef<Set<string>>(new Set());
   const location = useLocation();
+  const navigate = useNavigate();
   const isIntro = location.pathname === '/' && introPhase !== 'done';
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let initialized = false;
+    const checkMessages = async () => {
+      const [messages, users] = await Promise.all([getMessages(), getUsers()]);
+      const incoming = messages.filter(message => message.toUserId === currentUser.id);
+      if (!initialized) {
+        incoming.forEach(message => knownMessageIds.current.add(message.id));
+        initialized = true;
+        return;
+      }
+      const fresh = incoming.find(message => !knownMessageIds.current.has(message.id));
+      incoming.forEach(message => knownMessageIds.current.add(message.id));
+      if (!fresh) return;
+      const sender = users.find(user => user.id === fresh.fromUserId);
+      if (!sender) return;
+      setMessageToast({username: sender.username, avatarUrl: sender.avatarUrl, handle: sender.handle});
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(sender.username, {body: 'New messages was sent', icon: sender.avatarUrl});
+      }
+    };
+    checkMessages();
+    const interval = setInterval(checkMessages, 2000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
 
   const handleSupportSubmit = async () => {
     if (!supportMessage.trim()) return;
@@ -132,6 +161,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 relative h-full overflow-hidden flex justify-center">
         {children}
       </main>
+      {messageToast && (
+        <button onClick={() => { navigate(`/messages/${messageToast.handle}`); setMessageToast(null); }} className="fixed top-4 left-1/2 -translate-x-1/2 z-[120] flex items-center gap-3 rounded-xl bg-white dark:bg-zinc-900 border border-pink-200 dark:border-pink-800 px-4 py-3 shadow-2xl animate-in slide-in-from-top-8">
+          <img src={messageToast.avatarUrl} alt="" className="w-10 h-10 rounded-full" />
+          <span className="text-left"><strong className="block">{messageToast.username}</strong><span className="text-sm text-zinc-500">New messages was sent</span></span>
+        </button>
+      )}
       
       {/* Mobile Bottom Nav */}
       {!isIntro && (

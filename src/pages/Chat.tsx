@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { getMessages, getUsers, saveMessages } from '../lib/db';
+import { getMessages, getUsers, saveMessages, getNotifications, saveNotifications } from '../lib/db';
 import { Message, User } from '../types';
 import { ArrowLeft, Send } from 'lucide-react';
 
@@ -57,6 +57,15 @@ export function Chat() {
     
     const allMsgs = await getMessages();
     await saveMessages([...allMsgs, msg]);
+    const notifications = await getNotifications();
+    await saveNotifications([...notifications, {
+      id: `notif_${Date.now()}`,
+      userId: otherUser.id,
+      type: 'message',
+      fromUserId: currentUser.id,
+      read: false,
+      timestamp: Date.now()
+    }]);
     
     setMessages(prev => [...prev, msg]);
     setNewMessage('');
@@ -93,6 +102,9 @@ export function Chat() {
               <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${isMe ? 'bg-pink-600 text-white rounded-br-sm' : 'bg-zinc-100 dark:bg-zinc-800 rounded-bl-sm'}`}>
                   <p>{m.content}</p>
+                  {m.sharedVideoId?.startsWith('yt_') && (
+                    <a href={`https://www.youtube.com/shorts/${m.sharedVideoId.slice(3)}`} target="_blank" rel="noreferrer" className="mt-2 block text-xs underline opacity-90">Watch shared Short</a>
+                  )}
                 </div>
               </div>
             );

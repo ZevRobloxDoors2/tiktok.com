@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, ensureVideoInDB } from '../lib/db';
+import { getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, ensureVideoInDB, getMessages, saveMessages, getNotifications, saveNotifications } from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
 import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, User as UserIcon } from 'lucide-react';
@@ -35,7 +35,11 @@ export function Home() {
       const allDbVideos = await getVideos();
       const allUsers = await getUsers();
       const localViewed = (() => {
-        try { return JSON.parse(localStorage.getItem('viewedVideos') || '[]') as string[]; }
+        try {
+          const shared = JSON.parse(localStorage.getItem('viewedVideos') || '[]') as string[];
+          const userViewed = currentUser ? JSON.parse(localStorage.getItem(`viewedVideos_${currentUser.id}`) || '[]') as string[] : [];
+          return Array.from(new Set([...shared, ...userViewed]));
+        }
         catch { return []; }
       })();
       const unseenUgvs = allDbVideos.filter(video => {
@@ -329,6 +333,9 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   const [reportReason, setReportReason] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [youtubeError, setYoutubeError] = useState<number | null>(null);
+  const [showShare, setShowShare] = useState(false);
+  const [shareUsers, setShareUsers] = useState<User[]>([]);
+  const [sharedTo, setSharedTo] = useState<string | null>(null);
   const shouldPlayYoutube = useRef(false);
 
   useEffect(() => {
@@ -352,6 +359,10 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
             try { localViewed = JSON.parse(localStorage.getItem('viewedVideos') || '[]'); } catch (e) {}
             
             if (currentUser) {
+              const userViewedKey = `viewedVideos_${currentUser.id}`;
+              let userViewed: string[] = [];
+              try { userViewed = JSON.parse(localStorage.getItem(userViewedKey) || '[]') as string[]; } catch {}
+              if (!userViewed.includes(video.id)) localStorage.setItem(userViewedKey, JSON.stringify([...userViewed, video.id]));
               if (!video.viewedBy?.includes(currentUser.id)) {
                 ensureVideoInDB(video).then(() => {
                   incrementVideoView(video.id, currentUser.id);
@@ -398,6 +409,8 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
 
   const togglePlay = () => {
     if (video.isYouTube && ytPlayerRef.current) {
+      if (typeof ytPlayerRef.current.unMute === 'function') ytPlayerRef.current.unMute();
+      if (typeof ytPlayerRef.current.setVolume === 'function') ytPlayerRef.current.setVolume(100);
       if (isPlaying && typeof ytPlayerRef.current.pauseVideo === 'function') {
         try { ytPlayerRef.current.pauseVideo(); } catch (err) {}
       } else if (!isPlaying && typeof ytPlayerRef.current.playVideo === 'function') {
@@ -471,18 +484,34 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/#/video/${video.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Watch this on CentralTok',
-          url: url
-        });
-      } catch (err) {}
-    } else {
-      navigator.clipboard.writeText(url);
-      alert('Link copied to clipboard!');
-    }
+    if (!currentUser) return;
+    const users = await getUsers();
+    setShareUsers(users.filter(user => user.id !== currentUser.id));
+    setShowShare(true);
+  };
+
+  const sendVideo = async (recipient: User) => {
+    if (!currentUser) return;
+    const messages = await getMessages();
+    await saveMessages([...messages, {
+      id: `msg_${Date.now()}`,
+      fromUserId: currentUser.id,
+      toUserId: recipient.id,
+      content: `Shared a video with you: ${video.description}`,
+      sharedVideoId: video.id,
+      timestamp: Date.now()
+    }]);
+    const notifications = await getNotifications();
+    await saveNotifications([...notifications, {
+      id: `notif_${Date.now()}`,
+      userId: recipient.id,
+      type: 'message',
+      fromUserId: currentUser.id,
+      read: false,
+      timestamp: Date.now()
+    }]);
+    setSharedTo(recipient.id);
+    setTimeout(() => { setShowShare(false); setSharedTo(null); }, 1200);
   };
 
   const submitReport = async () => {
@@ -526,7 +555,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
       autoplay: 0,
       enablejsapi: 1,
       origin: window.location.origin,
-      mute: 1,
+      mute: 0,
       controls: 0,
       rel: 0,
       showinfo: 0,
@@ -727,6 +756,26 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showShare && (
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 pointer-events-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold mb-4">Send video</h3>
+            {sharedTo ? <p className="text-green-500 text-center py-6">Video sent!</p> : (
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {shareUsers.map(user => (
+                  <button key={user.id} onClick={() => sendVideo(user)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-left">
+                    <img src={user.avatarUrl} alt="" className="w-10 h-10 rounded-full" />
+                    <span className="font-semibold">{user.username}</span>
+                  </button>
+                ))}
+                {shareUsers.length === 0 && <p className="text-zinc-500 text-center py-6">No other users yet.</p>}
+              </div>
+            )}
+            <button onClick={() => setShowShare(false)} className="w-full mt-4 py-2 rounded-xl bg-zinc-200 dark:bg-zinc-800">Close</button>
           </div>
         </div>
       )}

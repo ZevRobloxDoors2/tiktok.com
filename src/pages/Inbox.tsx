@@ -10,9 +10,11 @@ export function Inbox() {
   const [notifications, setNotifications] = useState<(Notification & { fromUser: User })[]>([]);
   const [conversations, setConversations] = useState<{ user: User, lastMessage: Message }[]>([]);
   const [activeTab, setActiveTab] = useState<'activity' | 'messages'>('activity');
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
+    setShowNotificationPrompt(localStorage.getItem('notificationPromptDismissed') !== 'true');
     
     const loadInbox = async () => {
       const allUsers = await getUsers();
@@ -50,6 +52,12 @@ export function Inbox() {
     return () => clearInterval(interval);
   }, [currentUser]);
 
+  const chooseNotifications = async (enabled: boolean) => {
+    localStorage.setItem('notificationPromptDismissed', 'true');
+    setShowNotificationPrompt(false);
+    if (enabled && 'Notification' in window) await window.Notification.requestPermission();
+  };
+
   if (!currentUser) return <div className="p-8 text-center">Please log in to view your inbox.</div>;
 
   return (
@@ -57,6 +65,16 @@ export function Inbox() {
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md z-10">
         <h1 className="text-xl font-bold">Inbox</h1>
       </div>
+      {showNotificationPrompt && (
+        <div className="m-4 p-4 rounded-xl border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/30 animate-in slide-in-from-top-4">
+          <p className="font-semibold">Do you want real time notifications?</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">This will allow you to get notifications from others when you're not in the website.</p>
+          <div className="flex gap-2 mt-3">
+            <button onClick={() => chooseNotifications(true)} className="px-4 py-2 rounded-lg bg-pink-600 text-white font-semibold">Yes</button>
+            <button onClick={() => chooseNotifications(false)} className="px-4 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-800 font-semibold">No</button>
+          </div>
+        </div>
+      )}
       
       <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
         <button 

@@ -81,6 +81,7 @@ export type Message = {
   toUserId: string;
   content: string;
   timestamp: number;
+  sharedVideoId?: string;
 };
 
 export type Notification = {
