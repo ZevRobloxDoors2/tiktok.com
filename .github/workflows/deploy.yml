@@ -59,9 +59,10 @@ jobs:
 #          YOUTUBE_API_KEY_19: ${{ secrets.YOUTUBE_API_KEY_19 }}
 #          YOUTUBE_API_KEY_20: ${{ secrets.YOUTUBE_API_KEY_20 }}
         run: |
-          test -n "$YOUTUBE_API_KEY_1" || test -n "$YOUTUBE_API_KEY_2" || test -n "$YOUTUBE_API_KEY_3" || test -n "$YOUTUBE_API_KEY_4" || test -n "$YOUTUBE_API_KEY_5" || test -n "$YOUTUBE_API_KEY_6" || test -n "$YOUTUBE_API_KEY_7" || test -n "$YOUTUBE_API_KEY_8" || test -n "$YOUTUBE_API_KEY_9" || test -n "$YOUTUBE_API_KEY_10" || test -n "$YOUTUBE_API_KEY_11" || test -n "$YOUTUBE_API_KEY_12" || test -n "$YOUTUBE_API_KEY_13" || test -n "$YOUTUBE_API_KEY_14" || test -n "$YOUTUBE_API_KEY_15" || test -n "$YOUTUBE_API_KEY_16" || test -n "$YOUTUBE_API_KEY_17" || test -n "$YOUTUBE_API_KEY_18" || test -n "$YOUTUBE_API_KEY_19" || test -n "$YOUTUBE_API_KEY_20"
+          test -n "$YOUTUBE_API_KEY_1" || test -n "$YOUTUBE_API_KEY_2" || test -n "$YOUTUBE_API_KEY_3" || test -n "$YOUTUBE_API_KEY_4" || test -n "$YOUTUBE_API_KEY_5" || test -n "$YOUTUBE_API_KEY_6" || test -n "$YOUTUBE_API_KEY_7" || test -n "$YOUTUBE_API_KEY_8" || test -n "$YOUTUBE_API_KEY_9" || test -n "$YOUTUBE_API_KEY_10"
           node scripts/fetch-youtube-feed.mjs
           npx vite build
+          # || test -n "$YOUTUBE_API_KEY_11" || test -n "$YOUTUBE_API_KEY_12" || test -n "$YOUTUBE_API_KEY_13" || test -n "$YOUTUBE_API_KEY_14" || test -n "$YOUTUBE_API_KEY_15" || test -n "$YOUTUBE_API_KEY_16" || test -n "$YOUTUBE_API_KEY_17" || test -n "$YOUTUBE_API_KEY_18" || test -n "$YOUTUBE_API_KEY_19" || test -n "$YOUTUBE_API_KEY_20"
       - name: Verify Pages artifact
         run: test -s dist/index.html && test -d dist/assets
       - name: Setup Pages
