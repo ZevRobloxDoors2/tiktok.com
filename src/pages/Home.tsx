@@ -47,39 +47,38 @@ export function Home() {
 
       if (!nextVideo) {
         try {
-          const interacted = allDbVideos.filter(video => currentUser && (
-            video.likes?.includes(currentUser.id) ||
-            currentUser.favorites?.includes(video.id) ||
-            video.comments?.some(comment => comment.userId === currentUser.id)
-          ));
-          const tags = interacted.flatMap(video => video.tags || []);
-          const preferredQuery = tags.length ? `${tags[Math.floor(Math.random() * tags.length)]} shorts` : 'shorts';
-          const queries = Array.from(new Set([preferredQuery, 'youtube shorts', 'shorts']));
-          for (const query of queries) {
-            const youtubeParams = `pageToken=${encodeURIComponent(isRefresh ? '' : nextYtPageToken)}&q=${encodeURIComponent(query)}`;
-            const youtubeUrl = import.meta.env.VITE_YOUTUBE_API_KEY
-              ? `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&videoDuration=short&videoEmbeddable=true&safeSearch=moderate&key=${import.meta.env.VITE_YOUTUBE_API_KEY}&${youtubeParams}`
-              : `/api/youtube-shorts?${youtubeParams}`;
-            const response = await fetch(youtubeUrl);
-            if (!response.ok) continue;
-            const data = await response.json();
-            nextYtPageToken = data.nextPageToken || '';
-            const valid = normalizeYoutubeShorts(data.items || [], seenFeedIds.current)[0];
-            if (valid) {
-              nextVideo = {
-                id: `yt_${valid.id.videoId}`,
-                userId: 'youtube_user', videoUrl: '', description: valid.snippet.title,
-                tags: ['#shorts', '#youtube'], likes: [], comments: [], timestamp: Date.now(),
-                views: 0, filter: '', isYouTube: true, youtubeId: valid.id.videoId,
-                user: {
-                  id: 'youtube_user', email: `${valid.snippet.channelId}@youtube.local`, username: valid.snippet.channelTitle,
-                  handle: valid.snippet.channelTitle.replace(/\s+/g, '').toLowerCase(),
-                  avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${valid.snippet.channelId}`,
-                  bio: 'YouTube Creator', following: [], followers: [], isPrivate: false
-                }
-              };
-              break;
+          let feedItems: Array<{videoId?: string; title?: string; channelTitle?: string; channelId?: string}> = [];
+          const staticResponse = await fetch('./youtube-feed.json', {cache: 'no-store'});
+          if (staticResponse.ok) {
+            const data = await staticResponse.json();
+            feedItems = data.videos || [];
+          } else {
+            const localResponse = await fetch('/api/youtube-shorts?q=shorts');
+            if (localResponse.ok) {
+              const data = await localResponse.json();
+              feedItems = normalizeYoutubeShorts(data.items || [], seenFeedIds.current).map((item: any) => ({
+                videoId: item.id.videoId,
+                title: item.snippet.title,
+                channelTitle: item.snippet.channelTitle,
+                channelId: item.snippet.channelId
+              }));
             }
+          }
+          const valid = feedItems.find((item: {videoId?: string}) => item.videoId && !seenFeedIds.current.has(`yt_${item.videoId}`));
+          if (valid) {
+            nextYtPageToken = '';
+            nextVideo = {
+              id: `yt_${valid.videoId}`,
+              userId: 'youtube_user', videoUrl: '', description: valid.title,
+              tags: ['#shorts', '#youtube'], likes: [], comments: [], timestamp: Date.now(),
+              views: 0, filter: '', isYouTube: true, youtubeId: valid.videoId,
+              user: {
+                id: 'youtube_user', email: `${valid.channelId}@youtube.local`, username: valid.channelTitle,
+                handle: valid.channelTitle.replace(/\s+/g, '').toLowerCase(),
+                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${valid.channelId}`,
+                bio: 'YouTube Creator', following: [], followers: [], isPrivate: false
+              }
+            };
           }
         } catch (error) {
           console.warn('YouTube Shorts request failed', error);
