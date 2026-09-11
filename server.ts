@@ -14,9 +14,9 @@ async function startServer() {
 
   app.get("/api/youtube-shorts", async (req, res) => {
     try {
-      const apiKey = process.env['YOUTUBE_API_KEY'];
-      if (!apiKey) {
-        return res.status(500).json({ error: "YOUTUBE_API_KEY environment variable is required" });
+      const apiKeys = Array.from({length: 5}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean) as string[];
+      if (apiKeys.length === 0) {
+        return res.status(500).json({ error: "YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_5 are required" });
       }
 
       // We'll search for #shorts to get a list of YouTube Shorts.
@@ -24,28 +24,13 @@ async function startServer() {
       // We pass a pageToken if provided to allow paginating through results.
       const pageToken = req.query.pageToken as string || '';
       const searchQuery = req.query.q as string || '#shorts';
-      const queryParams = new URLSearchParams({
-        part: 'snippet',
-        maxResults: '1',
-        q: searchQuery,
-        type: 'video',
-        videoDuration: 'short',
-        key: apiKey
-      });
-
-      if (pageToken) {
-        queryParams.append('pageToken', pageToken);
+      for (const apiKey of apiKeys) {
+        const queryParams = new URLSearchParams({part: 'snippet', maxResults: '1', q: searchQuery, type: 'video', videoDuration: 'short', key: apiKey});
+        if (pageToken) queryParams.append('pageToken', pageToken);
+        const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${queryParams.toString()}`);
+        if (response.ok) return res.json(await response.json());
       }
-
-      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${queryParams.toString()}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        return res.status(response.status).json({ error: "YouTube API Error", details: errorData });
-      }
-
-      const data = await response.json();
-      res.json(data);
+      res.status(503).json({error: 'The Servers are Overloaded, This will be fixed shortly'});
     } catch (error) {
       console.error('YouTube API Error:', error);
       res.status(500).json({ error: "Internal Server Error" });

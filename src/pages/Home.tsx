@@ -17,6 +17,7 @@ export function Home() {
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [youtubeOverloaded, setYoutubeOverloaded] = useState(false);
   const [ytPageToken, setYtPageToken] = useState('');
   const seenFeedIds = useRef<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +53,7 @@ export function Home() {
           if (staticResponse.ok) {
             const data = await staticResponse.json();
             feedItems = data.videos || [];
+            setYoutubeOverloaded(Boolean(data.overloaded));
           } else {
             const localResponse = await fetch('/api/youtube-shorts?q=shorts');
             if (localResponse.ok) {
@@ -266,8 +268,8 @@ export function Home() {
             <Loader2 size={32} className="animate-spin text-zinc-500" />
           </div>
         ) : (
-          <div className="h-20 snap-start flex items-center justify-center bg-black shrink-0 text-zinc-500 text-sm pb-8">
-            You've caught up for now!
+          <div className="h-20 snap-start flex items-center justify-center bg-black shrink-0 text-zinc-500 text-sm pb-8 text-center px-4">
+            {youtubeOverloaded ? 'The Servers are Overloaded, This will be fixed shortly' : "You've caught up for now!"}
           </div>
         )}
       </motion.div>

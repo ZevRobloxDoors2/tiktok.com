@@ -38,9 +38,13 @@ jobs:
             youtube-feed-
       - name: Build
         env:
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_API_KEY_1: ${{ secrets.YOUTUBE_API_KEY_1 }}
+          YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
+          YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
+          YOUTUBE_API_KEY_4: ${{ secrets.YOUTUBE_API_KEY_4 }}
+          YOUTUBE_API_KEY_5: ${{ secrets.YOUTUBE_API_KEY_5 }}
         run: |
-          test -n "$YOUTUBE_API_KEY"
+          test -n "$YOUTUBE_API_KEY_1" || test -n "$YOUTUBE_API_KEY_2" || test -n "$YOUTUBE_API_KEY_3" || test -n "$YOUTUBE_API_KEY_4" || test -n "$YOUTUBE_API_KEY_5"
           node scripts/fetch-youtube-feed.mjs
           npx vite build
       - name: Verify Pages artifact
