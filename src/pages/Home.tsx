@@ -20,12 +20,16 @@ export function Home() {
   const [youtubeOverloaded, setYoutubeOverloaded] = useState(false);
   const [ytPageToken, setYtPageToken] = useState('');
   const seenFeedIds = useRef<Set<string>>(new Set());
+  const advanceRequested = useRef(false);
+  const lastScrollTop = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const fetchBatch = async (isRefresh = false) => {
     if (loadingBatch) return;
+    if (!isRefresh && !advanceRequested.current) return;
     setLoadingBatch(true);
+    advanceRequested.current = false;
     
     try {
       const allDbVideos = await getVideos();
@@ -143,10 +147,22 @@ export function Home() {
 
   const handleTouchEnd = () => setPulling(false);
 
+  const handleFeedScroll = () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const movedDown = container.scrollTop > lastScrollTop.current + 8;
+    lastScrollTop.current = container.scrollTop;
+    if (!movedDown || !hasMore) return;
+    advanceRequested.current = true;
+    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 160) {
+      fetchBatch();
+    }
+  };
+
   // Infinite Scroll Observer
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && !loadingBatch && hasMore) {
+      if (entries[0].isIntersecting && advanceRequested.current && !loadingBatch && hasMore) {
         fetchBatch();
       }
     });
@@ -184,9 +200,11 @@ export function Home() {
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         scrollUp();
-      } else if (e.key === 'ArrowDown') {
+      } else if (e.key === 'ArrowDown' || e.key === 'PageDown') {
         e.preventDefault();
+        advanceRequested.current = true;
         scrollDown();
+        fetchBatch();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -248,6 +266,7 @@ export function Home() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onScroll={handleFeedScroll}
         className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative bg-black"
       >
         {refreshing && (
@@ -316,11 +335,13 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   const [reportReason, setReportReason] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [youtubeError, setYoutubeError] = useState<number | null>(null);
+  const shouldPlayYoutube = useRef(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
+          shouldPlayYoutube.current = true;
           if (video.isYouTube && ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === 'function') {
             try {
               ytPlayerRef.current.playVideo();
@@ -354,6 +375,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
             }
           }
         } else {
+          shouldPlayYoutube.current = false;
           if (video.isYouTube && ytPlayerRef.current && typeof ytPlayerRef.current.pauseVideo === 'function') {
             ytPlayerRef.current.pauseVideo();
           } else if (videoRef.current && typeof videoRef.current.pause === 'function') {
@@ -371,7 +393,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
 
   const handleYtReady = (e: YouTubeEvent) => {
     ytPlayerRef.current = e.target;
-    if (isPlaying && typeof e.target.playVideo === 'function') {
+    if (shouldPlayYoutube.current && typeof e.target.playVideo === 'function') {
       try { e.target.playVideo(); } catch (err) {}
     }
   };
