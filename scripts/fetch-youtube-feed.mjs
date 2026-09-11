@@ -3,7 +3,7 @@ import {mkdir, writeFile} from 'node:fs/promises';
 const apiKeys = Array.from({length: 20}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean);
 if (apiKeys.length === 0) throw new Error('At least one YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_20 secret is required');
 
-const queries = ['shorts'];
+const queries = ['funny shorts', 'gaming shorts', 'school shorts', 'viral shorts', 'music shorts', 'sports shorts'];
 const videos = [];
 const seen = new Set();
 let successfulKey = false;
@@ -16,7 +16,12 @@ for (const query of queries) {
     });
     const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
     if (!response.ok) {
-      console.warn(`YouTube key ${index + 1} returned ${response.status}; trying the next key.`);
+      try {
+        const errorData = await response.json();
+        console.warn(`YouTube key ${index + 1} failed (${response.status}): ${errorData.error?.message || 'Unknown error'}`);
+      } catch {
+        console.warn(`YouTube key ${index + 1} failed (${response.status})`);
+      }
       continue;
     }
 

@@ -63,7 +63,7 @@ export function Home() {
             feedItems = data.videos || [];
             setYoutubeOverloaded(Boolean(data.overloaded));
           } else {
-            const localResponse = await fetch('/api/youtube-shorts?q=shorts');
+            const localResponse = await fetch('/api/youtube-shorts');
             if (localResponse.ok) {
               const data = await localResponse.json();
               feedItems = normalizeYoutubeShorts(data.items || [], seenFeedIds.current).map((item: any) => ({
@@ -74,7 +74,8 @@ export function Home() {
               }));
             }
           }
-          const valid = feedItems.find((item: {videoId?: string}) => item.videoId && !seenFeedIds.current.has(`yt_${item.videoId}`));
+          const validItems = feedItems.filter((item: {videoId?: string}) => item.videoId && !seenFeedIds.current.has(`yt_${item.videoId}`));
+          const valid = validItems.length > 0 ? validItems[Math.floor(Math.random() * validItems.length)] : undefined;
           if (valid) {
             nextYtPageToken = '';
             nextVideo = {

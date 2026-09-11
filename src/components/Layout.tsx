@@ -69,7 +69,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { icon: Home, label: 'For You', path: '/' },
-    { icon: Compass, label: 'Explore', path: '/explore' },
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
     { icon: User, label: 'Profile', path: currentUser ? `/profile/${currentUser.handle}` : '#' },
   ];
