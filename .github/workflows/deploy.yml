@@ -48,16 +48,16 @@ jobs:
           YOUTUBE_API_KEY_8: ${{ secrets.YOUTUBE_API_KEY_8 }}
           YOUTUBE_API_KEY_9: ${{ secrets.YOUTUBE_API_KEY_9 }}
           YOUTUBE_API_KEY_10: ${{ secrets.YOUTUBE_API_KEY_10 }}
-          YOUTUBE_API_KEY_11: ${{ secrets.YOUTUBE_API_KEY_11 }}
-          YOUTUBE_API_KEY_12: ${{ secrets.YOUTUBE_API_KEY_12 }}
-          YOUTUBE_API_KEY_13: ${{ secrets.YOUTUBE_API_KEY_13 }}
-          YOUTUBE_API_KEY_14: ${{ secrets.YOUTUBE_API_KEY_14 }}
-          YOUTUBE_API_KEY_15: ${{ secrets.YOUTUBE_API_KEY_15 }}
-          YOUTUBE_API_KEY_16: ${{ secrets.YOUTUBE_API_KEY_16 }}
-          YOUTUBE_API_KEY_17: ${{ secrets.YOUTUBE_API_KEY_17 }}
-          YOUTUBE_API_KEY_18: ${{ secrets.YOUTUBE_API_KEY_18 }}
-          YOUTUBE_API_KEY_19: ${{ secrets.YOUTUBE_API_KEY_19 }}
-          YOUTUBE_API_KEY_20: ${{ secrets.YOUTUBE_API_KEY_20 }}
+#          YOUTUBE_API_KEY_11: ${{ secrets.YOUTUBE_API_KEY_11 }}
+#          YOUTUBE_API_KEY_12: ${{ secrets.YOUTUBE_API_KEY_12 }}
+#          YOUTUBE_API_KEY_13: ${{ secrets.YOUTUBE_API_KEY_13 }}
+#          YOUTUBE_API_KEY_14: ${{ secrets.YOUTUBE_API_KEY_14 }}
+#          YOUTUBE_API_KEY_15: ${{ secrets.YOUTUBE_API_KEY_15 }}
+#          YOUTUBE_API_KEY_16: ${{ secrets.YOUTUBE_API_KEY_16 }}
+#          YOUTUBE_API_KEY_17: ${{ secrets.YOUTUBE_API_KEY_17 }}
+#          YOUTUBE_API_KEY_18: ${{ secrets.YOUTUBE_API_KEY_18 }}
+#          YOUTUBE_API_KEY_19: ${{ secrets.YOUTUBE_API_KEY_19 }}
+#          YOUTUBE_API_KEY_20: ${{ secrets.YOUTUBE_API_KEY_20 }}
         run: |
           test -n "$YOUTUBE_API_KEY_1" || test -n "$YOUTUBE_API_KEY_2" || test -n "$YOUTUBE_API_KEY_3" || test -n "$YOUTUBE_API_KEY_4" || test -n "$YOUTUBE_API_KEY_5" || test -n "$YOUTUBE_API_KEY_6" || test -n "$YOUTUBE_API_KEY_7" || test -n "$YOUTUBE_API_KEY_8" || test -n "$YOUTUBE_API_KEY_9" || test -n "$YOUTUBE_API_KEY_10" || test -n "$YOUTUBE_API_KEY_11" || test -n "$YOUTUBE_API_KEY_12" || test -n "$YOUTUBE_API_KEY_13" || test -n "$YOUTUBE_API_KEY_14" || test -n "$YOUTUBE_API_KEY_15" || test -n "$YOUTUBE_API_KEY_16" || test -n "$YOUTUBE_API_KEY_17" || test -n "$YOUTUBE_API_KEY_18" || test -n "$YOUTUBE_API_KEY_19" || test -n "$YOUTUBE_API_KEY_20"
           node scripts/fetch-youtube-feed.mjs
