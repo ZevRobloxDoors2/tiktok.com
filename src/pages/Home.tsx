@@ -136,8 +136,9 @@ export function Home() {
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!pulling) return;
     const y = e.touches[0].clientY;
+    if (startY - y > 12) advanceRequested.current = true;
+    if (!pulling) return;
     if (y - startY > 120) {
       setRefreshing(true);
       fetchBatch(true);
@@ -152,23 +153,15 @@ export function Home() {
     if (!container) return;
     const movedDown = container.scrollTop > lastScrollTop.current + 8;
     lastScrollTop.current = container.scrollTop;
-    if (!movedDown || !hasMore) return;
-    advanceRequested.current = true;
+    if (!movedDown || !hasMore || !advanceRequested.current) return;
     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 160) {
       fetchBatch();
     }
   };
 
-  // Infinite Scroll Observer
-  useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && advanceRequested.current && !loadingBatch && hasMore) {
-        fetchBatch();
-      }
-    });
-    if (endRef.current) observer.observe(endRef.current);
-    return () => observer.disconnect();
-  }, [loadingBatch, hasMore]);
+  const handleFeedWheel = (event: React.WheelEvent) => {
+    if (event.deltaY > 0) advanceRequested.current = true;
+  };
 
   // Intro Animation progression
   useEffect(() => {
@@ -267,6 +260,7 @@ export function Home() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onScroll={handleFeedScroll}
+        onWheel={handleFeedWheel}
         className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative bg-black"
       >
         {refreshing && (
@@ -537,8 +531,6 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
       rel: 0,
       showinfo: 0,
       modestbranding: 1,
-      loop: 1,
-      playlist: video.youtubeId,
       fs: 0,
       disablekb: 1,
       playsinline: 1
