@@ -1,9 +1,9 @@
-import {mkdir, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
 
 const apiKey = process.env.YOUTUBE_API_KEY;
 if (!apiKey) throw new Error('YOUTUBE_API_KEY is required');
 
-const queries = ['shorts', 'youtube shorts', 'viral shorts'];
+const queries = ['shorts'];
 const videos = [];
 const seen = new Set();
 let pageToken = '';
@@ -11,7 +11,7 @@ let pageToken = '';
 for (const query of queries) {
   const params = new URLSearchParams({
     part: 'snippet',
-    maxResults: '50',
+    maxResults: '25',
     q: query,
     type: 'video',
     videoDuration: 'short',
@@ -23,7 +23,14 @@ for (const query of queries) {
 
   const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
   if (!response.ok) {
-    throw new Error(`YouTube API returned ${response.status}: ${await response.text()}`);
+    try {
+      const existing = await readFile('public/youtube-feed.json', 'utf8');
+      JSON.parse(existing);
+      console.warn(`YouTube API returned ${response.status}; preserving the existing Shorts feed.`);
+      process.exit(0);
+    } catch {
+      throw new Error(`YouTube API returned ${response.status}: ${await response.text()}`);
+    }
   }
 
   const data = await response.json();

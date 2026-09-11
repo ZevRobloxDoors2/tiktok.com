@@ -29,6 +29,13 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm ci
+      - name: Restore cached Shorts feed
+        uses: actions/cache@v4
+        with:
+          path: public/youtube-feed.json
+          key: youtube-feed-${{ github.run_id }}
+          restore-keys: |
+            youtube-feed-
       - name: Build
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
