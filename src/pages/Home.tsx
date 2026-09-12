@@ -440,6 +440,14 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
 
   const handleYtStateChange = (e: YouTubeEvent) => {
     setIsPlaying(e.data === 1);
+    if (e.data === 0 && ytPlayerRef.current) {
+      if (typeof ytPlayerRef.current.seekTo === 'function') {
+        try { ytPlayerRef.current.seekTo(0); } catch (err) {}
+      }
+      if (typeof ytPlayerRef.current.playVideo === 'function') {
+        try { ytPlayerRef.current.playVideo(); } catch (err) {}
+      }
+    }
   };
 
   const togglePlay = () => {
