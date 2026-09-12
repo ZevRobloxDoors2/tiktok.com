@@ -3,12 +3,12 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, browserPopupRedirectResol
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  projectId: "gen-lang-client-0065963524",
-  appId: "1:319434380307:web:ceaa71804a8e278d2d1be6",
-  apiKey: "AIzaSyB86-2ycTmseKsWyrdW2VFKSaielTmYZdM",
-  authDomain: "gen-lang-client-0065963524.firebaseapp.com",
-  storageBucket: "gen-lang-client-0065963524.firebasestorage.app",
-  messagingSenderId: "319434380307",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0065963524",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:319434380307:web:ceaa71804a8e278d2d1be6",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "", 
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0065963524.firebaseapp.com",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0065963524.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "319434380307",
   measurementId: ""
 };
 
