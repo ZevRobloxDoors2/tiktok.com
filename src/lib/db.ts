@@ -1,102 +1,115 @@
-import { get, set } from 'idb-keyval';
+import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment } from '../types';
 
-export const initDb = async () => {
-  const users = await get<User[]>('users');
-  if (!users) {
-    await set('users', []);
-    await set('videos', []);
-    await set('messages', []);
-    await set('notifications', []);
-    await set('reports', []);
-    await set('appeals', []);
-    await set('auditLogs', []);
+export const initDb = async () => {};
+
+const fetchCollection = async <T>(collName: string): Promise<T[]> => {
+  try {
+    const snapshot = await getDocs(collection(db, collName));
+    return snapshot.docs.map(doc => doc.data() as T);
+  } catch (err) {
+    console.error("Error fetching collection:", collName, err);
+    return [];
   }
 };
 
-export const getUsers = async () => (await get<User[]>('users')) || [];
-export const saveUsers = async (users: User[]) => await set('users', users);
+const saveCollection = async <T extends { id: string }>(collName: string, items: T[]) => {
+  if (items.length === 0) return;
+  try {
+    const batch = writeBatch(db);
+    // writeBatch limits to 500, but we'll assume less for this quick migration
+    items.forEach(item => {
+      const docRef = doc(db, collName, item.id);
+      const dataToSave = { ...item };
+      if ((dataToSave as any).videoData) {
+        delete (dataToSave as any).videoData;
+      }
+      batch.set(docRef, dataToSave);
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error("Error saving collection:", collName, err);
+  }
+};
 
-export const getVideos = async () => (await get<Video[]>('videos')) || [];
-export const saveVideos = async (videos: Video[]) => await set('videos', videos);
+export const getUsers = () => fetchCollection<User>('users');
+export const saveUsers = (users: User[]) => saveCollection('users', users);
+
+export const getVideos = () => fetchCollection<Video>('videos');
+export const saveVideos = (videos: Video[]) => saveCollection('videos', videos);
 
 export const ensureVideoInDB = async (video: Video) => {
-  const videos = await getVideos();
-  if (!videos.find(v => v.id === video.id)) {
-    const dbVideo: Video = {
-      id: video.id,
-      userId: video.userId,
-      videoUrl: video.videoUrl,
-      videoData: video.videoData,
-      description: video.description,
-      tags: video.tags,
-      likes: video.likes || [],
-      comments: video.comments || [],
-      timestamp: video.timestamp,
-      views: video.views || 0,
-      filter: video.filter,
-      viewedBy: video.viewedBy || [],
-      isYouTube: video.isYouTube,
-      youtubeId: video.youtubeId
-    };
-    videos.push(dbVideo);
-    await saveVideos(videos);
+  try {
+    const docRef = doc(db, 'videos', video.id);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      const dbVideo = { ...video };
+      delete dbVideo.videoData;
+      await setDoc(docRef, dbVideo);
+    }
+  } catch (err) {
+    console.error(err);
   }
 };
 
 export const incrementVideoView = async (id: string, viewerId: string | null) => {
-  const videos = await getVideos();
-  const idx = videos.findIndex(v => v.id === id);
-  if (idx !== -1) {
-    const viewedBy = videos[idx].viewedBy || [];
-    if (viewerId && viewedBy.includes(viewerId)) return; // Already viewed
-    
-    videos[idx].views = (videos[idx].views || 0) + 1;
-    if (viewerId) {
-      videos[idx].viewedBy = [...viewedBy, viewerId];
+  try {
+    const docRef = doc(db, 'videos', id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const video = snap.data() as Video;
+      const viewedBy = video.viewedBy || [];
+      if (viewerId && viewedBy.includes(viewerId)) return;
+      
+      await updateDoc(docRef, {
+        views: (video.views || 0) + 1,
+        viewedBy: viewerId ? arrayUnion(viewerId) : viewedBy
+      });
     }
-    await saveVideos(videos);
+  } catch(err) {
+    console.error(err);
   }
 };
 
 export const addCommentToVideo = async (videoId: string, comment: Comment) => {
-  const videos = await getVideos();
-  const idx = videos.findIndex(v => v.id === videoId);
-  if (idx !== -1) {
-    videos[idx].comments = [...(videos[idx].comments || []), comment];
-    await saveVideos(videos);
+  try {
+    const docRef = doc(db, 'videos', videoId);
+    await updateDoc(docRef, {
+      comments: arrayUnion(comment)
+    });
+  } catch(err) {
+    console.error(err);
   }
 };
 
 export const updateVideo = async (videoId: string, update: (video: Video) => Video) => {
-  const videos = await getVideos();
-  const index = videos.findIndex(video => video.id === videoId);
-  if (index === -1) return;
-  videos[index] = update(videos[index]);
-  await saveVideos(videos);
+  try {
+    const docRef = doc(db, 'videos', videoId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const newVideo = update(snap.data() as Video);
+      delete newVideo.videoData;
+      await setDoc(docRef, newVideo);
+    }
+  } catch(err) {
+    console.error(err);
+  }
 };
 
-export const getMessages = async () => (await get<Message[]>('messages')) || [];
-export const saveMessages = async (messages: Message[]) => await set('messages', messages);
+export const getMessages = () => fetchCollection<Message>('messages');
+export const saveMessages = (messages: Message[]) => saveCollection('messages', messages);
 
-export const getNotifications = async () => (await get<Notification[]>('notifications')) || [];
-export const saveNotifications = async (notifications: Notification[]) => await set('notifications', notifications);
+export const getNotifications = () => fetchCollection<Notification>('notifications');
+export const saveNotifications = (notifications: Notification[]) => saveCollection('notifications', notifications);
 
-export const getReports = async () => (await get<Report[]>('reports')) || [];
-export const saveReports = async (reports: Report[]) => await set('reports', reports);
+export const getReports = () => fetchCollection<Report>('reports');
+export const saveReports = (reports: Report[]) => saveCollection('reports', reports);
 
-export const getAppeals = async () => (await get<Appeal[]>('appeals')) || [];
-export const saveAppeals = async (appeals: Appeal[]) => await set('appeals', appeals);
+export const getAppeals = () => fetchCollection<Appeal>('appeals');
+export const saveAppeals = (appeals: Appeal[]) => saveCollection('appeals', appeals);
 
-export const getAuditLogs = async () => (await get<AuditLog[]>('auditLogs')) || [];
-export const saveAuditLogs = async (logs: AuditLog[]) => await set('auditLogs', logs);
+export const getAuditLogs = () => fetchCollection<AuditLog>('auditLogs');
+export const saveAuditLogs = (logs: AuditLog[]) => saveCollection('auditLogs', logs);
 
-export const clearDb = async () => {
-  await set('users', []);
-  await set('videos', []);
-  await set('messages', []);
-  await set('notifications', []);
-  await set('reports', []);
-  await set('appeals', []);
-  await set('auditLogs', []);
-};
+export const clearDb = async () => {};

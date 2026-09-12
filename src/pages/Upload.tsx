@@ -104,35 +104,52 @@ export function Upload() {
   };
 
   const handleUpload = async () => {
-    if (!file || !previewUrl) return;
+    if (!file) return;
     setIsUploading(true);
     
-    // Simulate upload delay
-    await new Promise(r => setTimeout(r, 1500));
-    
-    // Parse tags explicitly from the tags input + description
-    const descTags = description.split(' ').filter(t => t.startsWith('#'));
-    const explicitTags = hashtags.split(' ').map(t => t.trim().startsWith('#') ? t.trim() : `#${t.trim()}`).filter(t => t !== '#');
-    const parsedTags = Array.from(new Set([...descTags, ...explicitTags]));
-    
-    const newVideo: Video = {
-      id: Math.random().toString(36).substr(2, 9),
-      userId: currentUser.id,
-      videoUrl: previewUrl, 
-      videoData: file, // Store actual file so we can recreate object URL on load
-      description,
-      tags: parsedTags,
-      likes: [],
-      comments: [],
-      timestamp: Date.now(),
-      views: 0,
-      filter: filter
-    };
-    
-    const videos = await getVideos();
-    await saveVideos([...videos, newVideo]);
-    
-    navigate('/');
+    try {
+      const videoId = Math.random().toString(36).substr(2, 9);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'centraltok');
+      
+      const res = await fetch('https://api.cloudinary.com/v1_1/nmdsqhos/video/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!res.ok) throw new Error('Cloudinary upload failed');
+      const data = await res.json();
+      const downloadUrl = data.secure_url;
+      
+      const descTags = description.split(' ').filter(t => t.startsWith('#'));
+      const explicitTags = hashtags.split(' ').map(t => t.trim().startsWith('#') ? t.trim() : `#${t.trim()}`).filter(t => t !== '#');
+      const parsedTags = Array.from(new Set([...descTags, ...explicitTags]));
+      
+      const newVideo: Video = {
+        id: videoId,
+        userId: currentUser.id,
+        videoUrl: downloadUrl, 
+        description,
+        tags: parsedTags,
+        likes: [],
+        comments: [],
+        timestamp: Date.now(),
+        views: 0,
+        filter: filter
+      };
+      
+      const videos = await getVideos();
+      await saveVideos([...videos, newVideo]);
+      
+      navigate('/');
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
