@@ -2,14 +2,61 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import "dotenv/config";
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+  
+  app.use(express.json());
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { history, prompt, videoContext } = req.body;
+      
+      const systemInstruction = `You are a helpful AI assistant integrated into a short-form video platform (like TikTok).
+      
+The user is currently watching a video with the following context:
+Title/Description: ${videoContext.description}
+Tags: ${videoContext.tags ? videoContext.tags.join(', ') : 'None'}
+Is YouTube video: ${videoContext.isYouTube ? 'Yes' : 'No'}
+YouTube Video ID: ${videoContext.youtubeId || 'N/A'}
+
+Answer any questions the user has about this video, or off-topic things if they prefer. Keep your responses concise, conversational, and tailored to the fast-paced nature of short videos.`;
+
+      // Construct contents array from history and new prompt
+      // We will map history to contents for generateContent.
+      // History format from client: [{ role: 'user' | 'model', parts: [{ text: string }] }]
+      const contents = history || [];
+      contents.push({ role: 'user', parts: [{ text: prompt }] });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents,
+        config: {
+          systemInstruction,
+        },
+      });
+
+      res.json({ response: response.text });
+    } catch (error: any) {
+      console.error('Chat API Error:', error);
+      res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
   });
 
   app.get("/api/youtube-shorts", async (req, res) => {

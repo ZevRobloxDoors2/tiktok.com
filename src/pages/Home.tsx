@@ -2,10 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, ensureVideoInDB, getMessages, saveMessages, getNotifications, saveNotifications, subscribeToVideo } from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
-import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, User as UserIcon } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, User as UserIcon, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
+import { AIChatPanel } from '../components/AIChatPanel';
 import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
 import { getReports, saveReports } from '../lib/db';
 import { normalizeYoutubeShorts } from '../lib/feed';
@@ -355,6 +356,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   const [hasViewed, setHasViewed] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
@@ -694,6 +696,13 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
           <span className="text-xs font-semibold">{video.comments?.length || 0}</span>
         </button>
         
+        <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={() => setShowAIChat(true)}>
+          <div className="p-2 rounded-full bg-white/20 backdrop-blur-md text-pink-300 shadow-[0_0_15px_rgba(236,72,153,0.3)] border border-white/10 hover:bg-white/30 transition-all">
+            <Sparkles size={28} className="fill-current" />
+          </div>
+          <span className="text-xs font-semibold text-pink-200">Ask AI</span>
+        </button>
+        
         <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={handleFavorite}>
           <div className={`p-2 rounded-full ${isFavorited ? 'text-yellow-400' : 'bg-zinc-800/40 text-white'}`}>
             <Bookmark size={28} className={isFavorited ? 'fill-current' : ''} />
@@ -761,6 +770,13 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
         <>
           <div className="absolute inset-0 bg-black/50 z-30 pointer-events-auto" onClick={() => setShowComments(false)} />
           <Comments video={video} onClose={() => setShowComments(false)} />
+        </>
+      )}
+
+      {showAIChat && (
+        <>
+          <div className="absolute inset-0 bg-black/50 z-30 pointer-events-auto" onClick={() => setShowAIChat(false)} />
+          <AIChatPanel video={video} onClose={() => setShowAIChat(false)} />
         </>
       )}
 
