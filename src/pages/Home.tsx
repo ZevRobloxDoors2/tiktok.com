@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, ensureVideoInDB, getMessages, saveMessages, getNotifications, saveNotifications } from '../lib/db';
+import { getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, ensureVideoInDB, getMessages, saveMessages, getNotifications, saveNotifications, subscribeToVideo } from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
 import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, User as UserIcon } from 'lucide-react';
@@ -338,6 +338,15 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   const [shareUsers, setShareUsers] = useState<User[]>([]);
   const [sharedTo, setSharedTo] = useState<string | null>(null);
   const shouldPlayYoutube = useRef(false);
+
+  useEffect(() => {
+    // Only subscribe to real-time updates for non-YouTube shorts (or YouTube shorts that are already in the DB, though their ID works too once added).
+    const unsub = subscribeToVideo(video.id, (updatedVideo) => {
+      setViews(updatedVideo.views || 0);
+      setLikesCount(updatedVideo.likes?.length || 0);
+    });
+    return () => unsub();
+  }, [video.id]);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {

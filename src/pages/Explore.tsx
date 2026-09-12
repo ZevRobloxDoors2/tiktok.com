@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Play, User as UserIcon } from 'lucide-react';
+import { Search, X, Play, User as UserIcon, Compass } from 'lucide-react';
 import { getVideos, getUsers } from '../lib/db';
 import { Video, User } from '../types';
 import { VideoItem } from './Home';

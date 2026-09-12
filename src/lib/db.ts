@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment } from '../types';
 
@@ -39,6 +39,16 @@ export const saveUsers = (users: User[]) => saveCollection('users', users);
 
 export const getVideos = () => fetchCollection<Video>('videos');
 export const saveVideos = (videos: Video[]) => saveCollection('videos', videos);
+
+export const subscribeToVideo = (videoId: string, callback: (video: Video) => void) => {
+  return onSnapshot(doc(db, 'videos', videoId), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data() as Video);
+    }
+  }, (err) => {
+    // Ignore errors for non-existent documents or missing permissions gracefully
+  });
+};
 
 export const ensureVideoInDB = async (video: Video) => {
   try {
