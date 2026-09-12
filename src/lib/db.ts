@@ -21,10 +21,11 @@ const saveCollection = async <T extends { id: string }>(collName: string, items:
     // writeBatch limits to 500, but we'll assume less for this quick migration
     items.forEach(item => {
       const docRef = doc(db, collName, item.id);
-      const dataToSave = { ...item };
+      let dataToSave = { ...item };
       if ((dataToSave as any).videoData) {
         delete (dataToSave as any).videoData;
       }
+      dataToSave = JSON.parse(JSON.stringify(dataToSave));
       batch.set(docRef, dataToSave);
     });
     await batch.commit();
@@ -44,8 +45,9 @@ export const ensureVideoInDB = async (video: Video) => {
     const docRef = doc(db, 'videos', video.id);
     const snap = await getDoc(docRef);
     if (!snap.exists()) {
-      const dbVideo = { ...video };
+      let dbVideo = { ...video };
       delete dbVideo.videoData;
+      dbVideo = JSON.parse(JSON.stringify(dbVideo));
       await setDoc(docRef, dbVideo);
     }
   } catch (err) {
@@ -88,8 +90,9 @@ export const updateVideo = async (videoId: string, update: (video: Video) => Vid
     const docRef = doc(db, 'videos', videoId);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      const newVideo = update(snap.data() as Video);
+      let newVideo = update(snap.data() as Video);
       delete newVideo.videoData;
+      newVideo = JSON.parse(JSON.stringify(newVideo));
       await setDoc(docRef, newVideo);
     }
   } catch(err) {
