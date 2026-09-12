@@ -14,6 +14,7 @@ import { Profile } from './pages/Profile';
 import { Inbox } from './pages/Inbox';
 import { Chat } from './pages/Chat';
 import { BanScreen } from './components/BanScreen';
+import { InterestsModal } from './components/InterestsModal';
 import { Admin } from './pages/Admin';
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -26,7 +27,12 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     }
   }
   
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <InterestsModal />
+    </>
+  );
 }
 
 export default function App() {

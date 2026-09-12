@@ -25,8 +25,20 @@ export function Explore() {
       const allUsers = await getUsers();
       const allVideos = await getVideos();
 
-      // Find users
-      const matchedUsers = allUsers.filter(u => u.username.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q));
+      // Find users and sort by closeness
+      const matchedUsers = allUsers.filter(u => u.username.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)).sort((a, b) => {
+        const aExact = a.username.toLowerCase() === q || a.handle.toLowerCase() === q;
+        const bExact = b.username.toLowerCase() === q || b.handle.toLowerCase() === q;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        
+        const aStarts = a.username.toLowerCase().startsWith(q) || a.handle.toLowerCase().startsWith(q);
+        const bStarts = b.username.toLowerCase().startsWith(q) || b.handle.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        
+        return 0;
+      });
       
       // Find local videos
       const matchedLocalVideos = allVideos.filter(v => {

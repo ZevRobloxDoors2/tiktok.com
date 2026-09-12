@@ -11,6 +11,7 @@ export type User = {
   isPrivate: boolean;
   deviceId?: string;
   role?: 'user' | 'staff' | 'owner';
+  interests?: string[];
   banStatus?: {
     type: 'temp' | 'perm' | 'hwid';
     until?: number; // timestamp for temp ban
@@ -80,6 +81,8 @@ export type Message = {
   fromUserId: string;
   toUserId: string;
   content: string;
+  imageUrl?: string;
+  videoUrl?: string;
   timestamp: number;
   sharedVideoId?: string;
 };

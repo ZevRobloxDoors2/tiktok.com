@@ -11,7 +11,7 @@ import { getReports, saveReports } from '../lib/db';
 import { normalizeYoutubeShorts } from '../lib/feed';
 
 export function Home() {
-  const { currentUser, introPhase, setIntroPhase, isLoading } = useAppStore();
+  const { currentUser, introPhase, setIntroPhase, isLoading, setShowAuthModal } = useAppStore();
   const [videos, setVideos] = useState<(Video & { user: User; feedId: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingBatch, setLoadingBatch] = useState(false);
@@ -22,11 +22,19 @@ export function Home() {
   const seenFeedIds = useRef<Set<string>>(new Set());
   const advanceRequested = useRef(false);
   const lastScrollTop = useRef(0);
+  const guestSwipeCount = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const fetchBatch = async (isRefresh = false) => {
     if (loadingBatch) return;
+    
+    // Check for guest swipe limit
+    if (!currentUser && guestSwipeCount.current >= 10) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!isRefresh && !advanceRequested.current) return;
     setLoadingBatch(true);
     advanceRequested.current = false;
@@ -63,7 +71,13 @@ export function Home() {
             feedItems = data.videos || [];
             setYoutubeOverloaded(Boolean(data.overloaded));
           } else {
-            const localResponse = await fetch('/api/youtube-shorts');
+            let fetchUrl = '/api/youtube-shorts';
+            if (currentUser?.interests && currentUser.interests.length > 0) {
+              const randomInterest = currentUser.interests[Math.floor(Math.random() * currentUser.interests.length)];
+              fetchUrl += `?q=${encodeURIComponent(randomInterest + ' shorts')}`;
+            }
+            
+            const localResponse = await fetch(fetchUrl);
             if (localResponse.ok) {
               const data = await localResponse.json();
               feedItems = normalizeYoutubeShorts(data.items || [], seenFeedIds.current).map((item: any) => ({
@@ -158,7 +172,18 @@ export function Home() {
     if (!container) return;
     const movedDown = container.scrollTop > lastScrollTop.current + 8;
     lastScrollTop.current = container.scrollTop;
+    
+    if (movedDown && !currentUser) {
+      guestSwipeCount.current += 1;
+    }
+    
     if (!movedDown || !hasMore || !advanceRequested.current) return;
+    
+    if (!currentUser && guestSwipeCount.current >= 10) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 160) {
       fetchBatch();
     }

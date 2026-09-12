@@ -6,8 +6,7 @@ import { AuthModal } from './AuthModal';
 import { saveReports, getMessages, getUsers } from '../lib/db';
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { currentUser, theme, toggleTheme, introPhase } = useAppStore();
-  const [showAuth, setShowAuth] = useState(false);
+  const { currentUser, theme, toggleTheme, introPhase, showAuthModal, setShowAuthModal } = useAppStore();
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
   const [supportType, setSupportType] = useState<'support' | 'bug' | null>(null);
@@ -81,7 +80,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const handleNavClick = (e: React.MouseEvent, path: string) => {
     if (path === '#' || (['/messages', '/upload'].includes(path) && !currentUser)) {
       e.preventDefault();
-      setShowAuth(true);
+      setShowAuthModal(true);
     }
   };
 
@@ -138,7 +137,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           
           {!currentUser ? (
             <button 
-              onClick={() => setShowAuth(true)}
+              onClick={() => setShowAuthModal(true)}
               className="flex items-center justify-center gap-2 w-full border-2 border-pink-600 text-pink-600 dark:text-pink-500 py-2 rounded-xl font-semibold hover:bg-pink-50 dark:hover:bg-pink-950/20 transition-colors"
             >
               <LogIn size={20} />
@@ -191,7 +190,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
       
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       
       {/* Support Modal */}
       {showSupportModal && (
