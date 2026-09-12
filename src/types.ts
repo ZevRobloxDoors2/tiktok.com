@@ -83,6 +83,7 @@ export type Message = {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  audioUrl?: string;
   timestamp: number;
   sharedVideoId?: string;
 };

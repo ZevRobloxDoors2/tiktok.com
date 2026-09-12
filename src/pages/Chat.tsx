@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { getMessages, getUsers, saveMessages, getNotifications, saveNotifications } from '../lib/db';
 import { Message, User } from '../types';
-import { ArrowLeft, Send, Phone, Paperclip, Camera, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Paperclip, Camera, X, Loader2, Mic, Square } from 'lucide-react';
 
 export function Chat() {
   const { handle } = useParams<{ handle: string }>();
@@ -15,11 +15,14 @@ export function Chat() {
   const [isUploading, setIsUploading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraFilter, setCameraFilter] = useState('');
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -50,8 +53,8 @@ export function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = async (content: string, imageUrl?: string, videoUrl?: string) => {
-    if ((!content.trim() && !imageUrl && !videoUrl) || !currentUser || !otherUser) return;
+  const sendMessage = async (content: string, imageUrl?: string, videoUrl?: string, audioUrl?: string) => {
+    if ((!content.trim() && !imageUrl && !videoUrl && !audioUrl) || !currentUser || !otherUser) return;
     
     const msg: Message = {
       id: Math.random().toString(36).substr(2, 9),
@@ -60,6 +63,7 @@ export function Chat() {
       content: content.trim(),
       imageUrl,
       videoUrl,
+      audioUrl,
       timestamp: Date.now()
     };
     
@@ -112,6 +116,48 @@ export function Chat() {
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Audio Recording Functions
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setIsUploading(true);
+        try {
+          const { url } = await uploadToCloudinary(audioBlob);
+          await sendMessage('', undefined, undefined, url);
+        } catch(err) {
+          alert("Failed to send audio message.");
+        } finally {
+          setIsUploading(false);
+        }
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecordingAudio(true);
+    } catch (err) {
+      alert("Microphone access denied.");
+    }
+  };
+
+  const stopAudioRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      setIsRecordingAudio(false);
     }
   };
 
@@ -207,6 +253,9 @@ export function Chat() {
                   {m.videoUrl && (
                     <video src={m.videoUrl} controls className="w-full rounded-lg mb-2 max-h-64 object-cover" />
                   )}
+                  {m.audioUrl && (
+                    <audio src={m.audioUrl} controls className="w-full mb-2" />
+                  )}
                   {m.content && <p>{m.content}</p>}
                   {m.sharedVideoId?.startsWith('yt_') && (
                     <a href={`https://www.youtube.com/shorts/${m.sharedVideoId.slice(3)}`} target="_blank" rel="noreferrer" className="mt-2 block text-xs underline opacity-90">Watch shared Short</a>
@@ -244,13 +293,33 @@ export function Chat() {
             <Camera size={20} />
           </button>
           
+          {isRecordingAudio ? (
+            <button
+              type="button"
+              onClick={stopAudioRecording}
+              className="p-2.5 text-red-500 hover:text-red-600 transition-colors mr-1 animate-pulse"
+              title="Stop recording"
+            >
+              <Square size={20} className="fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startAudioRecording}
+              className="p-2.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors mr-1"
+              title="Record audio"
+            >
+              <Mic size={20} />
+            </button>
+          )}
+
           <input 
             type="text" 
             value={newMessage}
             onChange={e => setNewMessage(e.target.value)}
-            placeholder="Send a message..."
+            placeholder={isRecordingAudio ? "Recording audio..." : "Send a message..."}
             className="flex-1 bg-zinc-100 dark:bg-zinc-900 rounded-full px-4 py-2.5 outline-none focus:ring-2 focus:ring-pink-500 transition-all"
-            disabled={isUploading}
+            disabled={isUploading || isRecordingAudio}
           />
           <button 
             type="submit"
