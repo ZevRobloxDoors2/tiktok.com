@@ -42,6 +42,18 @@ export function Chat() {
         .sort((a, b) => a.timestamp - b.timestamp);
         
       setMessages(chatMsgs);
+
+      // Mark incoming messages as read
+      const unreadIncoming = chatMsgs.filter(m => m.toUserId === currentUser.id && !m.read);
+      if (unreadIncoming.length > 0) {
+        const updatedAllMsgs = allMsgs.map(m => {
+          if (m.toUserId === currentUser.id && m.fromUserId === user.id && !m.read) {
+            return { ...m, read: true };
+          }
+          return m;
+        });
+        await saveMessages(updatedAllMsgs);
+      }
     };
     
     loadChat();

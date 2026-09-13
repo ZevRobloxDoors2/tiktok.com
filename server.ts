@@ -25,24 +25,38 @@ async function startServer() {
   
   app.use(express.json());
 
+  // Universal CORS and OPTIONS handler so preflight or relative requests never fail with 405
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
-  app.post("/api/chat", async (req, res) => {
+  const handleChat = async (req: express.Request, res: express.Response) => {
+    if (req.method === 'GET') {
+      return res.json({ status: "ok", message: "AI chat service is active" });
+    }
+
     try {
-      const { history = [], prompt, videoContext = {} } = req.body;
+      const { history = [], prompt, videoContext = {} } = req.body || {};
       
-      const systemInstruction = `You are a helpful and witty AI assistant inside a short-form video platform (like TikTok).
-You just watched the full video/clip with the user.
+      const systemInstruction = `You are a helpful, friendly, and witty AI video assistant inside CentralTok.
+You watched the video clip with the user.
 Video Context:
 - Description / Title: "${videoContext.description || 'Unknown'}"
 - Creator: @${videoContext.creator || 'unknown'}
 - Tags: ${videoContext.tags && videoContext.tags.length ? videoContext.tags.join(', ') : 'None'}
-- Is YouTube Short: ${videoContext.isYouTube ? `Yes (ID: ${videoContext.youtubeId})` : 'No'}
 
-Answer any questions the user has about this video, explain what is happening in the clip, or chat about off-topic subjects if requested. Keep your responses concise, conversational, and fun.`;
+Answer any questions the user has about this video, explain what is happening in the clip, or chat about off-topic subjects if requested. Keep your responses concise, conversational, and engaging.`;
 
       const ai = getAiClient();
       if (ai) {
@@ -54,24 +68,39 @@ Answer any questions the user has about this video, explain what is happening in
             }))
           : [];
         
-        formattedHistory.push({ role: 'user', parts: [{ text: prompt }] });
+        formattedHistory.push({ role: 'user', parts: [{ text: prompt || 'Can you tell me about this video?' }] });
 
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: formattedHistory,
-          config: {
-            systemInstruction,
-          },
-        });
+        const candidateModels = ["gemini-3.6-flash", "gemini-2.0-flash", "gemini-flash-latest"];
+        let generatedText = '';
+        
+        for (const modelName of candidateModels) {
+          try {
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: formattedHistory,
+              config: {
+                systemInstruction,
+              },
+            });
+            if (response && response.text) {
+              generatedText = response.text;
+              break;
+            }
+          } catch (modelErr) {
+            console.warn(`Model ${modelName} attempt failed:`, modelErr);
+          }
+        }
 
-        return res.json({ response: response.text });
+        if (generatedText) {
+          return res.json({ response: generatedText });
+        }
       }
 
       // Intelligent local fallback if GEMINI_API_KEY is not yet supplied in settings
       const p = (prompt || '').toLowerCase();
       let fallbackText = `I watched "${videoContext.description || 'this video'}" by @${videoContext.creator || 'the creator'}. `;
       if (p.includes('summary') || p.includes('what happened') || p.includes('explain') || p.includes('initial impression')) {
-        fallbackText += `In this ${videoContext.isYouTube ? 'YouTube Short' : 'video'}, the creator focuses on entertaining short-form content featuring ${videoContext.tags?.join(', ') || 'trending themes'}. It's captivating and quick-paced!`;
+        fallbackText += `In this video, the creator focuses on entertaining short-form content featuring ${videoContext.tags?.join(', ') || 'trending themes'}. It's captivating, fun, and quick-paced!`;
       } else if (p.includes('who') || p.includes('creator')) {
         fallbackText += `This video was published by @${videoContext.creator || 'the user'}.`;
       } else if (p.includes('joke')) {
@@ -86,7 +115,11 @@ Answer any questions the user has about this video, explain what is happening in
         response: `I've watched the video! It's titled "${req.body?.videoContext?.description || 'Video'}" by @${req.body?.videoContext?.creator || 'creator'}. Ask me any detail about what happened or any general question!`
       });
     }
-  });
+  };
+
+  // Support both /api/chat and wildcard paths to avoid 405
+  app.all("/api/chat", handleChat);
+  app.all("*/api/chat", handleChat);
 
   app.get("/api/youtube-shorts", async (req, res) => {
     try {
@@ -95,16 +128,21 @@ Answer any questions the user has about this video, explain what is happening in
         return res.status(500).json({ error: "YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_20 are required" });
       }
 
-      // We'll search for #shorts to get a list of YouTube Shorts.
-      // Note: Getting random shorts repeatedly can be tricky with a single search.
-      // We pass a pageToken if provided to allow paginating through results.
       const pageToken = req.query.pageToken as string || '';
-      const fallbackQueries = ['funny shorts', 'gaming shorts', 'school shorts', 'viral shorts', 'music shorts', 'sports shorts'];
+      const fallbackQueries = ['funny clips', 'gaming clips', 'school life', 'viral videos', 'trending dance', 'sports highlights'];
       const randomFallback = fallbackQueries[Math.floor(Math.random() * fallbackQueries.length)];
       const searchQuery = req.query.q as string || randomFallback;
+      const maxResults = req.query.maxResults as string || '8';
       
       for (const apiKey of apiKeys) {
-        const queryParams = new URLSearchParams({part: 'snippet', maxResults: '1', q: searchQuery, type: 'video', videoDuration: 'short', key: apiKey});
+        const queryParams = new URLSearchParams({
+          part: 'snippet', 
+          maxResults, 
+          q: searchQuery, 
+          type: 'video', 
+          videoDuration: 'short', 
+          key: apiKey
+        });
         if (pageToken) queryParams.append('pageToken', pageToken);
         const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${queryParams.toString()}`);
         if (response.ok) return res.json(await response.json());

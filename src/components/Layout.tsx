@@ -18,6 +18,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     authorName: string;
     authorAvatar?: string;
   } | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const knownMessageIds = useRef<Set<string>>(new Set());
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,6 +30,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const checkMessages = async () => {
       const [messages, users] = await Promise.all([getMessages(), getUsers()]);
       const incoming = messages.filter(message => message.toUserId === currentUser.id);
+      const unread = incoming.filter(m => !m.read).length;
+      setUnreadCount(unread);
+
       if (!initialized) {
         incoming.forEach(message => knownMessageIds.current.add(message.id));
         initialized = true;
@@ -180,15 +184,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 space-y-2">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const isMessages = item.label === 'Messages';
             return (
               <Link 
                 key={item.label} 
                 to={item.path}
                 onClick={(e) => handleNavClick(e, item.path)}
-                className={`flex items-center gap-4 px-3 py-3 rounded-xl transition-colors ${isActive ? 'text-pink-600 font-bold bg-pink-50 dark:bg-pink-950/30' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 font-medium'}`}
+                className={`flex items-center gap-4 px-3 py-3 rounded-xl transition-colors relative ${isActive ? 'text-pink-600 font-bold bg-pink-50 dark:bg-pink-950/30' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 font-medium'}`}
               >
                 <item.icon className={isActive ? 'fill-current' : ''} size={26} strokeWidth={isActive ? 2.5 : 2} />
                 <span className="text-lg">{item.label}</span>
+                {isMessages && unreadCount > 0 && (
+                  <span className="ml-auto bg-pink-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
+                    {unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -305,6 +315,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <PlusSquare size={18} className="text-zinc-900 dark:text-white" />
               </div>
             </div>
+          </Link>
+          <Link to="/messages" onClick={(e) => handleNavClick(e, '/messages')} className="p-2 relative">
+            <MessageSquare size={22} className={location.pathname === '/messages' ? 'text-pink-600 fill-current' : 'text-zinc-500'} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-pink-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                {unreadCount}
+              </span>
+            )}
           </Link>
           <Link to="/forum" onClick={(e) => handleNavClick(e, '/forum')} className="p-2">
             <HelpCircle size={22} className={location.pathname === '/forum' ? 'text-pink-600 fill-current' : 'text-zinc-500'} />

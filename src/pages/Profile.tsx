@@ -341,6 +341,7 @@ export function Profile() {
 function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }) {
   const { setCurrentUser } = useAppStore();
   const [username, setUsername] = useState(user.username);
+  const [handleInput, setHandleInput] = useState(user.handle);
   const [bio, setBio] = useState(user.bio);
   const [isPrivate, setIsPrivate] = useState(user.isPrivate);
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl);
@@ -350,7 +351,15 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
     const users = await getUsers();
     const idx = users.findIndex(u => u.id === user.id);
     if (idx !== -1) {
-      users[idx] = { ...users[idx], username, bio, isPrivate, avatarUrl };
+      const cleanHandle = handleInput.trim().replace(/^@/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+      users[idx] = { 
+        ...users[idx], 
+        username, 
+        handle: cleanHandle || user.handle, 
+        bio, 
+        isPrivate, 
+        avatarUrl 
+      };
       await saveUsers(users);
       setCurrentUser(users[idx]);
     }
@@ -401,6 +410,17 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
               onChange={e => setUsername(e.target.value)} 
               className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-1">Handle (@)</label>
+            <input 
+              value={handleInput} 
+              onChange={e => setHandleInput(e.target.value)} 
+              placeholder="username handle"
+              className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all"
+            />
+            <p className="text-xs text-zinc-500 mt-1">Unique handle for your profile URL.</p>
           </div>
           
           <div>

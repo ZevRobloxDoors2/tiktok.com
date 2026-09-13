@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest } from '../types';
 
 export const initDb = async () => {};
 
@@ -113,6 +113,25 @@ export const updateVideo = async (videoId: string, update: (video: Video) => Vid
 export const getMessages = () => fetchCollection<Message>('messages');
 export const saveMessages = (messages: Message[]) => saveCollection('messages', messages);
 
+export const markMessagesFromUserAsRead = async (currentUserId: string, otherUserId: string) => {
+  try {
+    const allMsgs = await getMessages();
+    let hasChanged = false;
+    const updated = allMsgs.map(m => {
+      if (m.fromUserId === otherUserId && m.toUserId === currentUserId && !m.read) {
+        hasChanged = true;
+        return { ...m, read: true };
+      }
+      return m;
+    });
+    if (hasChanged) {
+      await saveMessages(updated);
+    }
+  } catch (err) {
+    console.error("Error marking messages as read:", err);
+  }
+};
+
 export const getNotifications = () => fetchCollection<Notification>('notifications');
 export const saveNotifications = (notifications: Notification[]) => saveCollection('notifications', notifications);
 
@@ -186,6 +205,17 @@ export const deleteFAQPostFromDB = async (postId: string) => {
     await deleteDoc(docRef);
   } catch (err) {
     console.error("Error deleting FAQ post:", err);
+  }
+};
+
+export const getForumEditRequests = () => fetchCollection<ForumEditRequest>('forum_edit_requests');
+export const saveForumEditRequests = (reqs: ForumEditRequest[]) => saveCollection('forum_edit_requests', reqs);
+export const deleteForumEditRequestFromDB = async (reqId: string) => {
+  try {
+    const docRef = doc(db, 'forum_edit_requests', reqId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Error deleting forum edit request:", err);
   }
 };
 

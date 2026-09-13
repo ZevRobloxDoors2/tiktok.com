@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
-import { getFAQCategories, saveFAQCategories, getFAQPosts, saveFAQPosts, deleteFAQPostFromDB, getUsers, announceForumPostToEveryone } from '../lib/db';
-import { FAQCategory, FAQPost, FAQReply, User } from '../types';
+import { 
+  getFAQCategories, saveFAQCategories, getFAQPosts, saveFAQPosts, deleteFAQPostFromDB, 
+  getUsers, announceForumPostToEveryone, getForumEditRequests, saveForumEditRequests, 
+  deleteForumEditRequestFromDB 
+} from '../lib/db';
+import { FAQCategory, FAQPost, FAQReply, User, ForumEditRequest } from '../types';
 import { 
   Hash, Search, Pin, MessageSquare, Plus, Settings, Trash2, Send, 
-  Smile, ShieldCheck, Crown, ChevronLeft, Tag, X, Check, Filter
+  Smile, ShieldCheck, Crown, ChevronLeft, Tag, X, Check, Filter,
+  Lock, Video as VideoIcon, Paperclip, Eye, Edit3
 } from 'lucide-react';
+import { ForumRichText, ForumToolbar } from './ForumRichText';
 
 const DEFAULT_CATEGORIES: FAQCategory[] = [
   { id: 'announcements', name: 'Announcements', icon: '📢', color: '#5865F2', description: 'Official updates from the owner and staff team' },
@@ -26,16 +32,84 @@ export function DiscordForum() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPost, setSelectedPost] = useState<FAQPost | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [isReplyPreview, setIsReplyPreview] = useState(false);
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPost, setEditingPost] = useState<FAQPost | null>(null);
+  const [isStaffEditing, setIsStaffEditing] = useState(false);
+  const [editRequests, setEditRequests] = useState<ForumEditRequest[]>([]);
+  const [showRequestsPanel, setShowRequestsPanel] = useState(false);
   
-  // Create Post Form
+  // Create/Edit Post Form
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [newContent, setNewContent] = useState('');
   const [isPinned, setIsPinned] = useState(false);
+  const [allowReplies, setAllowReplies] = useState(true);
+  const [registeredOnly, setRegisteredOnly] = useState(false);
+  const [announceToEveryone, setAnnounceToEveryone] = useState(true);
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const postTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Formatting helper for textareas
+  const insertFormatting = (
+    ref: React.RefObject<HTMLTextAreaElement>,
+    currentText: string,
+    setText: (s: string) => void,
+    prefix: string,
+    suffix: string = '',
+    defaultText: string = 'text'
+  ) => {
+    const textarea = ref.current;
+    if (!textarea) {
+      setText(currentText + prefix + defaultText + suffix);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = currentText.substring(start, end);
+    const textToInsert = selected || defaultText;
+    const newText = currentText.substring(0, start) + prefix + textToInsert + suffix + currentText.substring(end);
+    
+    setText(newText);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(
+        start + prefix.length,
+        start + prefix.length + textToInsert.length
+      );
+    }, 40);
+  };
+
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isVid = file.type.startsWith('video');
+    const isImg = file.type.startsWith('image');
+    if (!isVid && !isImg) {
+      alert("Please upload an image or video file.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (ev.target?.result) {
+        setMediaUrl(ev.target.result as string);
+        setMediaType(isVid ? 'video' : 'image');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
   
   // Create Category Form
   const [catName, setCatName] = useState('');
@@ -62,7 +136,9 @@ export function DiscordForum() {
       setNewCategory(cats[0].id);
     }
 
-    let allPosts = await getFAQPosts();
+    let [allPosts, allRequests] = await Promise.all([getFAQPosts(), getForumEditRequests()]);
+    setEditRequests(allRequests);
+    
     if (allPosts.length === 0) {
       // Seed initial helpful FAQs
       const initialPosts: FAQPost[] = [
@@ -139,6 +215,11 @@ export function DiscordForum() {
     if (!isStaffOrOwner || !currentUser) return;
     if (!newTitle.trim() || !newContent.trim() || !newCategory) return;
 
+    let detectedMediaType = mediaType;
+    if (mediaUrl.trim() && !detectedMediaType) {
+      detectedMediaType = mediaUrl.match(/\.(mp4|webm|mov|m4v)($|\?)/i) ? 'video' : 'image';
+    }
+
     const newPost: FAQPost = {
       id: `faq_${Date.now()}`,
       authorId: currentUser.id,
@@ -148,19 +229,31 @@ export function DiscordForum() {
       pinned: isPinned,
       timestamp: Date.now(),
       replies: [],
-      reactions: {}
+      reactions: {},
+      allowReplies,
+      registeredOnly,
+      mediaUrl: mediaUrl.trim() || undefined,
+      mediaType: detectedMediaType || undefined
     };
 
     const updated = [newPost, ...posts];
     setPosts(updated);
     await saveFAQPosts(updated);
 
-    // Announce to all users in the system; offline users will receive it when they come online
-    await announceForumPostToEveryone(newPost, currentUser);
+    // Announce to all users only if the toggle is enabled
+    if (announceToEveryone) {
+      await announceForumPostToEveryone(newPost, currentUser);
+    }
 
     setNewTitle('');
     setNewContent('');
     setIsPinned(false);
+    setAllowReplies(true);
+    setRegisteredOnly(false);
+    setAnnounceToEveryone(true);
+    setMediaUrl('');
+    setMediaType(null);
+    setIsPreviewMode(false);
     setShowCreateModal(false);
   };
 
@@ -209,6 +302,131 @@ export function DiscordForum() {
     const updated = posts.filter(p => p.id !== postId);
     setPosts(updated);
     if (selectedPost?.id === postId) setSelectedPost(null);
+  };
+
+  const handleEditPost = (post: FAQPost) => {
+    setEditingPost(post);
+    setNewTitle(post.title);
+    setNewContent(post.content);
+    setNewCategory(post.categoryId);
+    setIsPinned(!!post.pinned);
+    setAllowReplies(post.allowReplies !== false);
+    setRegisteredOnly(!!post.registeredOnly);
+    setMediaUrl(post.mediaUrl || '');
+    setMediaType(post.mediaType || null);
+    
+    const isPostAuthor = currentUser?.id === post.authorId;
+    // Staff needs approval if they aren't the author and not the owner
+    setIsStaffEditing(isStaff && !isPostAuthor && !isOwner);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPost || !currentUser) return;
+
+    let detectedMediaType = mediaType;
+    if (mediaUrl.trim() && !detectedMediaType) {
+      detectedMediaType = mediaUrl.match(/\.(mp4|webm|mov|m4v)($|\?)/i) ? 'video' : 'image';
+    }
+
+    if (isStaffEditing) {
+      // Staff needs approval from owner
+      const editReq: ForumEditRequest = {
+        id: `edit_req_${Date.now()}`,
+        postId: editingPost.id,
+        staffId: currentUser.id,
+        proposedTitle: newTitle.trim(),
+        proposedContent: newContent.trim(),
+        proposedCategoryId: newCategory,
+        proposedMediaUrl: mediaUrl.trim() || undefined,
+        proposedMediaType: detectedMediaType || undefined,
+        proposedPinned: isPinned,
+        proposedAllowReplies: allowReplies,
+        proposedRegisteredOnly: registeredOnly,
+        status: 'pending',
+        timestamp: Date.now()
+      };
+      
+      const updatedReqs = [editReq, ...editRequests];
+      setEditRequests(updatedReqs);
+      await saveForumEditRequests(updatedReqs);
+      alert("Edit request submitted to owner for approval.");
+    } else {
+      // Owner or Author can edit directly
+      const updatedPosts = posts.map(p => {
+        if (p.id === editingPost.id) {
+          return {
+            ...p,
+            title: newTitle.trim(),
+            content: newContent.trim(),
+            categoryId: newCategory,
+            pinned: isPinned,
+            allowReplies,
+            registeredOnly,
+            mediaUrl: mediaUrl.trim() || undefined,
+            mediaType: detectedMediaType || undefined,
+            updatedAt: Date.now()
+          };
+        }
+        return p;
+      });
+      
+      setPosts(updatedPosts);
+      await saveFAQPosts(updatedPosts);
+      if (selectedPost?.id === editingPost.id) {
+        setSelectedPost(updatedPosts.find(p => p.id === editingPost.id) || null);
+      }
+    }
+
+    setShowEditModal(false);
+    setEditingPost(null);
+    setNewTitle('');
+    setNewContent('');
+    setMediaUrl('');
+    setMediaType(null);
+  };
+
+  const handleApproveEdit = async (req: ForumEditRequest) => {
+    if (!isOwner) return;
+
+    const updatedPosts = posts.map(p => {
+      if (p.id === req.postId) {
+        return {
+          ...p,
+          title: req.proposedTitle,
+          content: req.proposedContent,
+          categoryId: req.proposedCategoryId,
+          pinned: req.proposedPinned,
+          allowReplies: req.proposedAllowReplies,
+          registeredOnly: req.proposedRegisteredOnly,
+          mediaUrl: req.proposedMediaUrl,
+          mediaType: req.proposedMediaType,
+          updatedAt: Date.now()
+        };
+      }
+      return p;
+    });
+
+    setPosts(updatedPosts);
+    await saveFAQPosts(updatedPosts);
+
+    const updatedReqs = editRequests.filter(r => r.id !== req.id);
+    setEditRequests(updatedReqs);
+    await saveForumEditRequests(updatedReqs);
+    await deleteForumEditRequestFromDB(req.id);
+    
+    if (selectedPost?.id === req.postId) {
+      setSelectedPost(updatedPosts.find(p => p.id === req.postId) || null);
+    }
+  };
+
+  const handleRejectEdit = async (reqId: string) => {
+    if (!isOwner) return;
+    const updatedReqs = editRequests.filter(r => r.id !== reqId);
+    setEditRequests(updatedReqs);
+    await saveForumEditRequests(updatedReqs);
+    await deleteForumEditRequestFromDB(reqId);
   };
 
   // Handle adding reply
@@ -285,6 +503,14 @@ export function DiscordForum() {
 
         {/* Action Controls for Staff/Owner */}
         <div className="flex items-center gap-2 flex-wrap">
+          {isOwner && editRequests.length > 0 && (
+            <button
+              onClick={() => setShowRequestsPanel(true)}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-lg relative"
+            >
+              <ShieldCheck size={14} /> Requests ({editRequests.length})
+            </button>
+          )}
           {isStaffOrOwner && (
             <>
               <button
@@ -319,179 +545,274 @@ export function DiscordForum() {
               <ChevronLeft size={16} /> Back to all discussions
             </button>
 
-            {/* Thread Original Post */}
-            <div className="bg-[#2b2d31] border border-[#35373c] rounded-2xl p-6 shadow-md relative">
-              {/* Category tag & Pin badge */}
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                {selectedPost.pinned && (
-                  <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-950/40 border border-amber-600/40 px-2.5 py-0.5 rounded-full">
-                    <Pin size={12} /> Pinned
-                  </span>
-                )}
-                {(() => {
-                  const cat = getCategory(selectedPost.categoryId);
-                  return cat ? (
-                    <span 
-                      className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 border"
-                      style={{ backgroundColor: `${cat.color}20`, borderColor: `${cat.color}60`, color: cat.color }}
-                    >
-                      <span>{cat.icon || '🏷️'}</span> {cat.name}
-                    </span>
-                  ) : null;
-                })()}
-
-                {isStaffOrOwner && (
-                  <button
-                    onClick={() => handleDeletePost(selectedPost.id)}
-                    className="ml-auto text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-[#35373c] transition-colors"
-                    title="Delete Thread"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-
-              {/* Title */}
-              <h1 className="text-xl md:text-2xl font-extrabold text-white mb-4 leading-snug">
-                {selectedPost.title}
-              </h1>
-
-              {/* Author Row */}
-              <div className="flex items-center gap-3 pb-4 mb-4 border-b border-[#35373c]/70">
-                {(() => {
-                  const author = getAuthor(selectedPost.authorId);
-                  const isOwnerPost = author?.role === 'owner';
-                  const isStaffPost = author?.role === 'staff';
-                  return (
-                    <>
-                      {author?.avatarUrl ? (
-                        <img src={author.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover border border-zinc-700" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-[#5865F2] flex items-center justify-center font-bold text-white">
-                          {author?.username?.charAt(0) || 'S'}
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-white">{author?.username || 'Staff Team'}</span>
-                          {isOwnerPost ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700/50">
-                              <Crown size={11} /> Owner
-                            </span>
-                          ) : isStaffPost ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/50">
-                              <ShieldCheck size={11} /> Staff
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#35373c] text-zinc-400">
-                              Member
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-zinc-400">
-                          {new Date(selectedPost.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedPost.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-
-              {/* Body Content */}
-              <div className="text-zinc-200 text-sm md:text-base leading-relaxed whitespace-pre-wrap mb-6">
-                {selectedPost.content}
-              </div>
-
-              {/* Reactions Bar */}
-              <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#35373c]/50">
-                {['👍', '❤️', '💡', '🔥', '🎉'].map(emoji => {
-                  const count = selectedPost.reactions?.[emoji]?.length || 0;
-                  const active = currentUser && selectedPost.reactions?.[emoji]?.includes(currentUser.id);
-                  return (
-                    <button
-                      key={emoji}
-                      onClick={() => handleReact(selectedPost.id, emoji)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
-                        active 
-                          ? 'bg-[#5865F2]/20 border-[#5865F2] text-white' 
-                          : 'bg-[#232428] border-zinc-800 text-zinc-300 hover:bg-[#35373c]'
-                      }`}
-                    >
-                      <span>{emoji}</span>
-                      {count > 0 && <span className="font-bold">{count}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Replies Section */}
-            <div className="bg-[#2b2d31] border border-[#35373c] rounded-2xl p-6 space-y-4">
-              <h3 className="font-bold text-sm text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                <MessageSquare size={16} /> Discussion & Comments ({selectedPost.replies?.length || 0})
-              </h3>
-
-              {/* Replies List */}
-              <div className="space-y-3">
-                {selectedPost.replies?.map(reply => {
-                  const repAuthor = getAuthor(reply.authorId);
-                  const isRepOwner = repAuthor?.role === 'owner';
-                  const isRepStaff = repAuthor?.role === 'staff';
-                  return (
-                    <div key={reply.id} className="p-3.5 bg-[#232428] border border-[#35373c]/60 rounded-xl flex gap-3">
-                      {repAuthor?.avatarUrl ? (
-                        <img src={repAuthor.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5 border border-zinc-700" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-[#5865F2] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                          {repAuthor?.username?.charAt(0) || 'U'}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="font-bold text-xs text-white">@{repAuthor?.handle || 'user'}</span>
-                          {isRepOwner && (
-                            <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-red-900/60 text-red-300 border border-red-700/50">
-                              Owner
-                            </span>
-                          )}
-                          {isRepStaff && (
-                            <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-blue-900/60 text-blue-300 border border-blue-700/50">
-                              Staff
-                            </span>
-                          )}
-                          <span className="text-[11px] text-zinc-500">
-                            {new Date(reply.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">{reply.content}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {(!selectedPost.replies || selectedPost.replies.length === 0) && (
-                  <p className="text-xs text-zinc-500 py-3 italic">No comments yet. Have a question? Post a reply below.</p>
-                )}
-              </div>
-
-              {/* Reply Composer */}
-              <div className="pt-3 border-t border-[#35373c] flex gap-2">
-                <input
-                  type="text"
-                  value={replyText}
-                  onChange={e => setReplyText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddReply(); }}
-                  placeholder={`Message #${selectedPost.title.slice(0, 24)}...`}
-                  className="flex-1 bg-[#1e1f22] border border-[#35373c] rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#5865F2]"
-                />
+            {/* Check Registered Only View Constraint */}
+            {selectedPost.registeredOnly && !currentUser ? (
+              <div className="bg-[#2b2d31] border border-[#35373c] rounded-2xl p-8 text-center space-y-4 max-w-md mx-auto my-6 shadow-xl">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto text-2xl">
+                  <Lock size={28} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Registered Members Only</h3>
+                  <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                    This forum discussion has been restricted to registered members. Please log in or create an account to view and participate.
+                  </p>
+                </div>
                 <button
-                  onClick={handleAddReply}
-                  disabled={!replyText.trim()}
-                  className="px-4 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors flex items-center gap-1.5 shrink-0"
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-6 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold rounded-xl transition-colors shadow-md"
                 >
-                  <Send size={15} /> Send
+                  Log In or Register
                 </button>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Thread Original Post */}
+                <div className="bg-[#2b2d31] border border-[#35373c] rounded-2xl p-6 shadow-md relative">
+                  {/* Category tag, Pin badge, Members-only badge */}
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    {selectedPost.pinned && (
+                      <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-950/40 border border-amber-600/40 px-2.5 py-0.5 rounded-full">
+                        <Pin size={12} /> Pinned
+                      </span>
+                    )}
+                    {selectedPost.registeredOnly && (
+                      <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-purple-400 bg-purple-950/40 border border-purple-600/40 px-2.5 py-0.5 rounded-full">
+                        <Lock size={12} /> Registered Only
+                      </span>
+                    )}
+                    {selectedPost.allowReplies === false && (
+                      <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-800/80 border border-zinc-700 px-2.5 py-0.5 rounded-full">
+                        <Lock size={12} /> Comments Disabled
+                      </span>
+                    )}
+                    {(() => {
+                      const cat = getCategory(selectedPost.categoryId);
+                      return cat ? (
+                        <span 
+                          className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 border"
+                          style={{ backgroundColor: `${cat.color}20`, borderColor: `${cat.color}60`, color: cat.color }}
+                        >
+                          <span>{cat.icon || '🏷️'}</span> {cat.name}
+                        </span>
+                      ) : null;
+                    })()}
+
+                    {isStaffOrOwner && (
+                      <button
+                        onClick={() => handleDeletePost(selectedPost.id)}
+                        className="ml-auto text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-[#35373c] transition-colors"
+                        title="Delete Thread"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                    {(isOwner || isStaff || (currentUser && selectedPost.authorId === currentUser.id)) && (
+                      <button
+                        onClick={() => handleEditPost(selectedPost)}
+                        className={`text-zinc-500 hover:text-blue-400 p-1.5 rounded-lg hover:bg-[#35373c] transition-colors ${!isStaffOrOwner && currentUser?.id === selectedPost.authorId ? 'ml-auto' : ''}`}
+                        title="Edit Thread"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Title */}
+                  <h1 className="text-xl md:text-2xl font-extrabold text-white mb-4 leading-snug">
+                    {selectedPost.title}
+                  </h1>
+
+                  {/* Author Row */}
+                  <div className="flex items-center gap-3 pb-4 mb-4 border-b border-[#35373c]/70">
+                    {(() => {
+                      const author = getAuthor(selectedPost.authorId);
+                      const isOwnerPost = author?.role === 'owner';
+                      const isStaffPost = author?.role === 'staff';
+                      return (
+                        <>
+                          {author?.avatarUrl ? (
+                            <img src={author.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover border border-zinc-700" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-[#5865F2] flex items-center justify-center font-bold text-white">
+                              {author?.username?.charAt(0) || 'S'}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-white">{author?.username || 'Staff Team'}</span>
+                              {isOwnerPost ? (
+                                <span className="flex items-center gap-1 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700/50">
+                                  <Crown size={11} /> Owner
+                                </span>
+                              ) : isStaffPost ? (
+                                <span className="flex items-center gap-1 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/50">
+                                  <ShieldCheck size={11} /> Staff
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#35373c] text-zinc-400">
+                                  Member
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-400">
+                              {new Date(selectedPost.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedPost.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Attached Media (Image or Video) */}
+                  {selectedPost.mediaUrl && (
+                    <div className="mb-6 rounded-xl overflow-hidden bg-black/40 border border-[#35373c] flex items-center justify-center max-h-[460px]">
+                      {selectedPost.mediaType === 'video' || selectedPost.mediaUrl.match(/\.(mp4|webm|mov|m4v)($|\?)/i) ? (
+                        <video controls src={selectedPost.mediaUrl} className="w-full max-h-[460px] object-contain rounded-xl" />
+                      ) : (
+                        <img src={selectedPost.mediaUrl} alt="Post attachment" className="w-full max-h-[460px] object-contain rounded-xl" />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Rich Body Content (Bold, Italic, Strikethrough, Code, Lists, Preserved Newlines) */}
+                  <ForumRichText content={selectedPost.content} className="text-zinc-200 text-sm md:text-base leading-relaxed mb-6" />
+
+                  {/* Reactions Bar */}
+                  <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#35373c]/50">
+                    {['👍', '❤️', '💡', '🔥', '🎉'].map(emoji => {
+                      const count = selectedPost.reactions?.[emoji]?.length || 0;
+                      const active = currentUser && selectedPost.reactions?.[emoji]?.includes(currentUser.id);
+                      return (
+                        <button
+                          key={emoji}
+                          onClick={() => handleReact(selectedPost.id, emoji)}
+                          className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
+                            active 
+                              ? 'bg-[#5865F2]/20 border-[#5865F2] text-white' 
+                              : 'bg-[#232428] border-zinc-800 text-zinc-300 hover:bg-[#35373c]'
+                          }`}
+                        >
+                          <span>{emoji}</span>
+                          {count > 0 && <span className="font-bold">{count}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Replies Section */}
+                <div className="bg-[#2b2d31] border border-[#35373c] rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-sm text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                      <MessageSquare size={16} /> Discussion & Comments ({selectedPost.replies?.length || 0})
+                    </h3>
+                    {selectedPost.allowReplies === false && (
+                      <span className="text-xs text-amber-400 font-semibold flex items-center gap-1 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-700/50">
+                        <Lock size={12} /> Comments Disabled
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Replies List */}
+                  <div className="space-y-3">
+                    {selectedPost.replies?.map(reply => {
+                      const repAuthor = getAuthor(reply.authorId);
+                      const isRepOwner = repAuthor?.role === 'owner';
+                      const isRepStaff = repAuthor?.role === 'staff';
+                      return (
+                        <div key={reply.id} className="p-3.5 bg-[#232428] border border-[#35373c]/60 rounded-xl flex gap-3">
+                          {repAuthor?.avatarUrl ? (
+                            <img src={repAuthor.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5 border border-zinc-700" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-[#5865F2] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                              {repAuthor?.username?.charAt(0) || 'U'}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-bold text-xs text-white">@{repAuthor?.handle || 'user'}</span>
+                              {isRepOwner && (
+                                <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-red-900/60 text-red-300 border border-red-700/50">
+                                  Owner
+                                </span>
+                              )}
+                              {isRepStaff && (
+                                <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-blue-900/60 text-blue-300 border border-blue-700/50">
+                                  Staff
+                                </span>
+                              )}
+                              <span className="text-[11px] text-zinc-500">
+                                {new Date(reply.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <ForumRichText content={reply.content} className="text-sm text-zinc-200" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {(!selectedPost.replies || selectedPost.replies.length === 0) && (
+                      <p className="text-xs text-zinc-500 py-3 italic">No comments yet.</p>
+                    )}
+                  </div>
+
+                  {/* Reply Composer or Locked Notice */}
+                  {selectedPost.allowReplies === false ? (
+                    <div className="p-4 bg-[#232428] border border-[#35373c] rounded-xl text-zinc-400 text-xs flex items-center gap-2.5">
+                      <Lock size={16} className="text-amber-400 shrink-0" />
+                      <span>Comments have been disabled for this thread by the author.</span>
+                    </div>
+                  ) : (
+                    <div className="pt-3 border-t border-[#35373c] space-y-2">
+                      <div className="border border-[#35373c] rounded-xl overflow-hidden bg-[#1e1f22]">
+                        <ForumToolbar
+                          onInsert={(prefix, suffix, placeholder) => 
+                            insertFormatting(replyTextareaRef, replyText, setReplyText, prefix, suffix, placeholder)
+                          }
+                          isPreview={isReplyPreview}
+                          onTogglePreview={() => setIsReplyPreview(!isReplyPreview)}
+                        />
+                        {isReplyPreview ? (
+                          <div className="p-3.5 min-h-[72px] text-sm text-white bg-[#1e1f22]">
+                            {replyText.trim() ? (
+                              <ForumRichText content={replyText} />
+                            ) : (
+                              <span className="text-zinc-500 italic">Preview of your reply will appear here...</span>
+                            )}
+                          </div>
+                        ) : (
+                          <textarea
+                            ref={replyTextareaRef}
+                            rows={3}
+                            value={replyText}
+                            onChange={e => setReplyText(e.target.value)}
+                            onKeyDown={e => {
+                              // Enter alone inserts a newline as requested
+                              // Ctrl+Enter or Cmd+Enter submits
+                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                e.preventDefault();
+                                handleAddReply();
+                              }
+                            }}
+                            placeholder={`Reply to #${selectedPost.title.slice(0, 24)}... (Press Enter for new line)`}
+                            className="w-full bg-[#1e1f22] p-3 text-sm text-white placeholder-zinc-500 focus:outline-none resize-none"
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-zinc-500">Press <b>Enter</b> for new line • <b>Ctrl+Enter</b> or click Send</span>
+                        <button
+                          onClick={handleAddReply}
+                          disabled={!replyText.trim()}
+                          className="px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-xl text-xs font-semibold disabled:opacity-50 transition-colors flex items-center gap-1.5 shrink-0 shadow"
+                        >
+                          <Send size={14} /> Send Reply
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -565,6 +886,22 @@ export function DiscordForum() {
                         {post.pinned && (
                           <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-amber-400 bg-amber-950/40 border border-amber-600/40 px-2 py-0.5 rounded-md">
                             <Pin size={11} /> Pinned
+                          </span>
+                        )}
+                        {post.registeredOnly && (
+                          <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-purple-400 bg-purple-950/40 border border-purple-600/40 px-2 py-0.5 rounded-md">
+                            <Lock size={11} /> Registered Only
+                          </span>
+                        )}
+                        {post.mediaUrl && (
+                          <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-cyan-400 bg-cyan-950/40 border border-cyan-600/40 px-2 py-0.5 rounded-md">
+                            {post.mediaType === 'video' ? <VideoIcon size={11} /> : <Paperclip size={11} />}
+                            {post.mediaType === 'video' ? 'Video' : 'Media'}
+                          </span>
+                        )}
+                        {post.allowReplies === false && (
+                          <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-zinc-400 bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 rounded-md">
+                            No Comments
                           </span>
                         )}
                         {cat && (
@@ -669,28 +1006,159 @@ export function DiscordForum() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase text-zinc-300 mb-1">Content / Answer</label>
-                <textarea
-                  required
-                  rows={6}
-                  value={newContent}
-                  onChange={e => setNewContent(e.target.value)}
-                  placeholder="Type the full FAQ guidance, details, or announcement..."
-                  className="w-full bg-[#1e1f22] border border-[#3d3f45] rounded-xl p-3.5 text-sm text-white resize-none focus:outline-none focus:border-[#5865F2]"
-                />
+                <label className="block text-xs font-bold uppercase text-zinc-300 mb-1">Content / Answer (Markdown & Formatting)</label>
+                <div className="border border-[#3d3f45] rounded-xl overflow-hidden bg-[#1e1f22]">
+                  <ForumToolbar
+                    onInsert={(prefix, suffix, placeholder) =>
+                      insertFormatting(postTextareaRef, newContent, setNewContent, prefix, suffix, placeholder)
+                    }
+                    isPreview={isPreviewMode}
+                    onTogglePreview={() => setIsPreviewMode(!isPreviewMode)}
+                  />
+                  {isPreviewMode ? (
+                    <div className="p-3.5 min-h-[140px] max-h-[220px] overflow-y-auto text-sm text-white bg-[#1e1f22]">
+                      {newContent.trim() ? (
+                        <ForumRichText content={newContent} />
+                      ) : (
+                        <span className="text-zinc-500 italic">Preview will appear here...</span>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      ref={postTextareaRef}
+                      required
+                      rows={6}
+                      value={newContent}
+                      onChange={e => setNewContent(e.target.value)}
+                      placeholder="Type the full FAQ guidance, details, or announcement... (Press Enter to start a new line)"
+                      className="w-full bg-[#1e1f22] p-3 text-sm text-white resize-none focus:outline-none"
+                    />
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1">Press <b>Enter</b> to start a new line. Use the toolbar buttons for Bold, Italic, Strikethrough, Code, and Lists.</p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="pinCheck"
-                  checked={isPinned}
-                  onChange={e => setIsPinned(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#5865F2] focus:ring-0 bg-[#1e1f22] border-zinc-700"
-                />
-                <label htmlFor="pinCheck" className="text-xs font-semibold text-zinc-300 cursor-pointer flex items-center gap-1">
-                  <Pin size={13} className="text-amber-400" /> Pin this thread to top of forum
+              {/* Media Attachment (Image or Video) */}
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-300 mb-1 flex items-center justify-between">
+                  <span>Attach Image or Video (Optional)</span>
+                  {mediaUrl && (
+                    <button
+                      type="button"
+                      onClick={() => { setMediaUrl(''); setMediaType(null); }}
+                      className="text-[11px] text-red-400 hover:underline"
+                    >
+                      Remove Attachment
+                    </button>
+                  )}
                 </label>
+                
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleMediaUpload}
+                  accept="image/*,video/*"
+                  className="hidden"
+                />
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-2 bg-[#2b2d31] hover:bg-[#35373c] text-xs font-semibold text-zinc-200 rounded-xl border border-zinc-700/70 flex items-center gap-1.5 shrink-0 transition-colors"
+                    >
+                      <Paperclip size={14} /> Choose File
+                    </button>
+                    <input
+                      type="url"
+                      value={mediaUrl}
+                      onChange={e => {
+                        setMediaUrl(e.target.value);
+                        if (e.target.value.match(/\.(mp4|webm|mov|m4v)($|\?)/i)) {
+                          setMediaType('video');
+                        } else if (e.target.value) {
+                          setMediaType('image');
+                        } else {
+                          setMediaType(null);
+                        }
+                      }}
+                      placeholder="Or paste direct image / video URL..."
+                      className="flex-1 bg-[#1e1f22] border border-[#3d3f45] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#5865F2]"
+                    />
+                  </div>
+
+                  {mediaUrl && (
+                    <div className="relative rounded-xl overflow-hidden border border-zinc-700 bg-black/40 max-h-40 flex items-center justify-center p-1">
+                      {mediaType === 'video' || mediaUrl.match(/\.(mp4|webm|mov|m4v)($|\?)/i) ? (
+                        <video src={mediaUrl} controls className="max-h-36 rounded-lg object-contain" />
+                      ) : (
+                        <img src={mediaUrl} alt="Attached Preview" className="max-h-36 rounded-lg object-contain" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Post Controls */}
+              <div className="space-y-2.5 pt-1 bg-[#2b2d31]/60 p-3 rounded-xl border border-[#3d3f45]/70">
+                <div className="text-[11px] font-bold uppercase text-zinc-400 tracking-wider">Post Permissions & Visibility</div>
+                
+                {/* Pin Post */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="pinCheck"
+                    checked={isPinned}
+                    onChange={e => setIsPinned(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#5865F2] focus:ring-0 bg-[#1e1f22] border-zinc-700"
+                  />
+                  <label htmlFor="pinCheck" className="text-xs font-semibold text-zinc-300 cursor-pointer flex items-center gap-1.5">
+                    <Pin size={13} className="text-amber-400" /> Pin this thread to top of forum
+                  </label>
+                </div>
+
+                {/* Enable Comments / Replies */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="allowRepliesCheck"
+                    checked={allowReplies}
+                    onChange={e => setAllowReplies(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#5865F2] focus:ring-0 bg-[#1e1f22] border-zinc-700"
+                  />
+                  <label htmlFor="allowRepliesCheck" className="text-xs font-semibold text-zinc-300 cursor-pointer flex items-center gap-1.5">
+                    <MessageSquare size={13} className="text-emerald-400" /> Allow comments & replies on this post
+                  </label>
+                </div>
+
+                {/* Registered users only */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="regOnlyCheck"
+                    checked={registeredOnly}
+                    onChange={e => setRegisteredOnly(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#5865F2] focus:ring-0 bg-[#1e1f22] border-zinc-700"
+                  />
+                  <label htmlFor="regOnlyCheck" className="text-xs font-semibold text-zinc-300 cursor-pointer flex items-center gap-1.5">
+                    <Lock size={13} className="text-purple-400" /> Only allow registered users to view this post
+                  </label>
+                </div>
+
+                {/* Announce to everyone */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="announceCheck"
+                    checked={announceToEveryone}
+                    onChange={e => setAnnounceToEveryone(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#5865F2] focus:ring-0 bg-[#1e1f22] border-zinc-700"
+                  />
+                  <label htmlFor="announceCheck" className="text-xs font-semibold text-zinc-300 cursor-pointer flex items-center gap-1.5">
+                    <span className="text-sm">📢</span> Announce this new forum to everyone (offline users get notified when online)
+                  </label>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-3">
@@ -819,6 +1287,186 @@ export function DiscordForum() {
                 + Add Category
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit FAQ Thread */}
+      {showEditModal && editingPost && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-[#313338] border border-[#3d3f45] w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#3d3f45] pb-3">
+              <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                <Edit3 size={18} className="text-[#5865F2]" /> {isStaffEditing ? 'Request Approval for Edit' : 'Edit FAQ Post'}
+              </h3>
+              <button onClick={() => { setShowEditModal(false); setEditingPost(null); }} className="text-zinc-400 hover:text-white p-1 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            {isStaffEditing && (
+              <div className="bg-amber-900/30 border border-amber-600/50 p-4 rounded-xl flex gap-3 items-start">
+                <ShieldCheck size={20} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-200">
+                  <strong className="block mb-0.5">Staff Edit Policy:</strong>
+                  You are proposing an edit to someone else's post. This will be sent to the **Owner** for final approval before taking effect.
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-300 mb-1">Post Title</label>
+                <input
+                  type="text"
+                  required
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  className="w-full bg-[#1e1f22] border border-[#3d3f45] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#5865F2]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-300 mb-1">Category</label>
+                <select
+                  value={newCategory}
+                  onChange={e => setNewCategory(e.target.value)}
+                  className="w-full bg-[#1e1f22] border border-[#3d3f45] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#5865F2]"
+                >
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.icon || '🏷️'} {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-300 mb-1">Content / Answer (Markdown & Formatting)</label>
+                <div className="border border-[#3d3f45] rounded-xl overflow-hidden bg-[#1e1f22]">
+                  <ForumToolbar
+                    onInsert={(prefix, suffix, placeholder) =>
+                      insertFormatting(postTextareaRef, newContent, setNewContent, prefix, suffix, placeholder)
+                    }
+                    isPreview={isPreviewMode}
+                    onTogglePreview={() => setIsPreviewMode(!isPreviewMode)}
+                  />
+                  {isPreviewMode ? (
+                    <div className="p-3.5 min-h-[140px] max-h-[220px] overflow-y-auto text-sm text-white bg-[#1e1f22]">
+                      <ForumRichText content={newContent} />
+                    </div>
+                  ) : (
+                    <textarea
+                      ref={postTextareaRef}
+                      required
+                      rows={6}
+                      value={newContent}
+                      onChange={e => setNewContent(e.target.value)}
+                      className="w-full bg-[#1e1f22] p-3 text-sm text-white resize-none focus:outline-none"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-300 mb-1">Attachment URL (Optional)</label>
+                <input
+                  type="url"
+                  value={mediaUrl}
+                  onChange={e => setMediaUrl(e.target.value)}
+                  placeholder="Image or video URL..."
+                  className="w-full bg-[#1e1f22] border border-[#3d3f45] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#5865F2]"
+                />
+              </div>
+
+              <div className="space-y-2.5 pt-1 bg-[#2b2d31]/60 p-3 rounded-xl border border-[#3d3f45]/70">
+                <div className="text-[11px] font-bold uppercase text-zinc-400 tracking-wider">Post Controls</div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="editPinCheck" checked={isPinned} onChange={e => setIsPinned(e.target.checked)} className="w-4 h-4 rounded text-[#5865F2] bg-[#1e1f22] border-zinc-700" />
+                    <label htmlFor="editPinCheck" className="text-xs font-semibold text-zinc-300 cursor-pointer">Pin</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="editAllowReplies" checked={allowReplies} onChange={e => setAllowReplies(e.target.checked)} className="w-4 h-4 rounded text-[#5865F2] bg-[#1e1f22] border-zinc-700" />
+                    <label htmlFor="editAllowReplies" className="text-xs font-semibold text-zinc-300 cursor-pointer">Allow Comments</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="editRegOnly" checked={registeredOnly} onChange={e => setRegisteredOnly(e.target.checked)} className="w-4 h-4 rounded text-[#5865F2] bg-[#1e1f22] border-zinc-700" />
+                    <label htmlFor="editRegOnly" className="text-xs font-semibold text-zinc-300 cursor-pointer">Registered Only</label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-zinc-400 hover:text-white transition-colors text-sm font-semibold">Cancel</button>
+                <button type="submit" className="px-8 py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center gap-2">
+                  {isStaffEditing ? <Send size={16} /> : <Check size={16} />}
+                  {isStaffEditing ? 'Submit for Approval' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Requests (Owner Only) */}
+      {showRequestsPanel && isOwner && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-[#313338] border border-[#3d3f45] w-full max-w-2xl rounded-2xl p-6 shadow-2xl space-y-4 max-h-[85dvh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#3d3f45] pb-3 shrink-0">
+              <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                <ShieldCheck size={18} className="text-amber-500" /> Pending Staff Edit Requests ({editRequests.length})
+              </h3>
+              <button onClick={() => setShowRequestsPanel(false)} className="text-zinc-400 hover:text-white p-1 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 hide-scrollbar">
+              {editRequests.length === 0 ? (
+                <div className="text-center py-12 text-zinc-500">No pending edit requests.</div>
+              ) : (
+                editRequests.map(req => {
+                  const staff = getAuthor(req.staffId);
+                  const post = posts.find(p => p.id === req.postId);
+                  return (
+                    <div key={req.id} className="bg-[#2b2d31] border border-[#3d3f45] rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-[#1f2023] pb-2">
+                        <div className="flex items-center gap-2">
+                          <img src={staff?.avatarUrl} alt="" className="w-7 h-7 rounded-full border border-zinc-700" />
+                          <div>
+                            <p className="text-xs font-bold text-white">@{staff?.handle} requested an edit</p>
+                            <p className="text-[10px] text-zinc-500">{new Date(req.timestamp).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleRejectEdit(req.id)} className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-[10px] font-bold">Reject</button>
+                          <button onClick={() => handleApproveEdit(req)} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold">Approve</button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-[11px]">
+                        <div>
+                          <p className="text-zinc-500 uppercase font-bold text-[9px] mb-0.5">Original Post</p>
+                          <p className="text-zinc-300 italic truncate">"{post?.title}"</p>
+                        </div>
+                        <div>
+                          <p className="text-zinc-500 uppercase font-bold text-[9px] mb-0.5">Proposed Title</p>
+                          <p className="text-white font-bold">{req.proposedTitle}</p>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <p className="text-zinc-500 uppercase font-bold text-[9px] mb-0.5">Proposed Changes</p>
+                        <div className="bg-[#1e1f22] p-2 rounded-lg border border-[#3d3f45] text-xs text-zinc-300 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                          {req.proposedContent}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

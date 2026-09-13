@@ -114,6 +114,26 @@ export type FAQPost = {
   updatedAt?: number;
   replies: FAQReply[];
   reactions?: Record<string, string[]>; // emoji -> array of userIds
+  allowReplies?: boolean; // enable comments/replies or not
+  registeredOnly?: boolean; // registered users only to view
+  mediaUrl?: string; // image or video attachment
+  mediaType?: 'image' | 'video'; // attachment type
+};
+
+export type ForumEditRequest = {
+  id: string;
+  postId: string;
+  staffId: string;
+  proposedTitle: string;
+  proposedContent: string;
+  proposedCategoryId: string;
+  proposedMediaUrl?: string;
+  proposedMediaType?: 'image' | 'video';
+  proposedPinned?: boolean;
+  proposedAllowReplies?: boolean;
+  proposedRegisteredOnly?: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  timestamp: number;
 };
 
 export type Comment = {
@@ -134,6 +154,7 @@ export type Message = {
   audioUrl?: string;
   timestamp: number;
   sharedVideoId?: string;
+  read?: boolean; // unread indicator for DM sidebar counter
 };
 
 export type Notification = {
