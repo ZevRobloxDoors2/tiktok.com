@@ -17,6 +17,10 @@ export type User = {
     until?: number; // timestamp for temp ban
     linkedAccount?: string; // for hwid evasion links
     reason?: string;
+    bannedBy?: string;
+    bannedAt?: number;
+    unbanReason?: string;
+    stillBannedReason?: string;
   };
 };
 
@@ -55,6 +59,9 @@ export type Video = {
   userId: string;
   videoUrl: string; // Object URL or external URL
   videoData?: File | Blob; // For IDB storage
+  imageUrl?: string;
+  mediaType?: 'video' | 'image';
+  visibility?: 'everyone' | 'friends' | 'only_you';
   description: string;
   tags: string[];
   likes: string[]; // User IDs
@@ -66,6 +73,47 @@ export type Video = {
   isYouTube?: boolean;
   youtubeId?: string;
   feedId?: string;
+};
+
+export type Story = {
+  id: string;
+  userId: string;
+  mediaUrl: string;
+  mediaType: 'video' | 'image';
+  visibility?: 'everyone' | 'friends' | 'only_you';
+  caption?: string;
+  timestamp: number;
+  expiresAt: number; // 24h expiration
+  viewers?: string[]; // User IDs who viewed
+  filter?: string;
+};
+
+export type FAQCategory = {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  icon?: string;
+};
+
+export type FAQReply = {
+  id: string;
+  authorId: string;
+  content: string;
+  timestamp: number;
+};
+
+export type FAQPost = {
+  id: string;
+  authorId: string;
+  title: string;
+  content: string;
+  categoryId: string;
+  pinned?: boolean;
+  timestamp: number;
+  updatedAt?: number;
+  replies: FAQReply[];
+  reactions?: Record<string, string[]>; // emoji -> array of userIds
 };
 
 export type Comment = {

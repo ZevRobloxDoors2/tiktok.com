@@ -1,6 +1,6 @@
-import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost } from '../types';
 
 export const initDb = async () => {};
 
@@ -124,5 +124,39 @@ export const saveAppeals = (appeals: Appeal[]) => saveCollection('appeals', appe
 
 export const getAuditLogs = () => fetchCollection<AuditLog>('auditLogs');
 export const saveAuditLogs = (logs: AuditLog[]) => saveCollection('auditLogs', logs);
+
+export const deleteVideoFromDB = async (videoId: string) => {
+  try {
+    const docRef = doc(db, 'videos', videoId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Error deleting video:", err);
+  }
+};
+
+export const getStories = () => fetchCollection<Story>('stories');
+export const saveStories = (stories: Story[]) => saveCollection('stories', stories);
+export const deleteStoryFromDB = async (storyId: string) => {
+  try {
+    const docRef = doc(db, 'stories', storyId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Error deleting story:", err);
+  }
+};
+
+export const getFAQCategories = () => fetchCollection<FAQCategory>('faq_categories');
+export const saveFAQCategories = (cats: FAQCategory[]) => saveCollection('faq_categories', cats);
+
+export const getFAQPosts = () => fetchCollection<FAQPost>('faq_posts');
+export const saveFAQPosts = (posts: FAQPost[]) => saveCollection('faq_posts', posts);
+export const deleteFAQPostFromDB = async (postId: string) => {
+  try {
+    const docRef = doc(db, 'faq_posts', postId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Error deleting FAQ post:", err);
+  }
+};
 
 export const clearDb = async () => {};

@@ -1,8 +1,98 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper to check staff or owner role from request claims or document
+    function isStaffOrAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'owner' || 
+        request.auth.token.role == 'staff' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if isStaffOrAdmin() || isOwner(userId);
+    }
+
+    // Videos collection (posts, shorts, photo posts)
+    match /videos/{videoId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Stories collection (24-hour ephemeral posts)
+    match /stories/{storyId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Messages collection
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Reports collection
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Appeals collection
+    match /appeals/{appealId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Audit logs collection
+    match /auditLogs/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if isStaffOrAdmin();
+    }
+
+    // FAQ Categories (Discord-like forum)
+    match /faq_categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // FAQ Posts (Discord-like forum posts)
+    match /faq_posts/{postId} {
+      allow read: if true;
+      allow create, update, delete: if true;
     }
   }
 }

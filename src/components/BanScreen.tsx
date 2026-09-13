@@ -66,22 +66,48 @@ export function BanScreen() {
         <h1 className="text-3xl font-bold text-red-500 mb-2">Account Banned</h1>
         
         {isHwid ? (
-          <p className="text-zinc-300 mb-6 leading-relaxed">
-            This account is linked to another banned account ({currentUser.banStatus.linkedAccount ? `@${currentUser.banStatus.linkedAccount.slice(0, 2)}******` : 'Unknown'}). 
-            Please enter that account and make an appeal. If that account is not yours and not supposed to be linked, Please contact Support.
-          </p>
+          <div className="mb-6 space-y-3">
+            <p className="text-zinc-300 leading-relaxed text-sm">
+              This account is linked to another banned account ({currentUser.banStatus.linkedAccount ? `@${currentUser.banStatus.linkedAccount.slice(0, 2)}******` : 'Unknown'}). 
+              Please enter that account and make an appeal. If that account is not yours and not supposed to be linked, Please contact Support.
+            </p>
+            <div className="p-3.5 bg-red-950/40 border border-red-800/50 rounded-xl text-red-200 text-sm">
+              <span className="font-bold block mb-1 text-red-400">Ban Reason (Staff/Owner):</span>
+              {currentUser.banStatus.reason || 'Enforcement linkage violation.'}
+            </div>
+          </div>
         ) : isTemp ? (
-          <p className="text-zinc-300 mb-6 leading-relaxed">
-            Your account has been temporarily suspended until {new Date(currentUser.banStatus.until!).toLocaleString()}.
-            <br/><br/>
-            Reason: {currentUser.banStatus.reason || 'Violation of community guidelines.'}
-          </p>
+          <div className="mb-6 space-y-3">
+            <p className="text-zinc-300 leading-relaxed text-sm">
+              Your account has been temporarily suspended until <span className="font-semibold text-white">{new Date(currentUser.banStatus.until!).toLocaleString()}</span>.
+            </p>
+            <div className="p-3.5 bg-red-950/40 border border-red-800/50 rounded-xl text-red-200 text-sm">
+              <span className="font-bold block mb-1 text-red-400">Ban Reason (Staff/Owner):</span>
+              {currentUser.banStatus.reason || 'Violation of community guidelines.'}
+            </div>
+            {currentUser.banStatus.stillBannedReason && (
+              <div className="p-3.5 bg-amber-950/40 border border-amber-800/50 rounded-xl text-amber-200 text-sm">
+                <span className="font-bold block mb-1 text-amber-400">Why You Are Still Banned:</span>
+                {currentUser.banStatus.stillBannedReason}
+              </div>
+            )}
+          </div>
         ) : (
-          <p className="text-zinc-300 mb-6 leading-relaxed">
-            Your account has been permanently banned.
-            <br/><br/>
-            Reason: {currentUser.banStatus.reason || 'Violation of community guidelines.'}
-          </p>
+          <div className="mb-6 space-y-3">
+            <p className="text-zinc-300 leading-relaxed text-sm">
+              Your account has been permanently suspended from CentralTok.
+            </p>
+            <div className="p-3.5 bg-red-950/40 border border-red-800/50 rounded-xl text-red-200 text-sm">
+              <span className="font-bold block mb-1 text-red-400">Ban Reason (Staff/Owner):</span>
+              {currentUser.banStatus.reason || 'Violation of community guidelines.'}
+            </div>
+            {currentUser.banStatus.stillBannedReason && (
+              <div className="p-3.5 bg-amber-950/40 border border-amber-800/50 rounded-xl text-amber-200 text-sm">
+                <span className="font-bold block mb-1 text-amber-400">Why You Are Still Banned:</span>
+                {currentUser.banStatus.stillBannedReason}
+              </div>
+            )}
+          </div>
         )}
 
         {isHwid ? (

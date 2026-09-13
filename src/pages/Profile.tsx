@@ -1,9 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getUsers, getVideos, saveUsers } from '../lib/db';
+import { getUsers, getVideos, saveUsers, deleteVideoFromDB } from '../lib/db';
 import { User, Video } from '../types';
 import { useAppStore } from '../store';
-import { Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag, Hammer, Wrench, LogOut, Check } from 'lucide-react';
+import { isFriend } from '../lib/utils';
+import { DiscordForum } from '../components/DiscordForum';
+import { 
+  Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag, 
+  Hammer, Wrench, Check, Trash2, HelpCircle, Users, Lock, Image as ImageIcon, LogOut 
+} from 'lucide-react';
 import { VideoItem } from './Home';
 
 export function Profile() {
@@ -15,37 +20,50 @@ export function Profile() {
   const [favoriteVideos, setFavoriteVideos] = useState<Video[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'favorites'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'favorites' | 'faq'>('videos');
   const [showEdit, setShowEdit] = useState(false);
-  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+
+  const areFriends = isFriend(currentUser, profileUser);
+  const isOwnProfile = currentUser?.id === profileUser?.id;
+  const isStaffOrOwner = currentUser?.role === 'owner' || currentUser?.role === 'staff';
+
+  const loadProfile = async () => {
+    const users = await getUsers();
+    const user = users.find(u => u.handle === handle);
+    if (user) {
+      setProfileUser(user);
+      setIsFollowing(currentUser?.following.includes(user.id) || false);
+      
+      const allVideos = await getVideos();
+      const userVideos = allVideos.filter(v => v.userId === user.id);
+      const userLikedVideos = allVideos.filter(v => v.likes.includes(user.id));
+      const userFavoriteVideos = allVideos.filter(v => user.favorites?.includes(v.id));
+      
+      const fixUrl = (v: Video) => ({
+        ...v,
+        videoUrl: v.videoData ? URL.createObjectURL(v.videoData) : v.videoUrl
+      });
+
+      const isOwnerView = currentUser?.id === user.id;
+      const isMutual = isFriend(currentUser, user);
+
+      // Filter based on visibility settings
+      const visibleVideos = userVideos.filter(v => {
+        if (isOwnerView || isStaffOrOwner) return true;
+        if (v.visibility === 'only_you') return false;
+        if (v.visibility === 'friends' && !isMutual) return false;
+        return true;
+      });
+      
+      setVideos(visibleVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
+      setLikedVideos(userLikedVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
+      setFavoriteVideos(userFavoriteVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const loadProfile = async () => {
-      const users = await getUsers();
-      setAllUsers(users);
-      const user = users.find(u => u.handle === handle);
-      if (user) {
-        setProfileUser(user);
-        setIsFollowing(currentUser?.following.includes(user.id) || false);
-        
-        const allVideos = await getVideos();
-        const userVideos = allVideos.filter(v => v.userId === user.id);
-        const userLikedVideos = allVideos.filter(v => v.likes.includes(user.id));
-        const userFavoriteVideos = allVideos.filter(v => user.favorites?.includes(v.id));
-        
-        const fixUrl = (v: Video) => ({
-          ...v,
-          videoUrl: v.videoData ? URL.createObjectURL(v.videoData) : v.videoUrl
-        });
-        
-        setVideos(userVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
-        setLikedVideos(userLikedVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
-        setFavoriteVideos(userFavoriteVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
-      }
-      setLoading(false);
-    };
     loadProfile();
   }, [handle, currentUser, showEdit]);
 
@@ -74,10 +92,17 @@ export function Profile() {
     alert(`User ${profileUser?.username} has been reported. Our team will review this account.`);
   };
 
+  const handleDeleteVideo = async (videoId: string) => {
+    if (!window.confirm("Are you sure you want to delete this post? This action cannot be undone.")) return;
+    await deleteVideoFromDB(videoId);
+    setVideos(prev => prev.filter(v => v.id !== videoId));
+    setLikedVideos(prev => prev.filter(v => v.id !== videoId));
+    setFavoriteVideos(prev => prev.filter(v => v.id !== videoId));
+    if (selectedVideo?.id === videoId) setSelectedVideo(null);
+  };
+
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   if (!profileUser) return <div className="p-8 text-center text-zinc-500">User not found</div>;
-
-  const isOwnProfile = currentUser?.id === profileUser.id;
 
   return (
     <div className="w-full h-full overflow-y-auto hide-scrollbar pb-24 md:pb-0">
@@ -94,14 +119,15 @@ export function Profile() {
           )}
           
           <div className="flex-1 text-center md:text-left">
-            <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-              <h1 
-                className={`text-2xl font-bold ${isOwnProfile ? 'cursor-pointer hover:underline' : ''}`}
-                onClick={() => isOwnProfile && setShowAccountSwitcher(true)}
-                title={isOwnProfile ? 'Switch accounts' : ''}
-              >
+            <div className="flex items-center justify-center md:justify-start gap-2 mb-1 flex-wrap">
+              <h1 className="text-2xl font-bold">
                 {profileUser.username}
               </h1>
+              {areFriends && !isOwnProfile && (
+                <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold flex items-center gap-1">
+                  <Users size={12} /> Friends
+                </span>
+              )}
               {profileUser.role === 'owner' && (
                 <div className="flex gap-0.5 text-red-500" title="Owner">
                   <Hammer size={20} />
@@ -134,7 +160,7 @@ export function Profile() {
             
             <p className="mb-4 whitespace-pre-wrap">{profileUser.bio}</p>
             
-            <div className="flex items-center justify-center md:justify-start gap-2">
+            <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
               {isOwnProfile ? (
                 <>
                   <button onClick={() => setShowEdit(true)} className="px-6 py-2 border border-zinc-300 dark:border-zinc-700 font-semibold rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors flex items-center gap-2">
@@ -148,13 +174,15 @@ export function Profile() {
                 <>
                   <button 
                     onClick={handleFollow}
-                    className={`px-8 py-2 font-semibold rounded-md transition-colors ${
+                    className={`px-8 py-2 font-semibold rounded-md transition-colors flex items-center gap-1.5 ${
                       isFollowing 
-                        ? 'border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900' 
+                        ? areFriends 
+                          ? 'border border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                          : 'border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900' 
                         : 'bg-pink-600 text-white hover:bg-pink-700'
                     }`}
                   >
-                    {isFollowing ? 'Following' : 'Follow'}
+                    {isFollowing ? (areFriends ? <><Users size={16} /> Friends</> : 'Following') : 'Follow'}
                   </button>
                   <Link to={`/messages/${profileUser.handle}`} className="px-6 py-2 border border-zinc-300 dark:border-zinc-700 font-semibold rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
                     Message
@@ -174,14 +202,14 @@ export function Profile() {
             onClick={() => setActiveTab('videos')}
             className={`flex-1 py-4 font-semibold flex items-center justify-center gap-2 ${activeTab === 'videos' ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white' : 'text-zinc-500'}`}
           >
-            <Grid size={20} /> Videos
+            <Grid size={18} /> Posts
           </button>
           {(!profileUser.isPrivate || isOwnProfile || isFollowing) && (
             <button 
               onClick={() => setActiveTab('liked')}
               className={`flex-1 py-4 font-semibold flex items-center justify-center gap-2 ${activeTab === 'liked' ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white' : 'text-zinc-500'}`}
             >
-              <Heart size={20} /> Liked
+              <Heart size={18} /> Liked
             </button>
           )}
           {isOwnProfile && (
@@ -189,69 +217,93 @@ export function Profile() {
               onClick={() => setActiveTab('favorites')}
               className={`flex-1 py-4 font-semibold flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white' : 'text-zinc-500'}`}
             >
-              <Bookmark size={20} /> Favorites
+              <Bookmark size={18} /> Favorites
             </button>
           )}
+          {/* FAQ Forum tab under Profile categories */}
+          <button 
+            onClick={() => setActiveTab('faq')}
+            className={`flex-1 py-4 font-semibold flex items-center justify-center gap-2 ${activeTab === 'faq' ? 'text-[#5865F2] border-b-2 border-[#5865F2]' : 'text-zinc-500'}`}
+          >
+            <HelpCircle size={18} /> FAQ Forum
+          </button>
         </div>
         
-        {/* Grid */}
-        <div className="grid grid-cols-3 gap-0.5 md:gap-1 p-0.5 md:p-1">
-          {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : favoriteVideos).map(video => (
-            <div key={video.id} onClick={() => setSelectedVideo(video)} className="aspect-[3/4] relative bg-black group cursor-pointer overflow-hidden">
-              <video src={video.videoUrl} className={`w-full h-full object-cover ${video.filter || ''}`} />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-              <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white font-semibold text-sm drop-shadow-md">
-                <Play size={16} className="fill-current" />
-                <span>{video.views || 0}</span>
+        {/* Tab Content */}
+        {activeTab === 'faq' ? (
+          <div className="p-3 md:p-6">
+            <DiscordForum />
+          </div>
+        ) : (
+          /* Grid */
+          <div className="grid grid-cols-3 gap-0.5 md:gap-1 p-0.5 md:p-1">
+            {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : favoriteVideos).map(video => {
+              const canDelete = currentUser?.id === video.userId || isStaffOrOwner;
+              const isImage = video.mediaType === 'image';
+              
+              return (
+                <div key={video.id} className="aspect-[3/4] relative bg-black group cursor-pointer overflow-hidden rounded-sm">
+                  <div onClick={() => setSelectedVideo(video)} className="w-full h-full">
+                    {isImage ? (
+                      <img src={video.videoUrl} alt={video.description} className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={video.videoUrl} className={`w-full h-full object-cover ${video.filter || ''}`} />
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+                    
+                    {/* Media Type & Privacy Badges */}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                      {isImage && (
+                        <span className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <ImageIcon size={10} /> Photo
+                        </span>
+                      )}
+                      {video.visibility === 'friends' && (
+                        <span className="bg-emerald-600/80 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <Users size={10} /> Friends
+                        </span>
+                      )}
+                      {video.visibility === 'only_you' && (
+                        <span className="bg-zinc-800/90 backdrop-blur-sm text-amber-300 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <Lock size={10} /> Only you
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white font-semibold text-xs drop-shadow-md">
+                      <Play size={14} className="fill-current" />
+                      <span>{video.views || 0}</span>
+                    </div>
+                  </div>
+
+                  {/* Delete Button on Hover */}
+                  {canDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteVideo(video.id);
+                      }}
+                      className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete Post"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : favoriteVideos).length === 0 && (
+              <div className="col-span-3 py-20 text-center text-zinc-500">
+                No posts found in this tab.
               </div>
-            </div>
-          ))}
-          {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : favoriteVideos).length === 0 && (
-            <div className="col-span-3 py-20 text-center text-zinc-500">
-              No videos found in this tab.
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
       </div>
       
       {showEdit && currentUser && (
         <EditProfileModal user={currentUser} onClose={() => setShowEdit(false)} />
-      )}
-
-      {showAccountSwitcher && currentUser && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-xl font-bold">Switch Account</h2>
-              <button onClick={() => setShowAccountSwitcher(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full"><X size={20} /></button>
-            </div>
-            <div className="p-2">
-              {allUsers.map(u => (
-                <div 
-                  key={u.id}
-                  onClick={() => {
-                    setCurrentUser(u);
-                    setShowAccountSwitcher(false);
-                    window.location.hash = `#/profile/${u.handle}`;
-                  }}
-                  className="flex items-center gap-3 p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition-colors"
-                >
-                  {u.avatarUrl ? (
-                    <img src={u.avatarUrl} alt="" className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold">{u.username.charAt(0)}</div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold truncate">{u.username}</p>
-                    <p className="text-sm text-zinc-500 truncate">@{u.handle}</p>
-                  </div>
-                  {currentUser.id === u.id && <Check size={20} className="text-pink-600 shrink-0" />}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Video Playback Modal */}
@@ -263,9 +315,29 @@ export function Profile() {
           >
             <X size={24} />
           </button>
-          <div className="w-full h-full max-w-[500px] relative bg-zinc-950">
-            {/* Find the user who posted the video since the selected video might belong to someone else (if in liked/favorites tab) */}
-            <VideoItem video={{...selectedVideo, user: profileUser}} />
+
+          {/* Delete Post Button in Modal */}
+          {(currentUser?.id === selectedVideo.userId || isStaffOrOwner) && (
+            <button
+              onClick={() => handleDeleteVideo(selectedVideo.id)}
+              className="absolute top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 shadow-lg"
+            >
+              <Trash2 size={16} /> Delete Post
+            </button>
+          )}
+
+          <div className="w-full h-full max-w-[500px] relative bg-zinc-950 flex items-center justify-center">
+            {selectedVideo.mediaType === 'image' ? (
+              <div className="relative w-full h-full flex items-center justify-center bg-zinc-950">
+                <img src={selectedVideo.videoUrl} alt="" className="max-w-full max-h-full object-contain" />
+                <div className="absolute bottom-6 left-4 right-4 text-white z-10">
+                  <p className="font-bold text-base mb-1">@{profileUser.handle}</p>
+                  <p className="text-sm">{selectedVideo.description}</p>
+                </div>
+              </div>
+            ) : (
+              <VideoItem video={{...selectedVideo, user: profileUser}} />
+            )}
           </div>
         </div>
       )}

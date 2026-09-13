@@ -1,12 +1,21 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, ensureVideoInDB, getMessages, saveMessages, getNotifications, saveNotifications, subscribeToVideo } from '../lib/db';
+import { 
+  getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, 
+  ensureVideoInDB, getMessages, saveMessages, getNotifications, 
+  saveNotifications, subscribeToVideo, deleteVideoFromDB 
+} from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
-import { Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, User as UserIcon, Sparkles } from 'lucide-react';
+import { 
+  Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, 
+  User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock 
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
 import { AIChatPanel } from '../components/AIChatPanel';
+import { StoriesBar } from '../components/StoriesBar';
+import { isFriend } from '../lib/utils';
 import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
 import { getReports, saveReports } from '../lib/db';
 import { normalizeYoutubeShorts } from '../lib/feed';
@@ -53,6 +62,16 @@ export function Home() {
       })();
       const unseenUgvs = allDbVideos.filter(video => {
         if (video.isYouTube || seenFeedIds.current.has(video.id) || localViewed.includes(video.id)) return false;
+
+        // Post Visibility & Friendship check
+        const isAuthor = currentUser?.id === video.userId;
+        const isStaff = currentUser?.role === 'owner' || currentUser?.role === 'staff';
+        if (video.visibility === 'only_you' && !isAuthor && !isStaff) return false;
+        if (video.visibility === 'friends' && !isAuthor && !isStaff) {
+          const videoAuthor = allUsers.find(u => u.id === video.userId);
+          if (!isFriend(currentUser, videoAuthor)) return false;
+        }
+
         return !currentUser || !(video.viewedBy || []).includes(currentUser.id);
       }).map(v => ({
         ...v,
@@ -280,8 +299,17 @@ export function Home() {
     );
   }
 
+  const handlePostDeleted = (deletedId: string) => {
+    setVideos(prev => prev.filter(v => v.id !== deletedId));
+  };
+
   return (
-    <div className="relative h-full w-full flex justify-center bg-black md:bg-zinc-950">
+    <div className="relative h-full w-full flex flex-col items-center bg-black md:bg-zinc-950 overflow-hidden">
+      {/* 24-Hour Stories Tray */}
+      <div className="w-full max-w-[500px] z-30 shrink-0">
+        <StoriesBar />
+      </div>
+
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -292,7 +320,7 @@ export function Home() {
         onTouchEnd={handleTouchEnd}
         onScroll={handleFeedScroll}
         onWheel={handleFeedWheel}
-        className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative bg-black"
+        className="h-full w-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll hide-scrollbar pb-16 md:pb-0 relative bg-black flex-1"
       >
         {refreshing && (
           <div className="absolute top-4 left-0 right-0 flex justify-center z-50">
@@ -301,10 +329,11 @@ export function Home() {
             </div>
           </div>
         )}
-        {videos.map((video, index) => (
+        {videos.map((video) => (
           <VideoItem 
             key={video.feedId} 
             video={video} 
+            onDelete={() => handlePostDeleted(video.id)}
           />
         ))}
         {hasMore ? (
@@ -341,7 +370,10 @@ export function Home() {
   );
 }
 
-export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string } }> = ({ video }) => {
+export const VideoItem: React.FC<{ 
+  video: Video & { user: User; feedId?: string };
+  onDelete?: (id: string) => void;
+}> = ({ video, onDelete }) => {
   const { currentUser, setCurrentUser } = useAppStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const ytPlayerRef = useRef<any>(null);
@@ -365,6 +397,16 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
   const [shareUsers, setShareUsers] = useState<User[]>([]);
   const [sharedTo, setSharedTo] = useState<string | null>(null);
   const shouldPlayYoutube = useRef(false);
+
+  const areFriends = isFriend(currentUser, video.user);
+  const canDelete = !video.isYouTube && (currentUser?.id === video.userId || currentUser?.role === 'owner' || currentUser?.role === 'staff');
+  const isImageMedia = video.mediaType === 'image';
+
+  const handleDeletePost = async () => {
+    if (!window.confirm("Are you sure you want to delete this post? This action cannot be undone.")) return;
+    await deleteVideoFromDB(video.id);
+    if (onDelete) onDelete(video.id);
+  };
 
   useEffect(() => {
     // Only subscribe to real-time updates for non-YouTube shorts (or YouTube shorts that are already in the DB, though their ID works too once added).
@@ -635,7 +677,18 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
             />
           </div>
         )
-      ) : video.videoUrl && (video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:')) ? (
+      ) : isImageMedia ? (
+        <div className="w-full h-full bg-black flex items-center justify-center relative select-none" onClick={togglePlay}>
+          <img 
+            src={video.videoUrl} 
+            alt={video.description} 
+            className={`max-w-full max-h-full object-contain ${video.filter || ''}`} 
+          />
+          <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 z-20">
+            <ImageIcon size={14} /> Photo
+          </div>
+        </div>
+      ) : video.videoUrl && (video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:') || video.videoUrl.includes('video')) ? (
         <video 
           ref={videoRef}
           src={video.videoUrl}
@@ -657,7 +710,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
       
       {video.isYouTube && <div className="absolute inset-0 z-10" onClick={togglePlay} />}
       
-      {!isPlaying && (
+      {!isPlaying && !isImageMedia && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <div className="bg-black/50 p-4 rounded-full text-white">
             <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
@@ -666,7 +719,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
       )}
 
       {/* Right Action Bar */}
-      <div className="absolute right-4 bottom-24 md:bottom-20 flex flex-col items-center gap-5 z-20 transition-opacity">
+      <div className="absolute right-4 bottom-24 md:bottom-20 flex flex-col items-center gap-4 z-20 transition-opacity">
         <div className="relative mb-2">
           <Link to={`/profile/${video.user?.handle || ''}`}>
             {video.user?.avatarUrl ? (
@@ -696,11 +749,17 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
           <span className="text-xs font-semibold">{video.comments?.length || 0}</span>
         </button>
         
-        <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={() => setShowAIChat(true)}>
-          <div className="p-2 rounded-full bg-white/20 backdrop-blur-md text-pink-300 shadow-[0_0_15px_rgba(236,72,153,0.3)] border border-white/10 hover:bg-white/30 transition-all">
-            <Sparkles size={28} className="fill-current" />
+        {/* Glass button with AI text */}
+        <button 
+          className="flex flex-col items-center gap-1 text-white drop-shadow-md group cursor-pointer" 
+          onClick={() => setShowAIChat(true)}
+          title="Ask AI about this video"
+        >
+          <div className="px-2.5 py-1.5 rounded-2xl bg-white/20 hover:bg-white/30 backdrop-blur-xl border border-white/30 text-white shadow-[0_4px_16px_rgba(0,0,0,0.3)] flex items-center gap-1 transition-all group-hover:scale-105 active:scale-95 group-hover:border-pink-400/60">
+            <Sparkles size={15} className="text-pink-300 animate-pulse fill-pink-300" />
+            <span className="text-xs font-black tracking-wider text-white">AI</span>
           </div>
-          <span className="text-xs font-semibold text-pink-200">Ask AI</span>
+          <span className="text-[10px] font-semibold text-pink-200 drop-shadow">Ask AI</span>
         </button>
         
         <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={handleFavorite}>
@@ -717,10 +776,24 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
           <span className="text-xs font-semibold">Share</span>
         </button>
 
+        {/* Delete Post Button if owner/staff or post author */}
+        {canDelete && (
+          <button 
+            className="flex flex-col items-center gap-1 text-white drop-shadow-md" 
+            onClick={handleDeletePost}
+            title="Delete this post"
+          >
+            <div className="p-2 rounded-full bg-zinc-800/60 hover:bg-red-600 text-zinc-300 hover:text-white transition-colors">
+              <Trash2 size={22} />
+            </div>
+            <span className="text-[10px] font-semibold">Delete</span>
+          </button>
+        )}
+
         {currentUser && (
-          <button className="flex flex-col items-center gap-1 text-white drop-shadow-md mt-2" onClick={() => setShowReport(true)}>
+          <button className="flex flex-col items-center gap-1 text-white drop-shadow-md mt-1" onClick={() => setShowReport(true)}>
             <div className="p-2 rounded-full bg-zinc-800/40 text-zinc-300 hover:text-red-500 transition-colors">
-              <Flag size={22} />
+              <Flag size={20} />
             </div>
             <span className="text-[10px] font-semibold">Report</span>
           </button>
@@ -729,9 +802,26 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
 
       {/* Bottom Info */}
       <div className="absolute bottom-0 left-0 right-16 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent text-white pb-20 md:pb-6 pointer-events-none z-10">
-        <Link to={`/profile/${video.user?.handle}`} className="font-bold text-lg pointer-events-auto hover:underline">
-          @{video.user?.handle || 'unknown'}
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link to={`/profile/${video.user?.handle}`} className="font-bold text-lg pointer-events-auto hover:underline">
+            @{video.user?.handle || 'unknown'}
+          </Link>
+          {areFriends && (
+            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full text-[10px] font-bold flex items-center gap-1">
+              <Users size={10} /> Friends
+            </span>
+          )}
+          {video.visibility === 'friends' && (
+            <span className="px-2 py-0.5 bg-zinc-800/90 text-zinc-300 rounded-full text-[10px] font-semibold flex items-center gap-1">
+              <Users size={10} /> Friends only
+            </span>
+          )}
+          {video.visibility === 'only_you' && (
+            <span className="px-2 py-0.5 bg-zinc-800/90 text-amber-300 rounded-full text-[10px] font-semibold flex items-center gap-1">
+              <Lock size={10} /> Only you
+            </span>
+          )}
+        </div>
         <p className="text-sm mt-1 mb-2 line-clamp-2">{video.description}</p>
         <div className="flex flex-wrap items-center gap-1 mb-2">
           {video.tags?.map(t => (
@@ -751,7 +841,7 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
       </div>
 
       {/* Progress Bar */}
-      {!video.isYouTube && (
+      {!video.isYouTube && !isImageMedia && (
         <div className="absolute bottom-12 md:bottom-0 left-0 right-0 h-4 z-30 flex items-end opacity-0 group-hover:opacity-100 transition-opacity">
           <input 
             type="range"
@@ -774,10 +864,19 @@ export const VideoItem: React.FC<{ video: Video & { user: User; feedId: string }
       )}
 
       {showAIChat && (
-        <>
-          <div className="absolute inset-0 bg-black/50 z-30 pointer-events-auto" onClick={() => setShowAIChat(false)} />
-          <AIChatPanel video={video} onClose={() => setShowAIChat(false)} />
-        </>
+        <AIChatPanel 
+          isOpen={showAIChat} 
+          onClose={() => setShowAIChat(false)} 
+          videoContext={{
+            title: video.description || 'Short Video',
+            creator: video.user?.username || video.user?.handle || 'creator',
+            tags: video.tags || [],
+            url: video.videoUrl,
+            isYouTube: video.isYouTube,
+            youtubeId: video.youtubeId,
+            mediaType: video.mediaType
+          }}
+        />
       )}
 
       {showReport && (

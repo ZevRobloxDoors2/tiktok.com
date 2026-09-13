@@ -22,6 +22,8 @@ export function Admin() {
     title: string;
     action: () => Promise<void>;
     requireReason: boolean;
+    reasonLabel?: string;
+    reasonPlaceholder?: string;
   }>({ isOpen: false, title: '', action: async () => {}, requireReason: false });
   const [actionReason, setActionReason] = useState('');
   
@@ -94,13 +96,22 @@ export function Admin() {
     await loadData();
   };
 
-  const executeWithConfirm = (title: string, action: (reason: string) => Promise<void>, requireReason = true) => {
+  const executeWithConfirm = (
+    title: string, 
+    action: (reason: string) => Promise<void>, 
+    requireReason = true,
+    reasonLabel?: string,
+    reasonPlaceholder?: string
+  ) => {
     setConfirmModal({
       isOpen: true,
       title,
       requireReason,
+      reasonLabel,
+      reasonPlaceholder,
       action: async () => {
-        await action(actionReason);
+        if (requireReason && !actionReason.trim()) return;
+        await action(actionReason.trim());
         setConfirmModal({ isOpen: false, title: '', action: async () => {}, requireReason: false });
         setActionReason('');
       }
@@ -129,54 +140,106 @@ export function Admin() {
         }
         await logAction(`report_${status}`, report.id, `Report resolved. Notes: ${reason}`);
       }
-    });
+    }, true, 'Moderator Note / Reason', 'State why this report is resolved...');
   };
 
   // User Ban actions
   const applyBan = (user: User, type: 'temp' | 'perm' | 'hwid', days?: number) => {
-    const title = type === 'temp' ? `Temp Ban (7 days)` : type === 'perm' ? 'Permanent Ban' : 'Enforcement Ban';
-    executeWithConfirm(title, async (reason) => {
-      const allUsers = await getUsers();
-      const idx = allUsers.findIndex(u => u.id === user.id);
-      if (idx !== -1) {
-        const until = type === 'temp' && days ? Date.now() + (days * 24 * 60 * 60 * 1000) : undefined;
-        allUsers[idx].banStatus = {
-          type,
-          until,
-          reason,
-          linkedAccount: type === 'hwid' ? user.handle : undefined
-        };
-        if (type === 'hwid') allUsers[idx].deviceId = allUsers[idx].deviceId || getDeviceId();
-        await saveUsers(allUsers);
-        setUsers(allUsers);
-        await logAction('ban_user', user.id, `Banned user (${type})${days ? ` for ${days} days` : ''}. Reason: ${reason}`);
-      }
-    });
+    const title = type === 'temp' 
+      ? `Temp Ban (7 days): @${user.handle}` 
+      : type === 'perm' 
+      ? `Permanent Ban: @${user.handle}` 
+      : `Enforcement (Hardware) Ban: @${user.handle}`;
+    
+    executeWithConfirm(
+      title, 
+      async (reason) => {
+        const allUsers = await getUsers();
+        const idx = allUsers.findIndex(u => u.id === user.id);
+        if (idx !== -1) {
+          const until = type === 'temp' && days ? Date.now() + (days * 24 * 60 * 60 * 1000) : undefined;
+          allUsers[idx].banStatus = {
+            type,
+            until,
+            reason: reason.trim(),
+            bannedBy: currentUser!.id,
+            bannedAt: Date.now(),
+            linkedAccount: type === 'hwid' ? user.handle : undefined
+          };
+          if (type === 'hwid') allUsers[idx].deviceId = allUsers[idx].deviceId || getDeviceId();
+          await saveUsers(allUsers);
+          setUsers(allUsers);
+          await logAction('ban_user', user.id, `Banned user (${type})${days ? ` for ${days} days` : ''}. Reason: ${reason}`);
+        }
+      },
+      true,
+      'Reason for Ban (Mandatory for staff/owner)',
+      'Specify the guideline violation or reason why this user is being banned...'
+    );
+  };
+
+  // User Unban action
+  const unbanUser = (user: User) => {
+    executeWithConfirm(
+      `Unban User: @${user.handle}`,
+      async (reason) => {
+        const allUsers = await getUsers();
+        const idx = allUsers.findIndex(u => u.id === user.id);
+        if (idx !== -1) {
+          delete allUsers[idx].banStatus;
+          await saveUsers(allUsers);
+          setUsers(allUsers);
+          await logAction('unban_user', user.id, `Unbanned user @${user.handle}. Reason: ${reason}`);
+        }
+      },
+      true,
+      'Reason for Unbanning (Mandatory)',
+      'Explain why this person is getting unbanned...'
+    );
   };
 
   // Appeal actions
   const resolveAppeal = (appeal: Appeal, status: 'accepted' | 'rejected') => {
-    executeWithConfirm(`${status === 'accepted' ? 'Accept' : 'Reject'} Appeal`, async (reason) => {
-      const allAppeals = await getAppeals();
-      const idx = allAppeals.findIndex(a => a.id === appeal.id);
-      if (idx !== -1) {
-        allAppeals[idx].status = status;
-        allAppeals[idx].adminNotes = reason;
-        await saveAppeals(allAppeals);
-        setAppeals(allAppeals);
-        
-        if (status === 'accepted') {
+    const u = users.find(user => user.id === appeal.userId);
+    const title = status === 'accepted' ? `Accept Appeal & Unban @${u?.handle || 'User'}` : `Reject Appeal - Keep @${u?.handle || 'User'} Banned`;
+    const label = status === 'accepted' 
+      ? 'Reason for Unbanning (Mandatory - why they are getting unbanned)' 
+      : 'Reason Why Still Banned (Mandatory - why they remain banned)';
+    const placeholder = status === 'accepted'
+      ? 'Provide detailed reason why this user is getting unbanned...'
+      : 'Explain why this appeal was rejected and why the user is still banned...';
+
+    executeWithConfirm(
+      title, 
+      async (reason) => {
+        const allAppeals = await getAppeals();
+        const idx = allAppeals.findIndex(a => a.id === appeal.id);
+        if (idx !== -1) {
+          allAppeals[idx].status = status;
+          allAppeals[idx].adminNotes = reason;
+          await saveAppeals(allAppeals);
+          setAppeals(allAppeals);
+          
           const allUsers = await getUsers();
-          const uIdx = allUsers.findIndex(u => u.id === appeal.userId);
+          const uIdx = allUsers.findIndex(user => user.id === appeal.userId);
           if (uIdx !== -1) {
-            delete allUsers[uIdx].banStatus;
+            if (status === 'accepted') {
+              delete allUsers[uIdx].banStatus;
+            } else {
+              if (allUsers[uIdx].banStatus) {
+                allUsers[uIdx].banStatus!.stillBannedReason = reason;
+              }
+            }
             await saveUsers(allUsers);
             setUsers(allUsers);
           }
+          await logAction(`appeal_${status}`, appeal.id, `Appeal ${status}. Reason/Notes: ${reason}`);
         }
-        await logAction(`appeal_${status}`, appeal.id, `Appeal ${status}. Notes: ${reason}`);
-      }
-    });
+      },
+      true,
+      label,
+      placeholder
+    );
   };
 
   const filteredLogs = logs.filter(log => {
@@ -285,9 +348,16 @@ export function Admin() {
                       </td>
                       <td className="py-3 pr-4">
                         {u.banStatus ? (
-                          <span className="text-red-500 text-xs uppercase bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded font-semibold whitespace-nowrap">
-                            {u.banStatus.type} Ban
-                          </span>
+                          <div>
+                            <span className="text-red-500 text-xs uppercase bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded font-semibold whitespace-nowrap">
+                              {u.banStatus.type} Ban
+                            </span>
+                            {u.banStatus.reason && (
+                              <p className="text-[11px] text-zinc-400 mt-1 max-w-[200px] truncate" title={u.banStatus.reason}>
+                                Reason: {u.banStatus.reason}
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-green-500 text-xs uppercase bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded font-semibold">
                             Active
@@ -298,7 +368,16 @@ export function Admin() {
                         {new Date(parseInt(u.id.split('_')[1] || '0')).toLocaleDateString() === 'Invalid Date' ? 'Unknown' : new Date(parseInt(u.id.split('_')[1])).toLocaleDateString()}
                       </td>
                       <td className="py-3">
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 items-center">
+                          {u.banStatus && (
+                            <button 
+                              onClick={() => unbanUser(u)} 
+                              className="px-2.5 py-1 bg-green-500/20 text-green-600 dark:text-green-400 font-semibold rounded text-xs hover:bg-green-500/30 flex items-center gap-1"
+                              title="Unban this user"
+                            >
+                              <CheckCircle size={13} /> Unban User
+                            </button>
+                          )}
                           {!u.banStatus && u.role !== 'owner' && (
                             <>
                               <button onClick={() => applyBan(u, 'temp', 7)} className="px-2 py-1 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-semibold rounded text-xs hover:bg-yellow-500/30">
@@ -431,12 +510,14 @@ export function Admin() {
             <h3 className="text-xl font-bold mb-4">{confirmModal.title}</h3>
             {confirmModal.requireReason ? (
               <div className="mb-6">
-                <label className="block text-sm font-semibold mb-2">Reason for Action (Required)</label>
+                <label className="block text-sm font-semibold mb-2">
+                  {confirmModal.reasonLabel || 'Reason for Action (Required)'}
+                </label>
                 <textarea 
                   value={actionReason}
                   onChange={e => setActionReason(e.target.value)}
                   className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 border border-transparent focus:border-pink-500 focus:outline-none resize-none min-h-[100px]"
-                  placeholder="Provide a detailed reason for the audit log..."
+                  placeholder={confirmModal.reasonPlaceholder || 'Provide a detailed reason for this action...'}
                 />
               </div>
             ) : (
