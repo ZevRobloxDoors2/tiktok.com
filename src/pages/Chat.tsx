@@ -257,8 +257,10 @@ export function Chat() {
                     <audio src={m.audioUrl} controls className="w-full mb-2" />
                   )}
                   {m.content && <p>{m.content}</p>}
-                  {m.sharedVideoId?.startsWith('yt_') && (
-                    <a href={`https://www.youtube.com/shorts/${m.sharedVideoId.slice(3)}`} target="_blank" rel="noreferrer" className="mt-2 block text-xs underline opacity-90">Watch shared Short</a>
+                  {m.sharedVideoId && (
+                    <Link to="/" className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 text-xs font-semibold hover:bg-black/30 transition-colors">
+                      <span>🎬 View shared video</span>
+                    </Link>
                   )}
                 </div>
               </div>

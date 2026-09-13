@@ -74,8 +74,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose, video
 Title: "${videoContext.title}"
 Creator: @${videoContext.creator}
 Tags: ${videoContext.tags.join(', ')}
-Type: ${isYt ? 'YouTube Short' : isPhoto ? 'Photo Post' : 'Direct Video'}
-${videoContext.youtubeId ? `YouTube ID: ${videoContext.youtubeId}` : ''}
+Type: ${isPhoto ? 'Photo Post' : 'Video'}
 
 Provide a brief, friendly 2-sentence summary of what happened in the video, and invite the user to ask any questions about the video or any off-topic questions.`;
 
@@ -89,8 +88,6 @@ Provide a brief, friendly 2-sentence summary of what happened in the video, and 
           videoContext: {
             description: videoContext.title,
             tags: videoContext.tags,
-            isYouTube: videoContext.isYouTube,
-            youtubeId: videoContext.youtubeId,
             creator: videoContext.creator
           }
         })
@@ -110,7 +107,7 @@ Provide a brief, friendly 2-sentence summary of what happened in the video, and 
           {
             role: 'model',
             parts: [{ 
-              text: `🎬 I've finished watching "${videoContext.title}" by @${videoContext.creator}!\n\nAsk me anything about what happened in this ${isYt ? 'YouTube Short' : 'video'}, the creator, background audio, or any off-topic question you're curious about.` 
+              text: `🎬 I've finished watching "${videoContext.title}" by @${videoContext.creator}!\n\nAsk me anything about what happened in this video, the creator, soundtrack, or any other questions!` 
             }],
             timestamp: Date.now()
           }
@@ -224,11 +221,11 @@ Provide a brief, friendly 2-sentence summary of what happened in the video, and 
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-sm text-white">AI Video Watcher</span>
                 <span className="px-1.5 py-0.2 text-[10px] font-bold bg-pink-500/20 text-pink-400 border border-pink-500/30 rounded-full">
-                  {videoContext.isYouTube ? 'YouTube Short' : 'Video'}
+                  {videoContext.mediaType === 'image' ? 'Photo' : 'Video'}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 truncate max-w-[260px]">
-                Watching @{videoContext.creator}: {videoContext.title || 'Short clip'}
+                Watching @{videoContext.creator}: {videoContext.title || 'Video'}
               </p>
             </div>
           </div>
@@ -255,7 +252,7 @@ Provide a brief, friendly 2-sentence summary of what happened in the video, and 
             </div>
 
             <h3 className="text-base font-bold text-white mb-1">
-              AI is watching the full {videoContext.isYouTube ? 'YouTube Short' : 'video'}...
+              AI is watching the full video...
             </h3>
             <p className="text-xs text-zinc-400 max-w-xs mb-5">
               Analyzing frames, speech, audio tracks, and creator context so you can ask anything.

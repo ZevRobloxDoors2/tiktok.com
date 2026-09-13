@@ -94,7 +94,7 @@ export function Home() {
             let fetchUrl = '/api/youtube-shorts';
             if (currentUser?.interests && currentUser.interests.length > 0) {
               const randomInterest = currentUser.interests[Math.floor(Math.random() * currentUser.interests.length)];
-              fetchUrl += `?q=${encodeURIComponent(randomInterest + ' shorts')}`;
+              fetchUrl += `?q=${encodeURIComponent(randomInterest + ' trending')}`;
             }
             
             const localResponse = await fetch(fetchUrl);
@@ -112,16 +112,35 @@ export function Home() {
           const valid = validItems.length > 0 ? validItems[Math.floor(Math.random() * validItems.length)] : undefined;
           if (valid) {
             nextYtPageToken = '';
+            const cleanedTitle = (valid.title || '')
+              .replace(/#shorts?\b/gi, '')
+              .replace(/#youtubeshorts?\b/gi, '')
+              .replace(/#youtube\b/gi, '')
+              .trim();
+
             nextVideo = {
               id: `yt_${valid.videoId}`,
-              userId: 'youtube_user', videoUrl: '', description: valid.title,
-              tags: ['#shorts', '#youtube'], likes: [], comments: [], timestamp: Date.now(),
-              views: 0, filter: '', isYouTube: true, youtubeId: valid.videoId,
+              userId: 'centraltok_creator', 
+              videoUrl: '', 
+              description: cleanedTitle || 'Trending video on CentralTok',
+              tags: ['#viral', '#trending', '#centraltok'], 
+              likes: [], 
+              comments: [], 
+              timestamp: Date.now(),
+              views: 0, 
+              filter: '', 
+              isYouTube: true, 
+              youtubeId: valid.videoId,
               user: {
-                id: 'youtube_user', email: `${valid.channelId}@youtube.local`, username: valid.channelTitle,
-                handle: valid.channelTitle.replace(/\s+/g, '').toLowerCase(),
+                id: 'centraltok_creator', 
+                email: `${valid.channelId}@centraltok.local`, 
+                username: valid.channelTitle,
+                handle: valid.channelTitle.replace(/\s+/g, '').toLowerCase().slice(0, 18),
                 avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${valid.channelId}`,
-                bio: 'YouTube Creator', following: [], followers: [], isPrivate: false
+                bio: 'CentralTok Creator', 
+                following: [], 
+                followers: [], 
+                isPrivate: false
               }
             };
           }
@@ -649,7 +668,8 @@ export const VideoItem: React.FC<{
       modestbranding: 1,
       fs: 0,
       disablekb: 1,
-      playsinline: 1
+      playsinline: 1,
+      iv_load_policy: 3
     },
   };
 
@@ -657,24 +677,43 @@ export const VideoItem: React.FC<{
     <div ref={containerRef} className="w-full h-full snap-start relative bg-black flex items-center justify-center group overflow-hidden">
       {video.isYouTube ? (
         youtubeError ? (
-          <div className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-4 bg-zinc-950 p-6 text-center text-white">
-            <img src={`https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`} alt="YouTube Short thumbnail" className="absolute inset-0 h-full w-full object-cover opacity-40" />
-            <div className="relative z-10">
-              <p className="font-semibold">This Short cannot be embedded.</p>
-              <a href={`https://www.youtube.com/shorts/${video.youtubeId}`} target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-lg bg-pink-600 px-4 py-2 font-semibold">Watch on YouTube</a>
+          <div className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-4 bg-zinc-950 p-6 text-center text-white select-none">
+            <img 
+              src={`https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`} 
+              alt="Video preview" 
+              className="absolute inset-0 h-full w-full object-cover opacity-25 blur-sm" 
+            />
+            <div className="relative z-10 max-w-xs flex flex-col items-center">
+              <div className="w-12 h-12 rounded-full bg-zinc-800/90 flex items-center justify-center mb-2 shadow-lg">
+                <Music size={22} className="text-pink-500" />
+              </div>
+              <p className="font-semibold text-sm">Media stream unavailable</p>
+              <button 
+                onClick={() => setYoutubeError(null)} 
+                className="mt-3 inline-block rounded-xl bg-pink-600 hover:bg-pink-700 px-4 py-2 text-xs font-bold text-white shadow-lg active:scale-95 transition-transform"
+              >
+                Retry Stream
+              </button>
             </div>
           </div>
         ) : (
-          <div className="absolute inset-0 z-0 pointer-events-none">
-            <YouTube 
-              videoId={video.youtubeId} 
-              opts={opts} 
-              onReady={handleYtReady}
-              onStateChange={handleYtStateChange}
-              onError={(event) => setYoutubeError(event.data)}
-              className="w-full h-full" 
-              iframeClassName="w-full h-full object-contain" 
-            />
+          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden flex items-center justify-center select-none bg-black">
+            {/* Cropped & scaled viewport to push any YouTube / Shorts watermark outside visible boundary */}
+            <div className="w-[124%] h-[124%] scale-105 relative flex items-center justify-center pointer-events-none">
+              <YouTube 
+                videoId={video.youtubeId} 
+                opts={opts} 
+                onReady={handleYtReady}
+                onStateChange={handleYtStateChange}
+                onError={(event) => setYoutubeError(event.data)}
+                className="w-full h-full" 
+                iframeClassName="w-full h-full object-cover pointer-events-none" 
+              />
+            </div>
+            {/* Edge gradient masks completely clipping corner watermarks */}
+            <div className="absolute bottom-0 right-0 w-44 h-24 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none z-[5]" />
+            <div className="absolute top-0 right-0 w-44 h-24 bg-gradient-to-b from-black via-black/80 to-transparent pointer-events-none z-[5]" />
+            <div className="absolute top-0 left-0 w-full h-16 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-[5]" />
           </div>
         )
       ) : isImageMedia ? (
@@ -822,16 +861,20 @@ export const VideoItem: React.FC<{
             </span>
           )}
         </div>
-        <p className="text-sm mt-1 mb-2 line-clamp-2">{video.description}</p>
+        <p className="text-sm mt-1 mb-2 line-clamp-2">
+          {video.description?.replace(/#shorts?\b/gi, '').replace(/#youtubeshorts?\b/gi, '').replace(/#youtube\b/gi, '').trim()}
+        </p>
         <div className="flex flex-wrap items-center gap-1 mb-2">
-          {video.tags?.map(t => (
-            <span key={t} className="text-sm font-semibold">{t}</span>
-          ))}
+          {(video.tags || [])
+            .filter(t => !/shorts?|youtube/i.test(t))
+            .map(t => (
+              <span key={t} className="text-sm font-semibold">{t}</span>
+            ))}
         </div>
         <div className="flex items-center gap-4 text-sm font-medium">
           <div className="flex items-center gap-2">
             <Music size={14} className="animate-[spin_4s_linear_infinite]" />
-            <span>{video.isYouTube ? 'YouTube Short Audio' : 'Original Audio'}</span>
+            <span>Original Audio</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Eye size={16} />

@@ -59,7 +59,11 @@ export function Explore() {
               isYouTube: true,
               youtubeId: vidId,
               videoUrl: `https://www.youtube.com/watch?v=${vidId}`,
-              description: item.snippet.title,
+              description: (item.snippet.title || '')
+                .replace(/#shorts?\b/gi, '')
+                .replace(/#youtubeshorts?\b/gi, '')
+                .replace(/#youtube\b/gi, '')
+                .trim(),
               user: {
                 handle: item.snippet.channelTitle,
                 username: item.snippet.channelTitle,

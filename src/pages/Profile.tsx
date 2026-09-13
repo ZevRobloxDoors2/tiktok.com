@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getUsers, getVideos, saveUsers, deleteVideoFromDB } from '../lib/db';
 import { User, Video } from '../types';
 import { useAppStore } from '../store';
 import { isFriend } from '../lib/utils';
-import { DiscordForum } from '../components/DiscordForum';
 import { 
   Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag, 
   Hammer, Wrench, Check, Trash2, HelpCircle, Users, Lock, Image as ImageIcon, LogOut 
@@ -14,13 +13,14 @@ import { VideoItem } from './Home';
 export function Profile() {
   const { handle } = useParams<{ handle: string }>();
   const { currentUser, setCurrentUser } = useAppStore();
+  const navigate = useNavigate();
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [likedVideos, setLikedVideos] = useState<Video[]>([]);
   const [favoriteVideos, setFavoriteVideos] = useState<Video[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'favorites' | 'faq'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'favorites'>('videos');
   const [showEdit, setShowEdit] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 
@@ -220,23 +220,17 @@ export function Profile() {
               <Bookmark size={18} /> Favorites
             </button>
           )}
-          {/* FAQ Forum tab under Profile categories */}
+          {/* Forum button that links to /forum */}
           <button 
-            onClick={() => setActiveTab('faq')}
-            className={`flex-1 py-4 font-semibold flex items-center justify-center gap-2 ${activeTab === 'faq' ? 'text-[#5865F2] border-b-2 border-[#5865F2]' : 'text-zinc-500'}`}
+            onClick={() => navigate('/forum')}
+            className="flex-1 py-4 font-semibold flex items-center justify-center gap-2 text-zinc-500 hover:text-[#5865F2] transition-colors"
           >
-            <HelpCircle size={18} /> FAQ Forum
+            <HelpCircle size={18} /> Forum
           </button>
         </div>
         
-        {/* Tab Content */}
-        {activeTab === 'faq' ? (
-          <div className="p-3 md:p-6">
-            <DiscordForum />
-          </div>
-        ) : (
-          /* Grid */
-          <div className="grid grid-cols-3 gap-0.5 md:gap-1 p-0.5 md:p-1">
+        {/* Tab Content Grid */}
+        <div className="grid grid-cols-3 gap-0.5 md:gap-1 p-0.5 md:p-1">
             {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : favoriteVideos).map(video => {
               const canDelete = currentUser?.id === video.userId || isStaffOrOwner;
               const isImage = video.mediaType === 'image';
@@ -298,7 +292,6 @@ export function Profile() {
               </div>
             )}
           </div>
-        )}
 
       </div>
       

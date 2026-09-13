@@ -139,9 +139,12 @@ export type Message = {
 export type Notification = {
   id: string;
   userId: string; // The user receiving the notification
-  type: 'like' | 'mention' | 'message' | 'follow';
+  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement';
   fromUserId: string;
   videoId?: string;
+  forumPostId?: string;
+  title?: string;
+  message?: string;
   read: boolean;
   timestamp: number;
 };

@@ -23,7 +23,20 @@ export function Inbox() {
       
       const userNotifs = allNotifs
         .filter(n => n.userId === currentUser.id)
-        .map(n => ({ ...n, fromUser: allUsers.find(u => u.id === n.fromUserId)! }))
+        .map(n => ({ 
+          ...n, 
+          fromUser: allUsers.find(u => u.id === n.fromUserId) || {
+            id: n.fromUserId || 'system',
+            username: 'CentralTok Staff',
+            handle: 'staff',
+            avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=staff',
+            email: 'staff@centraltok.local',
+            bio: 'Official CentralTok Team',
+            following: [],
+            followers: [],
+            isPrivate: false
+          }
+        }))
         .sort((a, b) => b.timestamp - a.timestamp);
       
       const userMsgs = allMsgs.filter(m => m.fromUserId === currentUser.id || m.toUserId === currentUser.id);
@@ -104,18 +117,28 @@ export function Inbox() {
                 <div key={n.id} className="p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
                   <div className="relative">
                     <img src={n.fromUser.avatarUrl} alt="" className="w-12 h-12 rounded-full" />
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-zinc-950 flex items-center justify-center
-                      {n.type === 'like' ? 'bg-pink-600' : n.type === 'follow' ? 'bg-blue-500' : 'bg-green-500'} text-white">
+                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-zinc-950 flex items-center justify-center text-white
+                      ${n.type === 'like' ? 'bg-pink-600' : n.type === 'follow' ? 'bg-blue-500' : n.type === 'forum_announcement' ? 'bg-[#5865F2]' : 'bg-green-500'}`}>
                       {n.type === 'like' && <Heart size={12} className="fill-current" />}
                       {n.type === 'follow' && <UserPlus size={12} />}
                       {n.type === 'mention' && <span className="text-[10px] font-bold">@</span>}
+                      {n.type === 'forum_announcement' && <span className="text-[10px]">📢</span>}
                     </div>
                   </div>
                   <div className="flex-1">
                     <p className="text-sm">
-                      <Link to={`/profile/${n.fromUser.handle}`} className="font-bold hover:underline">{n.fromUser.username}</Link>
-                      {' '}
-                      {n.type === 'like' ? 'liked your video' : n.type === 'follow' ? 'started following you' : 'mentioned you'}
+                      {n.type === 'forum_announcement' ? (
+                        <>
+                          <span className="font-bold text-[#5865F2]">📢 Forum Announcement:</span>{' '}
+                          <Link to="/forum" className="font-semibold hover:underline">{n.title || n.message}</Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link to={`/profile/${n.fromUser.handle}`} className="font-bold hover:underline">{n.fromUser.username}</Link>
+                          {' '}
+                          {n.type === 'like' ? 'liked your video' : n.type === 'follow' ? 'started following you' : 'mentioned you'}
+                        </>
+                      )}
                     </p>
                     <span className="text-xs text-zinc-500">{new Date(n.timestamp).toLocaleDateString()}</span>
                   </div>

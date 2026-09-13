@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { getFAQCategories, saveFAQCategories, getFAQPosts, saveFAQPosts, deleteFAQPostFromDB, getUsers } from '../lib/db';
+import { getFAQCategories, saveFAQCategories, getFAQPosts, saveFAQPosts, deleteFAQPostFromDB, getUsers, announceForumPostToEveryone } from '../lib/db';
 import { FAQCategory, FAQPost, FAQReply, User } from '../types';
 import { 
   Hash, Search, Pin, MessageSquare, Plus, Settings, Trash2, Send, 
@@ -154,6 +154,9 @@ export function DiscordForum() {
     const updated = [newPost, ...posts];
     setPosts(updated);
     await saveFAQPosts(updated);
+
+    // Announce to all users in the system; offline users will receive it when they come online
+    await announceForumPostToEveryone(newPost, currentUser);
 
     setNewTitle('');
     setNewContent('');

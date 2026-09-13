@@ -116,6 +116,36 @@ export const saveMessages = (messages: Message[]) => saveCollection('messages', 
 export const getNotifications = () => fetchCollection<Notification>('notifications');
 export const saveNotifications = (notifications: Notification[]) => saveCollection('notifications', notifications);
 
+export const markNotificationAsRead = async (notificationId: string) => {
+  try {
+    const docRef = doc(db, 'notifications', notificationId);
+    await updateDoc(docRef, { read: true });
+  } catch (err) {
+    console.error("Error marking notification as read:", err);
+  }
+};
+
+export const announceForumPostToEveryone = async (post: FAQPost, author: User) => {
+  try {
+    const allUsers = await getUsers();
+    const existingNotifs = await getNotifications();
+    const newNotifs: Notification[] = allUsers.map(user => ({
+      id: `notif_forum_${post.id}_${user.id}`,
+      userId: user.id,
+      type: 'forum_announcement',
+      fromUserId: author.id,
+      forumPostId: post.id,
+      title: post.title,
+      message: `📢 New Forum Announcement: "${post.title}"`,
+      read: false,
+      timestamp: Date.now()
+    }));
+    await saveNotifications([...existingNotifs, ...newNotifs]);
+  } catch (err) {
+    console.error("Error announcing forum post to everyone:", err);
+  }
+};
+
 export const getReports = () => fetchCollection<Report>('reports');
 export const saveReports = (reports: Report[]) => saveCollection('reports', reports);
 
