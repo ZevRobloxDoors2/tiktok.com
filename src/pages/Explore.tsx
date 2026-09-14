@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Play, User as UserIcon, Compass } from 'lucide-react';
+import { Search, X, Play, User as UserIcon, Compass, Sparkles } from 'lucide-react';
 import { getVideos, getUsers } from '../lib/db';
 import { Video, User } from '../types';
 import { VideoItem } from './Home';
@@ -81,6 +81,35 @@ export function Explore() {
         ...youtubeVideos.map(v => ({ type: 'video' as const, data: v }))
       ];
 
+      // AI Fallback: if no results or very few (< 4 videos), trigger AI search
+      if (formattedResults.filter(r => r.type === 'video').length < 4) {
+        try {
+          const aiRes = await fetch(`/api/ai-search?q=${encodeURIComponent(q)}`);
+          if (aiRes.ok) {
+            const aiData = await aiRes.json();
+            const aiVideos = aiData.map((v: any) => ({
+              id: v.id,
+              isAI: true,
+              description: v.description,
+              tags: v.tags,
+              views: v.views,
+              user: {
+                username: v.username,
+                handle: v.handle,
+                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${v.handle}`
+              },
+              timestamp: Date.now(),
+              videoUrl: '' // No real video URL for AI generated placeholders
+            }));
+            
+            // Add unique AI results that don't overlap with existing ones (though they are generated, so overlap is unlikely)
+            formattedResults.push(...aiVideos.map((v: any) => ({ type: 'video' as const, data: v })));
+          }
+        } catch (err) {
+          console.warn('AI search fallback failed:', err);
+        }
+      }
+
       setResults(formattedResults);
     } catch(err) {
       console.error(err);
@@ -159,6 +188,12 @@ export function Explore() {
                       >
                         {video.isYouTube && video.youtubeId ? (
                           <img src={`https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`} className="w-full h-full object-cover" alt="thumbnail" />
+                        ) : (video as any).isAI ? (
+                          <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex flex-col items-center justify-center p-4 text-center">
+                            <Sparkles size={32} className="text-white mb-2 animate-pulse" />
+                            <p className="text-white text-[10px] font-bold uppercase tracking-wider opacity-80">AI Generated Suggestion</p>
+                            <p className="text-white text-xs font-semibold mt-1 line-clamp-3">{video.description}</p>
+                          </div>
                         ) : video.videoUrl ? (
                           <video src={video.videoUrl} className="w-full h-full object-cover" />
                         ) : (
@@ -167,10 +202,16 @@ export function Explore() {
                           </div>
                         )}
                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <Play size={32} className="text-white drop-shadow-md" />
+                          {(video as any).isAI ? (
+                            <div className="bg-white/20 backdrop-blur-md rounded-full p-3 border border-white/30">
+                               <Sparkles size={32} className="text-white" />
+                            </div>
+                          ) : (
+                            <Play size={32} className="text-white drop-shadow-md" />
+                          )}
                         </div>
                         <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white text-xs font-semibold drop-shadow-md">
-                          <Play size={12} className="fill-current" /> {video.views || 0}
+                          {(video as any).isAI ? <Sparkles size={12} className="fill-current" /> : <Play size={12} className="fill-current" />} {video.views || 0}
                         </div>
                       </div>
                     ))}

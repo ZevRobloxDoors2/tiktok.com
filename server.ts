@@ -121,6 +121,44 @@ Answer any questions the user has about this video, explain what is happening in
   app.all("/api/chat", handleChat);
   app.all("*/api/chat", handleChat);
 
+  app.get("/api/ai-search", async (req, res) => {
+    try {
+      const q = req.query.q as string || 'trending';
+      const ai = getAiClient();
+      if (!ai) return res.status(503).json({ error: "AI Service Unavailable" });
+
+      const prompt = `You are a search engine for "CentralTok", a short-form video app like TikTok.
+User is searching for: "${q}"
+Generate 6 diverse and highly relevant video search results. 
+Each result must be a JSON object with:
+- id: a unique string starting with "ai_"
+- description: a catchy video description
+- username: a creative username for the creator
+- handle: a creative handle (no spaces)
+- tags: array of 3-5 relevant hashtags
+- views: a realistic view count (number)
+- duration: length in seconds (15-60)
+
+Return ONLY a valid JSON array of these objects. No markdown formatting, no extra text.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: "application/json",
+        }
+      });
+
+      const text = response.text || '[]';
+      const aiResults = JSON.parse(text);
+      
+      res.json(aiResults);
+    } catch (error) {
+      console.error('AI Search Error:', error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
   app.get("/api/youtube-shorts", async (req, res) => {
     try {
       const apiKeys = Array.from({length: 20}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean) as string[];

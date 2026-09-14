@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos } from '../lib/db';
 import { User, Report, Appeal, AuditLog, Video } from '../types';
-import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2 } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
 
 export function Admin() {
@@ -20,10 +20,11 @@ export function Admin() {
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
-    action: () => Promise<void>;
+    action: (reason: string) => Promise<void>;
     requireReason: boolean;
     reasonLabel?: string;
     reasonPlaceholder?: string;
+    loading?: boolean;
   }>({ isOpen: false, title: '', action: async () => {}, requireReason: false });
   const [actionReason, setActionReason] = useState('');
   
@@ -103,19 +104,28 @@ export function Admin() {
     reasonLabel?: string,
     reasonPlaceholder?: string
   ) => {
+    setActionReason('');
     setConfirmModal({
       isOpen: true,
       title,
       requireReason,
       reasonLabel,
       reasonPlaceholder,
-      action: async () => {
-        if (requireReason && !actionReason.trim()) return;
-        await action(actionReason.trim());
-        setConfirmModal({ isOpen: false, title: '', action: async () => {}, requireReason: false });
-        setActionReason('');
-      }
+      action
     });
+  };
+
+  const handleConfirmAction = async () => {
+    if (confirmModal.requireReason && !actionReason.trim()) return;
+    setConfirmModal(prev => ({ ...prev, loading: true }));
+    try {
+      await confirmModal.action(actionReason.trim());
+      setConfirmModal({ isOpen: false, title: '', action: async () => {}, requireReason: false, loading: false });
+      setActionReason('');
+    } catch (err) {
+      console.error(err);
+      setConfirmModal(prev => ({ ...prev, loading: false }));
+    }
   };
 
   // Report actions
@@ -525,17 +535,26 @@ export function Admin() {
             )}
             <div className="flex gap-3">
               <button 
-                onClick={() => setConfirmModal({ isOpen: false, title: '', action: async () => {}, requireReason: false })}
-                className="flex-1 py-3 font-semibold bg-zinc-200 dark:bg-zinc-800 rounded-xl"
+                onClick={() => {
+                  setConfirmModal({ isOpen: false, title: '', action: async () => {}, requireReason: false });
+                  setActionReason('');
+                }}
+                disabled={confirmModal.loading}
+                className="flex-1 py-3 font-semibold bg-zinc-200 dark:bg-zinc-800 rounded-xl hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
               >
                 Cancel
               </button>
               <button 
-                onClick={confirmModal.action}
-                disabled={confirmModal.requireReason && !actionReason.trim()}
-                className="flex-1 py-3 font-semibold bg-pink-600 text-white rounded-xl disabled:opacity-50"
+                onClick={handleConfirmAction}
+                disabled={(confirmModal.requireReason && !actionReason.trim()) || confirmModal.loading}
+                className="flex-1 py-3 font-semibold bg-pink-600 text-white rounded-xl disabled:opacity-50 hover:bg-pink-700 transition-colors flex items-center justify-center gap-2"
               >
-                Confirm
+                {confirmModal.loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Processing...
+                  </>
+                ) : 'Confirm'}
               </button>
             </div>
           </div>

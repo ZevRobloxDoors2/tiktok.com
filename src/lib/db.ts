@@ -144,6 +144,17 @@ export const markNotificationAsRead = async (notificationId: string) => {
   }
 };
 
+export const subscribeToNotifications = (userId: string, callback: (notifications: Notification[]) => void) => {
+  return onSnapshot(collection(db, 'notifications'), (snapshot) => {
+    const notifs = snapshot.docs
+      .map(doc => doc.data() as Notification)
+      .filter(n => n.userId === userId);
+    callback(notifs);
+  }, (err) => {
+    console.warn("Notification subscription error:", err);
+  });
+};
+
 export const announceForumPostToEveryone = async (post: FAQPost, author: User) => {
   try {
     const allUsers = await getUsers();

@@ -16,6 +16,7 @@ export function Chat() {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraFilter, setCameraFilter] = useState('');
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -135,6 +136,7 @@ export function Chat() {
   const startAudioRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setAudioStream(stream);
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -170,6 +172,7 @@ export function Chat() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       setIsRecordingAudio(false);
+      setAudioStream(null);
     }
   };
 
@@ -266,9 +269,19 @@ export function Chat() {
                     <video src={m.videoUrl} controls className="w-full rounded-lg mb-2 max-h-64 object-cover" />
                   )}
                   {m.audioUrl && (
-                    <audio src={m.audioUrl} controls className="w-full mb-2" />
+                    <div className="space-y-1.5 min-w-[200px]">
+                      <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${isMe ? 'text-pink-100' : 'text-zinc-500'}`}>
+                        <Mic size={10} />
+                        <span>Voice Message</span>
+                      </div>
+                      <audio 
+                        src={m.audioUrl} 
+                        controls 
+                        className={`w-full h-8 rounded-lg ${isMe ? 'brightness-200 contrast-75' : ''}`} 
+                      />
+                    </div>
                   )}
-                  {m.content && <p>{m.content}</p>}
+                  {m.content && <p className="mt-1">{m.content}</p>}
                   {m.sharedVideoId && (
                     <Link to="/" className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 text-xs font-semibold hover:bg-black/30 transition-colors">
                       <span>🎬 View shared video</span>
@@ -327,14 +340,24 @@ export function Chat() {
             </button>
           )}
 
-          <input 
-            type="text" 
-            value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
-            placeholder={isRecordingAudio ? "Recording audio..." : "Send a message..."}
-            className="flex-1 bg-zinc-100 dark:bg-zinc-900 rounded-full px-4 py-2.5 outline-none focus:ring-2 focus:ring-pink-500 transition-all"
-            disabled={isUploading || isRecordingAudio}
-          />
+          {isRecordingAudio && audioStream ? (
+            <div className="flex-1 bg-zinc-100 dark:bg-zinc-900 rounded-full px-4 py-2 flex items-center gap-3 overflow-hidden border border-pink-500/20">
+              <div className="flex items-center gap-1.5 text-pink-500 animate-pulse shrink-0">
+                <Mic size={16} />
+                <span className="text-[10px] font-bold uppercase tracking-tighter">Live</span>
+              </div>
+              <VoiceVisualizer stream={audioStream} />
+            </div>
+          ) : (
+            <input 
+              type="text" 
+              value={newMessage}
+              onChange={e => setNewMessage(e.target.value)}
+              placeholder="Send a message..."
+              className="flex-1 bg-zinc-100 dark:bg-zinc-900 rounded-full px-4 py-2.5 outline-none focus:ring-2 focus:ring-pink-500 transition-all"
+              disabled={isUploading}
+            />
+          )}
           <button 
             type="submit"
             disabled={(!newMessage.trim() && !isUploading) || isUploading}
@@ -374,4 +397,70 @@ export function Chat() {
       )}
     </div>
   );
+}
+
+function VoiceVisualizer({ stream }: { stream: MediaStream }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    let audioContext: AudioContext;
+    let analyser: AnalyserNode;
+    let source: MediaStreamAudioSourceNode;
+    let animationId: number;
+
+    const start = () => {
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      analyser.fftSize = 64;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const draw = () => {
+        animationId = requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const padding = 3;
+        const barWidth = (canvas.width / (bufferLength / 2)) - padding;
+        
+        for (let i = 0; i < bufferLength / 2; i++) {
+          const barHeight = (dataArray[i] / 255) * canvas.height * 0.8;
+          const x = i * (barWidth + padding);
+          const y = (canvas.height - barHeight) / 2;
+          
+          ctx.fillStyle = '#ec4899'; // pink-500
+          
+          // Draw rounded bars manually for compatibility if roundRect is missing
+          const radius = barWidth / 2;
+          if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(x, y, barWidth, Math.max(barHeight, 4), radius);
+            ctx.fill();
+          } else {
+            ctx.fillRect(x, y, barWidth, Math.max(barHeight, 4));
+          }
+        }
+      };
+
+      draw();
+    };
+
+    start();
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      if (audioContext) audioContext.close();
+    };
+  }, [stream]);
+
+  return <canvas ref={canvasRef} width={200} height={32} className="flex-1 h-8 opacity-80" />;
 }

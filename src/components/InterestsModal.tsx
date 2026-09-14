@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { getUsers, saveUsers } from '../lib/db';
+import { Loader2 } from 'lucide-react';
 
 const TOPICS = [
   'Funny', 'Gaming', 'Building', 'Creative', 'Sports',
@@ -63,9 +64,14 @@ export function InterestsModal() {
         <button
           onClick={handleSave}
           disabled={selected.length === 0 || loading}
-          className="w-full bg-pink-600 text-white font-bold py-3 rounded-xl hover:bg-pink-700 transition-colors disabled:opacity-50"
+          className="w-full bg-pink-600 text-white font-bold py-3 rounded-xl hover:bg-pink-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
         >
-          {loading ? 'Saving...' : 'Continue'}
+          {loading ? (
+            <>
+              <Loader2 className="animate-spin" size={20} />
+              Saving...
+            </>
+          ) : 'Continue'}
         </button>
       </div>
     </div>

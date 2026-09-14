@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
 import { AIChatPanel } from '../components/AIChatPanel';
 import { StoriesBar } from '../components/StoriesBar';
+import { HolographicBadge, LikeParticles, AmbientGlow, ProfileHoverCard } from '../components/UIPolish';
 import { isFriend } from '../lib/utils';
 import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
 import { getReports, saveReports } from '../lib/db';
@@ -415,6 +416,8 @@ export const VideoItem: React.FC<{
   const [showShare, setShowShare] = useState(false);
   const [shareUsers, setShareUsers] = useState<User[]>([]);
   const [sharedTo, setSharedTo] = useState<string | null>(null);
+  const [likePos, setLikePos] = useState<{ x: number, y: number } | null>(null);
+  const lastTapRef = useRef<number>(0);
   const shouldPlayYoutube = useRef(false);
 
   const areFriends = isFriend(currentUser, video.user);
@@ -542,8 +545,14 @@ export const VideoItem: React.FC<{
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isActive, isPlaying, togglePlay]);
 
-  const handleLike = async () => {
+  const handleLike = async (e?: React.MouseEvent) => {
     if (!currentUser) return;
+    
+    // Particle effect trigger
+    if (e) {
+      setLikePos({ x: e.clientX, y: e.clientY });
+    }
+
     const newStatus = !isLiked;
     setIsLiked(newStatus);
     setLikesCount(prev => newStatus ? prev + 1 : prev - 1);
@@ -562,6 +571,15 @@ export const VideoItem: React.FC<{
       }
       await saveVideos(dbVideos);
     }
+  };
+
+  const handleDoubleTap = (e: React.MouseEvent) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      if (!isLiked) handleLike(e);
+      else setLikePos({ x: e.clientX, y: e.clientY });
+    }
+    lastTapRef.current = now;
   };
 
   const handleFavorite = async () => {
@@ -674,230 +692,245 @@ export const VideoItem: React.FC<{
   };
 
   return (
-    <div ref={containerRef} className="w-full h-full snap-start relative bg-black flex items-center justify-center group overflow-hidden">
-      {video.isYouTube ? (
-        youtubeError ? (
-          <div className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-4 bg-zinc-950 p-6 text-center text-white select-none">
-            <img 
-              src={`https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`} 
-              alt="Video preview" 
-              className="absolute inset-0 h-full w-full object-cover opacity-25 blur-sm" 
-            />
-            <div className="relative z-10 max-w-xs flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full bg-zinc-800/90 flex items-center justify-center mb-2 shadow-lg">
-                <Music size={22} className="text-pink-500" />
+    <div 
+      ref={containerRef} 
+      className="w-full h-full snap-start relative bg-black flex items-center justify-center group overflow-hidden"
+    >
+      <AmbientGlow 
+        src={video.isYouTube ? `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg` : (video.videoUrl || video.thumbnailUrl)} 
+        type={isImageMedia ? 'image' : 'video'}
+      >
+        <div className="relative w-full h-full max-w-[450px] aspect-[9/16] bg-black shadow-2xl flex items-center justify-center">
+          {/* Main Media Content */}
+          <div 
+            className="relative w-full h-full cursor-pointer group/vid" 
+            onClick={togglePlay}
+            onMouseDown={handleDoubleTap}
+          >
+            {video.isYouTube ? (
+              youtubeError ? (
+                <div className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-4 bg-zinc-950 p-6 text-center text-white select-none">
+                  <img 
+                    src={`https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`} 
+                    alt="Video preview" 
+                    className="absolute inset-0 h-full w-full object-cover opacity-25 blur-sm" 
+                  />
+                  <div className="relative z-10 max-w-xs flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-full bg-zinc-800/90 flex items-center justify-center mb-2 shadow-lg">
+                      <Music size={22} className="text-pink-500" />
+                    </div>
+                    <p className="font-semibold text-sm">Media stream unavailable</p>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setYoutubeError(null); }} 
+                      className="mt-3 inline-block rounded-xl bg-pink-600 hover:bg-pink-700 px-4 py-2 text-xs font-bold text-white shadow-lg active:scale-95 transition-transform"
+                    >
+                      Retry Stream
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden flex items-center justify-center select-none bg-black">
+                  <div className="w-[124%] h-[124%] scale-105 relative flex items-center justify-center pointer-events-none">
+                    <YouTube 
+                      videoId={video.youtubeId} 
+                      opts={opts} 
+                      onReady={handleYtReady}
+                      onStateChange={handleYtStateChange}
+                      onError={(event) => setYoutubeError(event.data)}
+                      className="w-full h-full" 
+                      iframeClassName="w-full h-full object-cover pointer-events-none" 
+                    />
+                  </div>
+                  <div className="absolute bottom-0 right-0 w-44 h-24 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none z-[5]" />
+                  <div className="absolute top-0 right-0 w-44 h-24 bg-gradient-to-b from-black via-black/80 to-transparent pointer-events-none z-[5]" />
+                  <div className="absolute top-0 left-0 w-full h-16 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-[5]" />
+                </div>
+              )
+            ) : isImageMedia ? (
+              <div className="w-full h-full bg-black flex items-center justify-center relative select-none">
+                <img 
+                  src={video.videoUrl} 
+                  alt={video.description} 
+                  className={`max-w-full max-h-full object-contain ${video.filter || ''}`} 
+                />
+                <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 z-20">
+                  <ImageIcon size={14} /> Photo
+                </div>
               </div>
-              <p className="font-semibold text-sm">Media stream unavailable</p>
-              <button 
-                onClick={() => setYoutubeError(null)} 
-                className="mt-3 inline-block rounded-xl bg-pink-600 hover:bg-pink-700 px-4 py-2 text-xs font-bold text-white shadow-lg active:scale-95 transition-transform"
-              >
-                Retry Stream
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden flex items-center justify-center select-none bg-black">
-            {/* Cropped & scaled viewport to push any YouTube / Shorts watermark outside visible boundary */}
-            <div className="w-[124%] h-[124%] scale-105 relative flex items-center justify-center pointer-events-none">
-              <YouTube 
-                videoId={video.youtubeId} 
-                opts={opts} 
-                onReady={handleYtReady}
-                onStateChange={handleYtStateChange}
-                onError={(event) => setYoutubeError(event.data)}
-                className="w-full h-full" 
-                iframeClassName="w-full h-full object-cover pointer-events-none" 
+            ) : video.videoUrl ? (
+              <video 
+                ref={videoRef}
+                src={video.videoUrl}
+                className={`w-full h-full object-contain bg-black ${video.filter || ''}`}
+                loop
+                playsInline
+                onTimeUpdate={handleTimeUpdate}
               />
-            </div>
-            {/* Edge gradient masks completely clipping corner watermarks */}
-            <div className="absolute bottom-0 right-0 w-44 h-24 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none z-[5]" />
-            <div className="absolute top-0 right-0 w-44 h-24 bg-gradient-to-b from-black via-black/80 to-transparent pointer-events-none z-[5]" />
-            <div className="absolute top-0 left-0 w-full h-16 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-[5]" />
-          </div>
-        )
-      ) : isImageMedia ? (
-        <div className="w-full h-full bg-black flex items-center justify-center relative select-none" onClick={togglePlay}>
-          <img 
-            src={video.videoUrl} 
-            alt={video.description} 
-            className={`max-w-full max-h-full object-contain ${video.filter || ''}`} 
-          />
-          <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 z-20">
-            <ImageIcon size={14} /> Photo
-          </div>
-        </div>
-      ) : video.videoUrl && (video.videoUrl.endsWith('.mp4') || video.videoUrl.startsWith('blob:') || video.videoUrl.includes('video')) ? (
-        <video 
-          ref={videoRef}
-          src={video.videoUrl}
-          className={`w-full h-full object-contain bg-black ${video.filter || ''}`}
-          loop
-          playsInline
-          onClick={togglePlay}
-          onTimeUpdate={handleTimeUpdate}
-        />
-      ) : video.videoUrl ? (
-        <div className="w-full h-full bg-black flex items-center justify-center" onClick={togglePlay}>
-          <img src={video.videoUrl} alt="Video fallback" className={`w-full h-full object-contain opacity-50 ${video.filter || ''}`} />
-        </div>
-      ) : (
-        <div className="w-full h-full bg-zinc-900 flex items-center justify-center" onClick={togglePlay}>
-          <Loader2 size={32} className="text-pink-600 animate-spin" />
-        </div>
-      )}
-      
-      {video.isYouTube && <div className="absolute inset-0 z-10" onClick={togglePlay} />}
-      
-      {!isPlaying && !isImageMedia && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="bg-black/50 p-4 rounded-full text-white">
-            <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          </div>
-        </div>
-      )}
-
-      {/* Right Action Bar */}
-      <div className="absolute right-4 bottom-24 md:bottom-20 flex flex-col items-center gap-4 z-20 transition-opacity">
-        <div className="relative mb-2">
-          <Link to={`/profile/${video.user?.handle || ''}`}>
-            {video.user?.avatarUrl ? (
-              <img src={video.user.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white bg-zinc-800 object-cover" />
             ) : (
-              <div className="w-12 h-12 rounded-full border-2 border-white bg-zinc-800 flex items-center justify-center">
-                <UserIcon size={24} className="text-zinc-500" />
+              <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+                <Loader2 size={32} className="text-pink-600 animate-spin" />
               </div>
             )}
-          </Link>
-          <button className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-pink-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-lg font-bold pb-0.5">
-            +
-          </button>
-        </div>
-        
-        <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={handleLike}>
-          <div className={`p-2 rounded-full ${isLiked ? 'bg-pink-600/20 text-pink-600' : 'bg-zinc-800/40 text-white'}`}>
-            <Heart size={28} className={isLiked ? 'fill-current' : ''} />
+            
+            {/* Play Overlay */}
+            {!isPlaying && !isImageMedia && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="bg-black/50 p-4 rounded-full text-white backdrop-blur-md">
+                  <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+              </div>
+            )}
           </div>
-          <span className="text-xs font-semibold">{likesCount}</span>
-        </button>
-        
-        <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={() => setShowComments(true)}>
-          <div className="p-2 rounded-full bg-zinc-800/40 text-white">
-            <MessageCircle size={28} className="fill-current" />
-          </div>
-          <span className="text-xs font-semibold">{video.comments?.length || 0}</span>
-        </button>
-        
-        {/* Glass button with AI text */}
-        <button 
-          className="flex flex-col items-center gap-1 text-white drop-shadow-md group cursor-pointer" 
-          onClick={() => setShowAIChat(true)}
-          title="Ask AI about this video"
-        >
-          <div className="px-2.5 py-1.5 rounded-2xl bg-white/20 hover:bg-white/30 backdrop-blur-xl border border-white/30 text-white shadow-[0_4px_16px_rgba(0,0,0,0.3)] flex items-center gap-1 transition-all group-hover:scale-105 active:scale-95 group-hover:border-pink-400/60">
-            <Sparkles size={15} className="text-pink-300 animate-pulse fill-pink-300" />
-            <span className="text-xs font-black tracking-wider text-white">AI</span>
-          </div>
-          <span className="text-[10px] font-semibold text-pink-200 drop-shadow">Ask AI</span>
-        </button>
-        
-        <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={handleFavorite}>
-          <div className={`p-2 rounded-full ${isFavorited ? 'text-yellow-400' : 'bg-zinc-800/40 text-white'}`}>
-            <Bookmark size={28} className={isFavorited ? 'fill-current' : ''} />
-          </div>
-          <span className="text-xs font-semibold">Save</span>
-        </button>
 
-        <button className="flex flex-col items-center gap-1 text-white drop-shadow-md" onClick={handleShare}>
-          <div className="p-2 rounded-full bg-zinc-800/40 text-white">
-            <Share2 size={28} className="fill-current" />
-          </div>
-          <span className="text-xs font-semibold">Share</span>
-        </button>
+          {/* Particle System */}
+          {likePos && (
+            <LikeParticles 
+              x={likePos.x} 
+              y={likePos.y} 
+              onComplete={() => setLikePos(null)} 
+            />
+          )}
 
-        {/* Delete Post Button if owner/staff or post author */}
-        {canDelete && (
-          <button 
-            className="flex flex-col items-center gap-1 text-white drop-shadow-md" 
-            onClick={handleDeletePost}
-            title="Delete this post"
-          >
-            <div className="p-2 rounded-full bg-zinc-800/60 hover:bg-red-600 text-zinc-300 hover:text-white transition-colors">
-              <Trash2 size={22} />
+          {/* Right Action Bar (Glassmorphic) */}
+          <div className="absolute right-3 bottom-24 md:bottom-20 flex flex-col items-center gap-5 z-20 transition-opacity">
+            <div className="relative mb-2 group/user">
+              <ProfileHoverCard user={video.user} />
+              <Link to={`/profile/${video.user?.handle || ''}`}>
+                {video.user?.avatarUrl ? (
+                  <img src={video.user.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white bg-zinc-800 object-cover shadow-[0_0_15px_rgba(255,255,255,0.3)] transform transition-transform group-hover/user:scale-110" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full border-2 border-white bg-zinc-800 flex items-center justify-center">
+                    <UserIcon size={24} className="text-zinc-500" />
+                  </div>
+                )}
+              </Link>
+              <button className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-pink-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-lg font-bold pb-0.5 shadow-lg transform transition-transform hover:scale-125">
+                +
+              </button>
             </div>
-            <span className="text-[10px] font-semibold">Delete</span>
-          </button>
-        )}
+            
+            <button className="flex flex-col items-center gap-1 group" onClick={(e) => handleLike(e)}>
+              <div className={`p-3 rounded-full backdrop-blur-md border border-white/10 transition-all duration-300 ${isLiked ? 'bg-pink-600/20 text-pink-600 border-pink-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                <Heart size={28} className={isLiked ? 'fill-current drop-shadow-[0_0_8px_rgba(236,72,153,0.6)]' : ''} />
+              </div>
+              <span className="text-xs font-bold text-white drop-shadow-md">{likesCount}</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 group" onClick={() => setShowComments(true)}>
+              <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-all">
+                <MessageCircle size={28} className="fill-current" />
+              </div>
+              <span className="text-xs font-bold text-white drop-shadow-md">{video.comments?.length || 0}</span>
+            </button>
+            
+            <button 
+              className="flex flex-col items-center gap-1 group" 
+              onClick={() => setShowAIChat(true)}
+            >
+              <div className="px-3 py-2 rounded-2xl bg-white/20 hover:bg-white/30 backdrop-blur-xl border border-white/30 text-white shadow-[0_4px_16px_rgba(0,0,0,0.3)] flex items-center gap-1 transition-all group-hover:scale-105 active:scale-95 group-hover:border-pink-400/60">
+                <Sparkles size={16} className="text-pink-300 animate-pulse fill-pink-300" />
+                <span className="text-[10px] font-black tracking-widest text-white">AI</span>
+              </div>
+              <span className="text-[10px] font-bold text-pink-100 drop-shadow">Ask AI</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 group" onClick={handleFavorite}>
+              <div className={`p-3 rounded-full backdrop-blur-md border border-white/10 transition-all duration-300 ${isFavorited ? 'bg-amber-500/20 text-yellow-400 border-yellow-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                <Bookmark size={28} className={isFavorited ? 'fill-current drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]' : ''} />
+              </div>
+              <span className="text-xs font-bold text-white drop-shadow-md">Save</span>
+            </button>
 
-        {currentUser && (
-          <button className="flex flex-col items-center gap-1 text-white drop-shadow-md mt-1" onClick={() => setShowReport(true)}>
-            <div className="p-2 rounded-full bg-zinc-800/40 text-zinc-300 hover:text-red-500 transition-colors">
-              <Flag size={20} />
+            <button className="flex flex-col items-center gap-1 group" onClick={handleShare}>
+              <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-all">
+                <Share2 size={28} className="fill-current" />
+              </div>
+              <span className="text-xs font-bold text-white drop-shadow-md">Share</span>
+            </button>
+
+            {canDelete && (
+              <button 
+                className="flex flex-col items-center gap-1 group" 
+                onClick={handleDeletePost}
+              >
+                <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-zinc-300 hover:bg-red-600/20 hover:text-red-500 transition-all">
+                  <Trash2 size={22} />
+                </div>
+                <span className="text-[10px] font-bold text-white drop-shadow-md">Delete</span>
+              </button>
+            )}
+
+            {currentUser && (
+              <button className="flex flex-col items-center gap-1 group" onClick={() => setShowReport(true)}>
+                <div className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-red-400 transition-colors">
+                  <Flag size={18} />
+                </div>
+                <span className="text-[9px] font-bold text-zinc-400">Report</span>
+              </button>
+            )}
+          </div>
+
+          {/* Bottom Info Section (Polished) */}
+          <div className="absolute bottom-0 left-0 right-16 p-6 pt-20 bg-gradient-to-t from-black/90 via-black/40 to-transparent text-white pb-20 md:pb-8 pointer-events-none z-10">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link to={`/profile/${video.user?.handle}`} className="font-black text-xl pointer-events-auto hover:underline flex items-center gap-2 group/author">
+                @{video.user?.handle || 'unknown'}
+                <div className="flex gap-1">
+                  {video.user?.isVerified && <HolographicBadge type="verified" />}
+                  {video.user?.role === 'staff' && <HolographicBadge type="staff" />}
+                  {video.user?.role === 'owner' && <HolographicBadge type="owner" />}
+                </div>
+              </Link>
+              {areFriends && (
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm">
+                  <Users size={10} /> Friends
+                </span>
+              )}
+              {video.visibility === 'friends' && (
+                <span className="px-2 py-0.5 bg-zinc-800/90 text-zinc-300 rounded-full text-[10px] font-semibold flex items-center gap-1">
+                  <Users size={10} /> Friends only
+                </span>
+              )}
             </div>
-            <span className="text-[10px] font-semibold">Report</span>
-          </button>
-        )}
-      </div>
-
-      {/* Bottom Info */}
-      <div className="absolute bottom-0 left-0 right-16 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent text-white pb-20 md:pb-6 pointer-events-none z-10">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link to={`/profile/${video.user?.handle}`} className="font-bold text-lg pointer-events-auto hover:underline">
-            @{video.user?.handle || 'unknown'}
-          </Link>
-          {areFriends && (
-            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full text-[10px] font-bold flex items-center gap-1">
-              <Users size={10} /> Friends
-            </span>
-          )}
-          {video.visibility === 'friends' && (
-            <span className="px-2 py-0.5 bg-zinc-800/90 text-zinc-300 rounded-full text-[10px] font-semibold flex items-center gap-1">
-              <Users size={10} /> Friends only
-            </span>
-          )}
-          {video.visibility === 'only_you' && (
-            <span className="px-2 py-0.5 bg-zinc-800/90 text-amber-300 rounded-full text-[10px] font-semibold flex items-center gap-1">
-              <Lock size={10} /> Only you
-            </span>
-          )}
-        </div>
-        <p className="text-sm mt-1 mb-2 line-clamp-2">
-          {video.description?.replace(/#shorts?\b/gi, '').replace(/#youtubeshorts?\b/gi, '').replace(/#youtube\b/gi, '').trim()}
-        </p>
-        <div className="flex flex-wrap items-center gap-1 mb-2">
-          {(video.tags || [])
-            .filter(t => !/shorts?|youtube/i.test(t))
-            .map(t => (
-              <span key={t} className="text-sm font-semibold">{t}</span>
-            ))}
-        </div>
-        <div className="flex items-center gap-4 text-sm font-medium">
-          <div className="flex items-center gap-2">
-            <Music size={14} className="animate-[spin_4s_linear_infinite]" />
-            <span>Original Audio</span>
+            <p className="text-sm mt-2 mb-3 line-clamp-2 leading-relaxed opacity-90 drop-shadow">
+              {video.description?.replace(/#shorts?\b/gi, '').replace(/#youtubeshorts?\b/gi, '').replace(/#youtube\b/gi, '').trim()}
+            </p>
+            
+            <div className="flex items-center gap-4 text-xs font-bold">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 group/music cursor-pointer pointer-events-auto">
+                <Music size={14} className="animate-[spin_4s_linear_infinite] text-pink-400" />
+                <span className="max-w-[120px] overflow-hidden whitespace-nowrap overflow-ellipsis">Original Audio</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-full border border-white/5">
+                <Eye size={16} className="text-zinc-400" />
+                <span>{views.toLocaleString()}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Eye size={16} />
-            <span>{views}</span>
+
+          {/* Interactive Glowing Progress Bar */}
+          <div className="absolute bottom-12 md:bottom-0 left-0 right-0 h-1.5 z-30 group/progress">
+            <div className="w-full h-full bg-white/10 relative overflow-hidden group-hover/progress:h-2.5 transition-all cursor-pointer pointer-events-auto">
+              <motion.div 
+                className="h-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 relative shadow-[0_0_12px_rgba(236,72,153,0.8)]"
+                style={{ width: `${progress}%` }}
+              >
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full opacity-0 group-hover/progress:opacity-100 transition-opacity shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
+              </motion.div>
+              <input 
+                type="range"
+                min="0"
+                max="100"
+                step="0.1"
+                value={progress || 0}
+                onChange={handleSeek}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                onClick={e => e.stopPropagation()}
+              />
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Progress Bar */}
-      {!video.isYouTube && !isImageMedia && (
-        <div className="absolute bottom-12 md:bottom-0 left-0 right-0 h-4 z-30 flex items-end opacity-0 group-hover:opacity-100 transition-opacity">
-          <input 
-            type="range"
-            min="0"
-            max="100"
-            step="0.1"
-            value={progress || 0}
-            onChange={handleSeek}
-            className="w-full video-slider"
-            onClick={e => e.stopPropagation()}
-          />
-        </div>
-      )}
+      </AmbientGlow>
       
       {showComments && (
         <>

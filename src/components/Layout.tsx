@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X, HelpCircle, Bell } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
-import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts } from '../lib/db';
+import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications } from '../lib/db';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { currentUser, theme, toggleTheme, introPhase, showAuthModal, setShowAuthModal } = useAppStore();
@@ -55,45 +56,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   // Check announcements - when offline user arrives/comes online, this delivers their pending announcement notification immediately
   useEffect(() => {
-    let active = true;
-    const checkAnnouncements = async () => {
-      try {
-        const [allNotifs, allUsers, allPosts] = await Promise.all([
-          getNotifications(),
-          getUsers(),
-          getFAQPosts()
-        ]);
-
-        if (!active) return;
-
-        if (currentUser) {
-          const unreadForumNotifs = allNotifs.filter(
-            n => n.userId === currentUser.id && n.type === 'forum_announcement' && !n.read
-          );
-
-          if (unreadForumNotifs.length > 0) {
-            const latest = unreadForumNotifs.sort((a, b) => b.timestamp - a.timestamp)[0];
-            const sessionKey = `ct_shown_forum_${latest.id}`;
-            if (!sessionStorage.getItem(sessionKey)) {
-              sessionStorage.setItem(sessionKey, 'true');
-              const author = allUsers.find(u => u.id === latest.fromUserId);
-              setForumToast({
-                id: latest.id,
-                title: latest.title || 'New Forum Announcement',
-                authorName: author?.username || 'Staff Team',
-                authorAvatar: author?.avatarUrl
-              });
-
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('📢 CentralTok Announcement', {
-                  body: latest.title || 'New Forum announcement posted',
-                  icon: author?.avatarUrl
-                });
-              }
-            }
-          }
-        } else {
-          // Guest online arrival check
+    if (!currentUser) {
+      // Guest online arrival check
+      const checkGuestAnnouncements = async () => {
+        try {
+          const [allUsers, allPosts] = await Promise.all([getUsers(), getFAQPosts()]);
           if (allPosts.length > 0) {
             const latestPost = allPosts.sort((a, b) => b.timestamp - a.timestamp)[0];
             const isRecent = Date.now() - latestPost.timestamp < 1000 * 60 * 60 * 24;
@@ -109,18 +76,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
               });
             }
           }
-        }
-      } catch (err) {
-        console.warn('Announcement poll error:', err);
-      }
-    };
+        } catch (err) {}
+      };
+      checkGuestAnnouncements();
+      return;
+    }
 
-    checkAnnouncements();
-    const interval = setInterval(checkAnnouncements, 5000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
+    const unsubscribe = subscribeToNotifications(currentUser.id, async (unreadForumNotifs) => {
+      const pending = unreadForumNotifs.filter(n => n.type === 'forum_announcement' && !n.read);
+      if (pending.length > 0) {
+        const latest = pending.sort((a, b) => b.timestamp - a.timestamp)[0];
+        const sessionKey = `ct_shown_forum_${latest.id}`;
+        if (!sessionStorage.getItem(sessionKey)) {
+          sessionStorage.setItem(sessionKey, 'true');
+          const users = await getUsers();
+          const author = users.find(u => u.id === latest.fromUserId);
+          setForumToast({
+            id: latest.id,
+            title: latest.title || 'New Forum Announcement',
+            authorName: author?.username || 'Staff Team',
+            authorAvatar: author?.avatarUrl
+          });
+
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('📢 CentralTok Announcement', {
+              body: latest.title || 'New Forum announcement posted',
+              icon: author?.avatarUrl
+            });
+          }
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, [currentUser?.id]);
 
   const handleSupportSubmit = async () => {
@@ -169,16 +157,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 overflow-hidden transition-colors">
       {/* Sidebar - Desktop */}
       {!isIntro && (
-        <div className="hidden md:flex w-64 flex-col border-r border-zinc-200 dark:border-zinc-800 p-4 shrink-0 h-full">
-          <Link to="/" className="flex flex-col gap-1 mb-8 px-2">
+        <div className="hidden md:flex w-64 flex-col border-r border-zinc-200 dark:border-zinc-800 p-4 shrink-0 h-full bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl z-50">
+          <Link to="/" className="flex flex-col gap-1 mb-8 px-2 group">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-lg flex items-center justify-center font-bold text-xl leading-none">C</div>
-              <span className="text-xl font-bold tracking-tight">CentralTok</span>
+              <div className="w-10 h-10 bg-black dark:bg-white text-white dark:text-black rounded-xl flex items-center justify-center font-black text-2xl leading-none transform transition-transform group-hover:rotate-6 group-hover:scale-110">C</div>
+              <span className="text-2xl font-black tracking-tighter">Central<span className="text-pink-600">Tok</span></span>
             </div>
           </Link>
-          <div className="text-xs text-zinc-500 mb-6 bg-zinc-100 dark:bg-zinc-900 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 leading-relaxed">
-            <span className="font-bold text-pink-600 dark:text-pink-400 block mb-1">BETA v0.9</span> 
-            This is in BETA, some bugs might appear, if they somehow appear please go to <button onClick={() => setShowSupportModal(true)} className="text-blue-500 dark:text-blue-400 hover:underline font-semibold inline">support</button>
+          <div className="text-[10px] text-zinc-500 mb-6 bg-zinc-100/50 dark:bg-zinc-900/50 backdrop-blur-md p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 leading-relaxed shadow-sm">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="bg-pink-600 text-white px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">BETA v0.9</span>
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            </div>
+            Bugs might appear. If so, please contact <button onClick={() => setShowSupportModal(true)} className="text-blue-500 dark:text-blue-400 hover:underline font-bold inline">support</button>
           </div>
         
         <nav className="flex-1 space-y-2">
@@ -190,14 +181,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 key={item.label} 
                 to={item.path}
                 onClick={(e) => handleNavClick(e, item.path)}
-                className={`flex items-center gap-4 px-3 py-3 rounded-xl transition-colors relative ${isActive ? 'text-pink-600 font-bold bg-pink-50 dark:bg-pink-950/30' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 font-medium'}`}
+                className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all relative group ${isActive ? 'text-pink-600 font-black bg-pink-500/10 border border-pink-500/20 shadow-[0_0_20px_rgba(236,72,153,0.1)]' : 'hover:bg-zinc-100 dark:hover:bg-white/5 font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
               >
-                <item.icon className={isActive ? 'fill-current' : ''} size={26} strokeWidth={isActive ? 2.5 : 2} />
-                <span className="text-lg">{item.label}</span>
+                <item.icon className={`transition-all ${isActive ? 'fill-current scale-110' : 'group-hover:scale-110'}`} size={24} strokeWidth={isActive ? 3 : 2} />
+                <span className="text-lg tracking-tight">{item.label}</span>
                 {isMessages && unreadCount > 0 && (
-                  <span className="ml-auto bg-pink-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
+                  <span className="ml-auto bg-pink-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(236,72,153,0.4)]">
                     {unreadCount}
                   </span>
+                )}
+                {isActive && (
+                  <motion.div layoutId="nav-active" className="absolute left-0 w-1 h-8 bg-pink-600 rounded-r-full" />
                 )}
               </Link>
             );
@@ -208,10 +202,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link 
             to="/upload"
             onClick={(e) => handleNavClick(e, '/upload')}
-            className="flex items-center justify-center gap-2 w-full bg-pink-600 hover:bg-pink-700 text-white py-3 rounded-xl font-semibold transition-colors"
+            className="group relative flex items-center justify-center gap-3 w-full bg-gradient-to-r from-pink-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 text-white py-4 rounded-2xl font-black tracking-widest shadow-[0_10px_20px_rgba(236,72,153,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
           >
-            <PlusSquare size={20} />
-            <span>Upload</span>
+            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <PlusSquare size={22} strokeWidth={3} />
+            <span className="uppercase text-sm">Upload</span>
           </Link>
           
           <button 
@@ -302,33 +297,38 @@ export function Layout({ children }: { children: React.ReactNode }) {
       
       {/* Mobile Bottom Nav */}
       {!isIntro && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around p-2 z-40">
-          <Link to="/" onClick={(e) => handleNavClick(e, '/')} className="p-2">
-            <Home size={22} className={location.pathname === '/' ? 'text-pink-600 fill-current' : 'text-zinc-500'} />
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around px-2 py-3 z-50 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
+          <Link to="/" onClick={(e) => handleNavClick(e, '/')} className="p-2.5 relative group">
+            <Home size={26} className={location.pathname === '/' ? 'text-pink-600 fill-current drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]' : 'text-zinc-500'} />
+            {location.pathname === '/' && <motion.div layoutId="mob-nav" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-600 rounded-full" />}
           </Link>
-          <Link to="/explore" onClick={(e) => handleNavClick(e, '/explore')} className="p-2">
-            <Compass size={22} className={location.pathname === '/explore' ? 'text-pink-600 fill-current' : 'text-zinc-500'} />
+          <Link to="/explore" onClick={(e) => handleNavClick(e, '/explore')} className="p-2.5 relative">
+            <Compass size={26} className={location.pathname === '/explore' ? 'text-pink-600 fill-current drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]' : 'text-zinc-500'} />
+            {location.pathname === '/explore' && <motion.div layoutId="mob-nav" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-600 rounded-full" />}
           </Link>
-          <Link to="/upload" onClick={(e) => handleNavClick(e, '/upload')} className="p-1">
-            <div className="w-10 h-7 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-500 p-[2px] flex items-center justify-center">
-              <div className="bg-white dark:bg-zinc-950 w-full h-full rounded-[9px] flex items-center justify-center">
-                <PlusSquare size={18} className="text-zinc-900 dark:text-white" />
+          <Link to="/upload" onClick={(e) => handleNavClick(e, '/upload')} className="p-1 transform hover:scale-110 active:scale-95 transition-transform">
+            <div className="w-12 h-8 rounded-xl bg-gradient-to-br from-cyan-400 via-pink-500 to-purple-600 p-[2px] shadow-lg shadow-pink-500/20">
+              <div className="w-full h-full bg-black dark:bg-zinc-900 rounded-[10px] flex items-center justify-center">
+                <PlusSquare size={20} className="text-white" />
               </div>
             </div>
           </Link>
-          <Link to="/messages" onClick={(e) => handleNavClick(e, '/messages')} className="p-2 relative">
-            <MessageSquare size={22} className={location.pathname === '/messages' ? 'text-pink-600 fill-current' : 'text-zinc-500'} />
+          <Link to="/messages" onClick={(e) => handleNavClick(e, '/messages')} className="p-2.5 relative">
+            <MessageSquare size={26} className={location.pathname === '/messages' ? 'text-pink-600 fill-current drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]' : 'text-zinc-500'} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-pink-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+              <span className="absolute top-1 right-1 bg-pink-600 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white dark:border-zinc-950">
                 {unreadCount}
               </span>
             )}
+            {location.pathname === '/messages' && <motion.div layoutId="mob-nav" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-600 rounded-full" />}
           </Link>
-          <Link to="/forum" onClick={(e) => handleNavClick(e, '/forum')} className="p-2">
-            <HelpCircle size={22} className={location.pathname === '/forum' ? 'text-pink-600 fill-current' : 'text-zinc-500'} />
-          </Link>
-          <Link to={currentUser ? `/profile/${currentUser.handle}` : '#'} onClick={(e) => handleNavClick(e, currentUser ? `/profile/${currentUser.handle}` : '#')} className="p-2">
-            <User size={22} className={location.pathname.startsWith('/profile') ? 'text-pink-600 fill-current' : 'text-zinc-500'} />
+          <Link to={currentUser ? `/profile/${currentUser.handle}` : '#'} onClick={(e) => handleNavClick(e, currentUser ? `/profile/${currentUser.handle}` : '#')} className="p-2.5 relative">
+            {currentUser ? (
+              <img src={currentUser.avatarUrl} className={`w-8 h-8 rounded-full border-2 transition-all ${location.pathname.includes('/profile') ? 'border-pink-600 scale-110 shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'border-zinc-300 dark:border-zinc-700'}`} alt="" />
+            ) : (
+              <User size={26} className="text-zinc-500" />
+            )}
+            {location.pathname.includes('/profile') && <motion.div layoutId="mob-nav" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-600 rounded-full" />}
           </Link>
         </div>
       )}
