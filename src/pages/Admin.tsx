@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos } from '../lib/db';
+import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings } from '../lib/db';
 import { User, Report, Appeal, AuditLog, Video } from '../types';
 import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2 } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
@@ -14,6 +14,7 @@ export function Admin() {
   const [appeals, setAppeals] = useState<Appeal[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [appSettings, setAppSettings] = useState<{ useCache: boolean }>({ useCache: true });
   
   const [logSearch, setLogSearch] = useState('');
   
@@ -37,6 +38,10 @@ export function Admin() {
     setAppeals(await getAppeals());
     setLogs(await getAuditLogs());
     setVideos(await getVideos());
+    if (isOwner) {
+      const settings = await getAppSettings();
+      setAppSettings(settings);
+    }
   };
 
   useEffect(() => {
@@ -252,6 +257,14 @@ export function Admin() {
     );
   };
 
+  const toggleCache = async () => {
+    if (!isOwner) return;
+    const newSettings = { useCache: !appSettings.useCache };
+    setAppSettings(newSettings);
+    await saveAppSettings(newSettings);
+    await logAction('toggle_cache', 'system', `Toggled cached data to ${newSettings.useCache ? 'ON' : 'OFF'}`);
+  };
+
   const filteredLogs = logs.filter(log => {
     if (!logSearch) return true;
     const searchLower = logSearch.toLowerCase();
@@ -270,8 +283,8 @@ export function Admin() {
         </div>
 
         <div className="flex gap-2 mb-6 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto pb-2">
-          {['reports', 'users', 'appeals', 'logs'].map(tab => (
-            (tab !== 'logs' || isOwner) && (
+          {['reports', 'users', 'appeals', 'logs', 'settings'].map(tab => (
+            ((tab !== 'logs' && tab !== 'settings') || isOwner) && (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -506,6 +519,46 @@ export function Admin() {
                   );
                 })}
                 {filteredLogs.length === 0 && <p className="text-zinc-500">No audit logs available.</p>}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'settings' && isOwner && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-xl font-bold mb-2">Global App Settings</h2>
+                <p className="text-zinc-500 text-sm mb-6">Manage high-level system behaviors. These changes affect all users instantly.</p>
+                
+                <div className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-lg">YouTube Data Caching</h3>
+                      <p className="text-sm text-zinc-500 max-w-md mt-1">
+                        When enabled, the app will prefer using the pre-fetched video feed to save YouTube API quota. 
+                        Turn this off to force the app to use live API keys from GitHub Secrets.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={toggleCache}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none ${
+                        appSettings.useCache ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          appSettings.useCache ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
+                      appSettings.useCache ? 'bg-green-100 text-green-600 dark:bg-green-900/30' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800'
+                    }`}>
+                      Status: {appSettings.useCache ? 'Cached Data ON (Default)' : 'Cached Data OFF (Live API)'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

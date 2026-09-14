@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { 
   getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, 
   ensureVideoInDB, getMessages, saveMessages, getNotifications, 
-  saveNotifications, subscribeToVideo, deleteVideoFromDB 
+  saveNotifications, subscribeToVideo, deleteVideoFromDB, getAppSettings 
 } from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
@@ -85,13 +85,21 @@ export function Home() {
 
       if (!nextVideo) {
         try {
+          const settings = await getAppSettings();
           let feedItems: Array<{videoId?: string; title?: string; channelTitle?: string; channelId?: string}> = [];
-          const staticResponse = await fetch('./youtube-feed.json', {cache: 'no-store'});
-          if (staticResponse.ok) {
-            const data = await staticResponse.json();
-            feedItems = data.videos || [];
-            setYoutubeOverloaded(Boolean(data.overloaded));
-          } else {
+          
+          let staticResponseOk = false;
+          if (settings.useCache) {
+            const staticResponse = await fetch('./youtube-feed.json', {cache: 'no-store'});
+            if (staticResponse.ok) {
+              const data = await staticResponse.json();
+              feedItems = data.videos || [];
+              setYoutubeOverloaded(Boolean(data.overloaded));
+              staticResponseOk = true;
+            }
+          }
+
+          if (!staticResponseOk) {
             let fetchUrl = '/api/youtube-shorts';
             if (currentUser?.interests && currentUser.interests.length > 0) {
               const randomInterest = currentUser.interests[Math.floor(Math.random() * currentUser.interests.length)];

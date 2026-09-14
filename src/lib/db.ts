@@ -230,4 +230,27 @@ export const deleteForumEditRequestFromDB = async (reqId: string) => {
   }
 };
 
+export const getAppSettings = async () => {
+  try {
+    const docRef = doc(db, 'app_settings', 'global');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as { useCache: boolean };
+    }
+    return { useCache: true };
+  } catch (err) {
+    console.error("Error fetching app settings:", err);
+    return { useCache: true };
+  }
+};
+
+export const saveAppSettings = async (settings: { useCache: boolean }) => {
+  try {
+    const docRef = doc(db, 'app_settings', 'global');
+    await setDoc(docRef, settings);
+  } catch (err) {
+    console.error("Error saving app settings:", err);
+  }
+};
+
 export const clearDb = async () => {};
