@@ -21,7 +21,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [introPhase, setIntroPhase] = useState<'loading' | 'merging' | 'expanding' | 'done'>('loading');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
+    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
   const [isLoading, setIsLoading] = useState(true);
 

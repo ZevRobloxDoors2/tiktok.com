@@ -254,7 +254,9 @@ export function Home() {
 
   const scrollDown = () => {
     if (containerRef.current) {
+      advanceRequested.current = true;
       containerRef.current.scrollBy({ top: containerRef.current.clientHeight, behavior: 'smooth' });
+      fetchBatch();
     }
   };
 
@@ -368,21 +370,23 @@ export function Home() {
       </motion.div>
       
       {/* Desktop Navigation Arrows */}
-      <div className="hidden md:flex absolute right-8 top-1/2 -translate-y-1/2 flex-col gap-4">
+      <div className="hidden md:flex absolute right-8 top-1/2 -translate-y-1/2 flex-col gap-4 z-40">
         <button 
           onClick={scrollUp}
-          className="p-4 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-full transition-colors drop-shadow-xl"
+          className="p-4 bg-white/10 dark:bg-zinc-800/80 hover:bg-pink-600 text-white rounded-full transition-all drop-shadow-2xl backdrop-blur-md border border-white/20 hover:scale-110 active:scale-95 group"
+          title="Scroll Up"
         >
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+          <svg className="w-8 h-8 transition-transform group-hover:-translate-y-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
           </svg>
         </button>
         <button 
           onClick={scrollDown}
-          className="p-4 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-full transition-colors drop-shadow-xl"
+          className="p-4 bg-white/10 dark:bg-zinc-800/80 hover:bg-pink-600 text-white rounded-full transition-all drop-shadow-2xl backdrop-blur-md border border-white/20 hover:scale-110 active:scale-95 group"
+          title="Scroll Down"
         >
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          <svg className="w-8 h-8 transition-transform group-hover:translate-y-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
       </div>
