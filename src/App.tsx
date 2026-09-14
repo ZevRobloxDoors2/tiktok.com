@@ -17,6 +17,7 @@ import { BanScreen } from './components/BanScreen';
 import { InterestsModal } from './components/InterestsModal';
 import { Admin } from './pages/Admin';
 import { Forum } from './pages/Forum';
+import { GamesApps } from './pages/GamesApps';
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { currentUser } = useAppStore();
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="/messages" element={<Inbox />} />
               <Route path="/messages/:handle" element={<Chat />} />
               <Route path="/forum" element={<Forum />} />
+              <Route path="/games-apps" element={<GamesApps />} />
               <Route path="/admin" element={<Admin />} />
             </Routes>
           </Layout>

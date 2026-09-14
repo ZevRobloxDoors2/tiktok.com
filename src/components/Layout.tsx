@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X, HelpCircle, Bell } from 'lucide-react';
+import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X, HelpCircle, Bell, Gamepad2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
@@ -140,6 +140,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
     { icon: User, label: 'Profile', path: currentUser ? `/profile/${currentUser.handle}` : '#' },
     { icon: HelpCircle, label: 'Forum', path: '/forum' },
+    { icon: Gamepad2, label: 'Games & Apps', path: '/games-apps' },
   ];
 
   if (currentUser?.role === 'staff' || currentUser?.role === 'owner') {
