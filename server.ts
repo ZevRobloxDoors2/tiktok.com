@@ -188,8 +188,12 @@ Return ONLY a valid JSON array of these objects. No markdown formatting, no extr
       }
 
       const apiKeys = Array.from({length: 20}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean) as string[];
+      if (process.env.YOUTUBE_API_KEY && !apiKeys.includes(process.env.YOUTUBE_API_KEY)) {
+        apiKeys.unshift(process.env.YOUTUBE_API_KEY);
+      }
+
       if (apiKeys.length === 0) {
-        return res.status(500).json({ error: "YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_20 are required" });
+        return res.status(500).json({ error: "YouTube API Key is required. Please set YOUTUBE_API_KEY in secrets." });
       }
 
       const pageToken = req.query.pageToken as string || '';
@@ -217,7 +221,10 @@ Return ONLY a valid JSON array of these objects. No markdown formatting, no extr
         const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${queryParams.toString()}`);
         if (response.ok) return res.json(await response.json());
       }
-      res.status(503).json({error: 'The Servers are Overloaded, This will be fixed shortly'});
+      res.status(503).json({
+        error: 'The Servers are Overloaded, This will be fixed shortly',
+        details: 'All configured API keys failed to return a valid response. Please check your YouTube API keys and quotas in Google Cloud Console.'
+      });
     } catch (error) {
       console.error('YouTube API Error:', error);
       res.status(500).json({ error: "Internal Server Error" });

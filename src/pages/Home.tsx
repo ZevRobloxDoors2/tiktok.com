@@ -123,6 +123,9 @@ export function Home() {
                 channelTitle: item.snippet.channelTitle,
                 channelId: item.snippet.channelId
               }));
+              setYoutubeOverloaded(false);
+            } else if (localResponse.status === 503) {
+              setYoutubeOverloaded(true);
             }
           }
           const validItems = feedItems.filter((item: {videoId?: string}) => item.videoId && !seenFeedIds.current.has(`yt_${item.videoId}`));
