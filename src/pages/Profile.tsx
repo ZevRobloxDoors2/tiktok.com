@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { getUsers, getVideos, saveUsers, deleteVideoFromDB, getAppeals, saveAppeals } from '../lib/db';
 import { User, Video, Appeal } from '../types';
 import { useAppStore } from '../store';

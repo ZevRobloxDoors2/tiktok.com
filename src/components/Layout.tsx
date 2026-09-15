@@ -1,13 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X, HelpCircle, Bell, Gamepad2 } from 'lucide-react';
+import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X, HelpCircle, Bell, Gamepad2, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
+import { MiniPlayer } from './MiniPlayer';
 import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications } from '../lib/db';
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { currentUser, theme, toggleTheme, introPhase, showAuthModal, setShowAuthModal } = useAppStore();
+  const { 
+    currentUser, 
+    theme, 
+    toggleTheme, 
+    introPhase, 
+    showAuthModal, 
+    setShowAuthModal, 
+    isGameActive, 
+    setIsGameActive,
+    miniPlayerActive
+  } = useAppStore();
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
   const [supportType, setSupportType] = useState<'support' | 'bug' | null>(null);
@@ -190,7 +201,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 overflow-hidden transition-colors">
       {/* Sidebar - Desktop */}
       {!isIntro && (
-        <div className="hidden md:flex w-64 flex-col border-r border-zinc-200 dark:border-zinc-800 p-4 shrink-0 h-full bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl z-50">
+        <motion.div 
+          id="desktop-sidebar"
+          animate={{ 
+            x: isGameActive ? -256 : 0,
+            width: isGameActive ? 0 : 256,
+            opacity: isGameActive ? 0 : 1
+          }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="hidden md:flex flex-col border-r border-zinc-200 dark:border-zinc-800 p-4 shrink-0 h-full bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl z-50 overflow-hidden"
+        >
           <Link to="/" className="flex flex-col gap-1 mb-8 px-2 group">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-black dark:bg-white text-white dark:text-black rounded-xl flex items-center justify-center font-black text-2xl leading-none transform transition-transform group-hover:rotate-6 group-hover:scale-110">C</div>
@@ -268,13 +288,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
       )}
 
       {/* Main Content */}
-      <main className="flex-1 relative h-full overflow-hidden flex justify-center">
+      <main id="main-content" className={`flex-1 relative h-full overflow-hidden flex justify-center transition-all duration-500 ${isGameActive ? 'pl-0' : ''}`}>
         {children}
       </main>
+
+      <MiniPlayer />
 
       {/* Forum Announcement Toast (Triggered immediately when user comes online) */}
       {forumToast && (
@@ -355,7 +377,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       
       {/* Mobile Bottom Nav */}
       {!isIntro && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around px-2 py-3 z-50 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
+        <motion.div 
+          id="mobile-bottom-nav"
+          animate={{ y: isGameActive ? 100 : 0 }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around px-2 py-3 z-50 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)]"
+        >
           <Link to="/" onClick={(e) => handleNavClick(e, '/')} className="p-2.5 relative group">
             <Home size={26} className={location.pathname === '/' ? 'text-pink-600 fill-current drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]' : 'text-zinc-500'} />
             {location.pathname === '/' && <motion.div layoutId="mob-nav" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-600 rounded-full" />}
@@ -388,7 +415,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
             {location.pathname.includes('/profile') && <motion.div layoutId="mob-nav" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-600 rounded-full" />}
           </Link>
-        </div>
+        </motion.div>
       )}
       
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}

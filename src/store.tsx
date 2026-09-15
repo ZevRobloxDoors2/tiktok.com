@@ -12,6 +12,16 @@ type AppState = {
   setIntroPhase: (phase: 'loading' | 'merging' | 'expanding' | 'done') => void;
   showAuthModal: boolean;
   setShowAuthModal: (val: boolean) => void;
+  isGameActive: boolean;
+  setIsGameActive: (val: boolean) => void;
+  activeGameUrl: string;
+  setActiveGameUrl: (url: string) => void;
+  miniPlayerActive: boolean;
+  setMiniPlayerActive: (val: boolean) => void;
+  miniPlayerUrl: string;
+  setMiniPlayerUrl: (url: string) => void;
+  miniPlayerTitle: string;
+  setMiniPlayerTitle: (title: string) => void;
 };
 
 const StoreContext = createContext<AppState | null>(null);
@@ -20,6 +30,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [introPhase, setIntroPhase] = useState<'loading' | 'merging' | 'expanding' | 'done'>('loading');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isGameActive, setIsGameActive] = useState(false);
+  const [activeGameUrl, setActiveGameUrl] = useState('');
+  const [miniPlayerActive, setMiniPlayerActive] = useState(false);
+  const [miniPlayerUrl, setMiniPlayerUrl] = useState('');
+  const [miniPlayerTitle, setMiniPlayerTitle] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
@@ -64,7 +79,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <StoreContext.Provider value={{ currentUser, setCurrentUser: handleSetUser, theme, toggleTheme, isLoading, introPhase, setIntroPhase, showAuthModal, setShowAuthModal }}>
+    <StoreContext.Provider value={{ 
+      currentUser, 
+      setCurrentUser: handleSetUser, 
+      theme, 
+      toggleTheme, 
+      isLoading, 
+      introPhase, 
+      setIntroPhase, 
+      showAuthModal, 
+      setShowAuthModal,
+      isGameActive,
+      setIsGameActive,
+      activeGameUrl,
+      setActiveGameUrl,
+      miniPlayerActive,
+      setMiniPlayerActive,
+      miniPlayerUrl,
+      setMiniPlayerUrl,
+      miniPlayerTitle,
+      setMiniPlayerTitle
+    }}>
       {children}
     </StoreContext.Provider>
   );

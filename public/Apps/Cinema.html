@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CinemaTok - Movies & TV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #09090b;
+            color: white;
+            overflow-x: hidden;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-heavy {
+            background: rgba(10, 10, 12, 0.8);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .movie-card:hover .play-overlay {
+            opacity: 1;
+        }
+        .scroll-hide::-webkit-scrollbar {
+            display: none;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in {
+            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .source-item {
+            cursor: grab;
+            transition: all 0.2s;
+        }
+        .source-item:active {
+            cursor: grabbing;
+        }
+        .source-item.ghost {
+            opacity: 0.4;
+            background: rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="app" class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 animate-in">
+            <div class="flex items-center gap-4">
+                <div>
+                    <h1 class="text-4xl font-black tracking-tighter mb-1">Cinema<span class="text-pink-600">Tok</span></h1>
+                    <p class="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">Global Streaming Hub</p>
+                </div>
+                <button onclick="toggleSettings()" class="p-3 rounded-2xl glass hover:bg-white/10 transition-all ml-4">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+            </div>
+            <div class="relative w-full md:w-96">
+                <input 
+                    type="text" 
+                    id="search-input"
+                    placeholder="Search millions of titles..." 
+                    class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 transition-all font-semibold"
+                >
+            </div>
+        </header>
+
+        <section id="trending" class="mb-12 animate-in" style="animation-delay: 0.1s">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-xl font-black flex items-center gap-2">
+                    <span class="w-2 h-8 bg-pink-600 rounded-full"></span>
+                    Trending Worldwide
+                </h2>
+            </div>
+            <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+                <!-- Movie cards injected here -->
+            </div>
+        </section>
+
+        <!-- Settings Modal -->
+        <div id="settings-view" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80" onclick="toggleSettings()"></div>
+            <div class="glass-heavy w-full max-w-lg rounded-[2.5rem] p-8 relative animate-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-black">Reordering Sources</h2>
+                        <p class="text-zinc-500 text-xs mt-1">Drag and drop to set preferred streaming priority.</p>
+                    </div>
+                    <button onclick="toggleSettings()" class="p-2 rounded-full hover:bg-white/10 transition-all">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                
+                <div id="source-list" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2 scroll-hide">
+                    <!-- Sources from images -->
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-white/5">
+                    <p class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest text-center">
+                        Default order is optimized for speed and quality.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div id="player-modal" class="fixed inset-0 z-[200] bg-black hidden flex flex-col">
+            <nav class="p-4 flex items-center justify-between glass z-10">
+                <button onclick="closePlayer()" class="flex items-center gap-2 px-6 py-2 rounded-2xl hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Exit Cinema
+                </button>
+                <div class="text-center">
+                    <h3 id="playing-title" class="text-xs font-black uppercase tracking-widest text-white truncate max-w-[200px]">Watching</h3>
+                    <p id="playing-source" class="text-[8px] font-bold text-zinc-500 uppercase tracking-[0.2em] mt-0.5">Searching Sources...</p>
+                </div>
+                <div class="w-32 flex justify-end gap-2">
+                    <button class="p-2 rounded-lg glass text-zinc-400">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/><path d="M12 8v4l3 3"/></svg>
+                    </button>
+                </div>
+            </nav>
+            <div class="flex-1 relative bg-black">
+                <div id="player-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-black z-20">
+                    <div class="w-12 h-12 border-4 border-pink-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p class="text-[10px] font-black uppercase tracking-widest animate-pulse">Initializing Stream...</p>
+                </div>
+                <iframe id="video-iframe" src="" class="w-full h-full border-none" allowfullscreen allow="autoplay; fullscreen"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script>
+        const TMDB_SEARCH = "https://api.themoviedb.org/3/search/multi?api_key=15d1a99839366ce326231ee8d6174452&query=";
+        const TMDB_TRENDING = "https://api.themoviedb.org/3/trending/all/week?api_key=15d1a99839366ce326231ee8d6174452";
+        const POSTER_BASE = "https://image.tmdb.org/t/p/w500";
+
+        let currentSources = [
+            { id: 'aurora', name: 'Aurora', icon: '💫', active: true, ext: false },
+            { id: 'lul', name: 'Lul', icon: '👾', active: true, ext: false },
+            { id: 'link', name: 'Link', icon: '🔗', active: true, ext: false },
+            { id: 'nebula', name: 'Nebula', icon: '🌌', active: true, ext: false },
+            { id: 'meridian', name: 'Meridian', icon: '🪐', active: true, ext: false },
+            { id: 'tiki', name: 'Tiki', icon: '🗿', active: true, ext: false },
+            { id: 'vidy', name: 'Vidy', icon: '📺', active: true, ext: false },
+            { id: 'kinglink', name: 'KingLink', icon: '🔥', active: true, ext: false },
+            { id: 'animetsu', name: 'Animetsu', icon: '⛩️', active: true, ext: false },
+            { id: 'cloudnestra', name: 'Cloudnestra', icon: '⚡', active: true, ext: true },
+            { id: 'hdrezka', name: 'HDRezka', icon: '🐙', active: true, ext: true },
+            { id: 'proton', name: 'ProtonMovies', icon: '⚛️', active: true, ext: true },
+            { id: 'fshare', name: 'Fshare', icon: '👽', active: true, ext: true },
+            { id: 'tuga', name: 'Tugaflix', icon: '🐯', active: true, ext: true },
+            { id: 'look', name: 'LookMovie', icon: '🛝', active: true, ext: true }
+        ];
+
+        function toggleSettings() {
+            const view = document.getElementById('settings-view');
+            view.classList.toggle('hidden');
+            if (!view.classList.contains('hidden')) renderSources();
+        }
+
+        function renderSources() {
+            const list = document.getElementById('source-list');
+            list.innerHTML = currentSources.map(s => `
+                <div class="source-item flex items-center justify-between p-4 rounded-2xl bg-zinc-950 border border-white/5 mb-2 ${s.ext ? 'opacity-50' : ''}" data-id="${s.id}">
+                    <div class="flex items-center gap-4">
+                        <span class="text-xl">${s.icon}</span>
+                        <div class="flex flex-col">
+                            <span class="text-sm font-black tracking-tight">${s.name}</span>
+                            ${s.ext ? '<span class="text-[8px] text-pink-500 font-bold uppercase tracking-widest">Extension Required</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        ${s.ext ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-zinc-600"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>' : ''}
+                        <div class="w-10 h-6 bg-blue-600 rounded-full flex items-center px-1">
+                            <div class="w-4 h-4 bg-white rounded-full ml-auto"></div>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-zinc-600"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                    </div>
+                </div>
+            `).join('');
+
+            new Sortable(list, {
+                animation: 150,
+                ghostClass: 'ghost',
+                onEnd: (evt) => {
+                    const newOrder = Array.from(list.children).map(el => el.dataset.id);
+                    currentSources = newOrder.map(id => currentSources.find(s => s.id === id));
+                }
+            });
+        }
+
+        async function fetchTrending() {
+            try {
+                const res = await fetch(TMDB_TRENDING);
+                const data = await res.json();
+                renderMovies(data.results);
+            } catch (e) { console.error(e); }
+        }
+
+        function renderMovies(data) {
+            const grid = document.getElementById('movie-grid');
+            grid.innerHTML = data.map(movie => `
+                <div class="movie-card group cursor-pointer animate-in" onclick="playMovie('${movie.id}', '${movie.title || movie.name}', '${movie.media_type}')">
+                    <div class="relative aspect-[2/3] rounded-[1.5rem] overflow-hidden mb-4 border border-white/5 bg-zinc-900 shadow-xl">
+                        <img src="${movie.poster_path ? POSTER_BASE + movie.poster_path : 'https://via.placeholder.com/500x750'}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                        <div class="play-overlay absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 transition-all duration-300 backdrop-blur-[2px]">
+                            <div class="w-14 h-14 rounded-full bg-pink-600 flex items-center justify-center shadow-2xl shadow-pink-600/50 transform scale-75 group-hover:scale-100 transition-transform duration-500">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                    <h3 class="font-black text-sm truncate group-hover:text-pink-500 transition-colors px-1">${movie.title || movie.name}</h3>
+                    <div class="flex items-center justify-between px-1 mt-1">
+                        <p class="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">${(movie.release_date || movie.first_air_date || 'N/A').split('-')[0]}</p>
+                        <span class="text-[8px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 font-black uppercase text-zinc-400">${movie.media_type || 'MOVIE'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function playMovie(id, title, type = 'movie') {
+            const modal = document.getElementById('player-modal');
+            const iframe = document.getElementById('video-iframe');
+            const titleEl = document.getElementById('playing-title');
+            const sourceEl = document.getElementById('playing-source');
+            const loader = document.getElementById('player-loader');
+            
+            modal.classList.remove('hidden');
+            loader.classList.remove('hidden');
+            iframe.src = '';
+            titleEl.textContent = title;
+
+            // Simple cycle simulation
+            let sourceIdx = 0;
+            const trySource = () => {
+                if (sourceIdx >= currentSources.length) {
+                    sourceEl.textContent = "No sources available";
+                    loader.innerHTML = '<p class="text-red-500 font-black">All sources failed.</p>';
+                    return;
+                }
+                const source = currentSources[sourceIdx];
+                sourceEl.textContent = `Attempting Source: ${source.name}...`;
+                
+                // Using vidsrc for actual playback
+                const provider = type === 'tv' ? `https://vidsrc.to/embed/tv/${id}` : `https://vidsrc.to/embed/movie/${id}`;
+                
+                iframe.src = provider;
+                iframe.onload = () => {
+                    setTimeout(() => {
+                        loader.classList.add('hidden');
+                        sourceEl.textContent = `Connected: ${source.name}`;
+                        window.parent.postMessage({ type: 'CINEMA_PLAYING', title, url: provider }, '*');
+                    }, 1000);
+                };
+            };
+
+            trySource();
+        }
+
+        function closePlayer() {
+            const modal = document.getElementById('player-modal');
+            const iframe = document.getElementById('video-iframe');
+            iframe.src = '';
+            modal.classList.add('hidden');
+            window.parent.postMessage({ type: 'CINEMA_CLOSED' }, '*');
+        }
+
+        fetchTrending();
+
+        let searchTimeout;
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const val = e.target.value;
+            if (val.length < 2) return fetchTrending();
+            
+            searchTimeout = setTimeout(async () => {
+                const res = await fetch(TMDB_SEARCH + encodeURIComponent(val));
+                const data = await res.json();
+                renderMovies(data.results);
+            }, 500);
+        });
+    </script>
+</body>
+</html>
