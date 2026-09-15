@@ -687,36 +687,51 @@
       right: 24px;
       width: 320px;
       aspect-ratio: 16/9;
-      background: #000;
-      border: 2px solid var(--primary);
-      border-radius: 16px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      background: rgba(10, 10, 15, 0.8);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
       z-index: 10000;
       overflow: hidden;
       display: none;
       flex-direction: column;
-      animation: miniSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      animation: miniPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    @keyframes miniSlideIn {
-      from { transform: translateY(100%) scale(0.8); opacity: 0; }
-      to { transform: translateY(0) scale(1); opacity: 1; }
+    @keyframes miniPop {
+      from { transform: translateY(50px) scale(0.9) rotate(2deg); opacity: 0; }
+      to { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
     }
     .mini-player.show { display: flex; }
     .mini-player-header {
-      padding: 8px 12px;
-      background: rgba(10, 10, 15, 0.95);
-      backdrop-filter: blur(10px);
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.03);
       display: flex;
       justify-content: space-between;
       align-items: center;
       cursor: move;
       user-select: none;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
-    .mini-player-title { font-size: 10px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; text-transform: uppercase; letter-spacing: 1px; }
-    .mini-player-controls { display: flex; gap: 8px; }
-    .mini-btn { width: 24px; height: 24px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.2s; }
-    .mini-btn:hover { background: var(--primary); border-color: var(--primary-light); transform: scale(1.1); }
+    .mini-player-title { font-size: 10px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; text-transform: uppercase; letter-spacing: 1.5px; }
+    .mini-player-controls { display: flex; gap: 6px; }
+    .mini-btn { 
+      width: 26px; 
+      height: 26px; 
+      border-radius: 8px; 
+      background: rgba(255, 255, 255, 0.05); 
+      border: 1px solid rgba(255, 255, 255, 0.1); 
+      color: white; 
+      cursor: pointer; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-size: 12px; 
+      transition: all 0.2s; 
+    }
+    .mini-btn:hover { background: var(--primary); border-color: var(--primary-light); transform: scale(1.1); box-shadow: 0 0 10px var(--primary-glow); }
+    .mini-btn.close:hover { background: var(--danger); border-color: #fca5a5; }
 
     @media (max-width: 1024px) { .sidebar { width: 320px; } .movie-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
     @media (max-width: 768px) {
@@ -865,7 +880,10 @@
           <button class="icon-btn" onclick="toggleMiniPlayer()" title="Mini Player" style="width: 36px; height: 36px; border-radius: 50%;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><rect x="13" y="13" width="5" height="5" rx="1" ry="1"/></svg>
           </button>
-          <button class="close-btn" id="closeModal">×</button>
+          <button class="btn btn-secondary" id="closeModal" style="padding: 8px 16px; font-size: 12px; height: 36px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Exit
+          </button>
         </div>
       </div>
       
@@ -971,8 +989,9 @@
     <div class="mini-player-header" id="miniPlayerHeader">
       <span class="mini-player-title" id="miniTitle">AuraFlix Mini</span>
       <div class="mini-player-controls">
+        <button class="mini-btn" onclick="nextServerFromMini()" title="Next Server">⏭</button>
         <button class="mini-btn" onclick="restoreFromMini()" title="Restore Content">⤴</button>
-        <button class="mini-btn" onclick="closeMiniPlayer()" title="Close Player">×</button>
+        <button class="mini-btn close" onclick="closeMiniPlayer()" title="Close Player">×</button>
       </div>
     </div>
     <div style="flex: 1; background: #000;" id="miniVideoContainer"></div>
@@ -1735,6 +1754,28 @@
       videoArea.appendChild(frame);
       mini.classList.remove('show');
       currentItem = null;
+      
+      // Also reset modal placeholders
+      document.getElementById('videoPlaceholder').style.display = 'flex';
+    }
+
+    function nextServerFromMini() {
+      if (!currentItem) return;
+      
+      currentServer = (currentServer + 1) % VideoSources.length;
+      const source = VideoSources[currentServer];
+      
+      // Update UI in sidebar if visible
+      document.querySelectorAll('.server-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === currentServer);
+      });
+      
+      const isTv = currentItem.media_type === 'tv' || currentItem.first_air_date;
+      const s = isTv ? document.getElementById('seasonSelect').value : null;
+      const e = isTv ? document.getElementById('episodeSelect').value : null;
+      
+      const url = buildUrl(source, currentItem, s, e);
+      UnblockEngine.load(url, UnblockEngine.currentMethod);
     }
 
     function makeDraggable(el, handle) {
@@ -1806,10 +1847,18 @@
     }
 
     function closeModal() {
+      const frame = document.getElementById('videoFrame');
+      const mini = document.getElementById('miniPlayer');
+      
+      // If a video is actually playing/loaded, transition to mini player on exit
+      if (currentItem && frame.src !== 'about:blank' && !mini.classList.contains('show')) {
+        toggleMiniPlayer();
+        return;
+      }
+
       DOM.modal.classList.remove('show');
       
       // Also ensure mini player is cleared if we are fully closing from the modal
-      const mini = document.getElementById('miniPlayer');
       if (!mini.classList.contains('show')) {
         if (DOM.frame._currentBlob) {
           URL.revokeObjectURL(DOM.frame._currentBlob);
