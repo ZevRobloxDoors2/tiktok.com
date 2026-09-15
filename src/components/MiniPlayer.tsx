@@ -55,55 +55,61 @@ export function MiniPlayer() {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+        initial={{ opacity: 0, scale: 0.8, y: 100, filter: "blur(20px)" }}
         animate={{ 
           opacity: 1, 
           scale: 1, 
           y: 0,
-          width: isExpanded ? '640px' : '420px', // "Little huger"
+          filter: "blur(0px)",
+          width: isExpanded ? '640px' : '420px', 
           height: isExpanded ? '360px' : '236px',
         }}
-        exit={{ opacity: 0, scale: 0.8, y: 20 }}
+        exit={{ opacity: 0, scale: 0.5, y: 100, filter: "blur(20px)" }}
         drag
         dragControls={dragControls}
         dragListener={false}
         dragMomentum={false}
-        whileDrag={{ 
-          scale: 1.02,
-          rotate: [0, -1.5, 1.5, -1.5, 0],
-          transition: { 
-            rotate: { 
-              repeat: Infinity, 
-              duration: 0.25,
-              ease: "easeInOut"
-            } 
-          }
-        }}
-        className="fixed bottom-6 right-6 z-[2000] rounded-[2rem] overflow-hidden shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] border border-white/10 backdrop-blur-xl bg-zinc-900/90 group"
+        transition={{ type: "spring", damping: 25, stiffness: 150 }}
+        className="fixed bottom-6 right-6 z-[2000] rounded-[2rem] overflow-hidden shadow-[0_40px_100px_-12px_rgba(0,0,0,0.8)] border border-white/10 backdrop-blur-[30px] bg-white/5 saturate-150 group"
       >
+        {/* Animated Glass Shine */}
+        <motion.div 
+          animate={{ x: ['-100%', '200%'] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "linear", repeatDelay: 5 }}
+          className="absolute inset-0 z-10 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-[-20deg] pointer-events-none"
+        />
+
+        {/* Ambient Glow */}
+        <div className="absolute -inset-20 bg-gradient-to-tr from-pink-500/20 via-indigo-500/20 to-cyan-500/20 blur-[60px] opacity-30 pointer-events-none" />
+
         {/* Header / Draggable Handle */}
         <div 
           onPointerDown={(e) => dragControls.start(e)}
-          className="absolute top-0 left-0 right-0 h-12 flex items-center justify-between px-4 z-50 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity cursor-move"
+          className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-5 z-50 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-5px] group-hover:translate-y-0 cursor-move"
         >
-          <div className="flex items-center gap-2">
-            <Move size={14} className="text-white/60" />
-            <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[200px]">
-              {miniPlayerTitle || 'Mini Player'}
+          <div className="flex items-center gap-3">
+            <div className="p-1.5 rounded-lg bg-white/10 backdrop-blur-md">
+              <Move size={14} className="text-white" />
+            </div>
+            <span className="text-[10px] font-black text-white uppercase tracking-[0.2em] truncate max-w-[200px] drop-shadow-md">
+              {miniPlayerTitle || 'Aura Player'}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            {/* The "Minimize" button to increase size (toggles expansion) */}
             <button 
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all hover:scale-110 active:scale-95 border border-white/5 backdrop-blur-md flex items-center gap-1.5"
+              title={isExpanded ? "Shrink" : "Expand"}
             >
-              <Maximize2 size={12} />
+              <Maximize2 size={14} className={isExpanded ? "rotate-180" : ""} />
             </button>
             <button 
               onClick={() => setMiniPlayerActive(false)}
-              className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500 text-white transition-all"
+              className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500 text-white transition-all hover:scale-110 active:scale-95 border border-red-500/20 backdrop-blur-md"
+              title="Close"
             >
-              <X size={12} />
+              <X size={14} />
             </button>
           </div>
         </div>
