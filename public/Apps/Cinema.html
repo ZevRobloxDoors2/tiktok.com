@@ -113,22 +113,23 @@
             <nav class="p-4 flex items-center justify-between glass z-10">
                 <button onclick="closePlayer()" class="flex items-center gap-2 px-6 py-2 rounded-2xl hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                    Exit Cinema
+                    Exit
                 </button>
                 <div class="text-center">
-                    <h3 id="playing-title" class="text-xs font-black uppercase tracking-widest text-white truncate max-w-[200px]">Watching</h3>
-                    <p id="playing-source" class="text-[8px] font-bold text-zinc-500 uppercase tracking-[0.2em] mt-0.5">Searching Sources...</p>
+                    <h3 id="playing-title" class="text-xs font-black uppercase tracking-widest text-white truncate max-w-[150px] md:max-w-[300px]">Watching</h3>
+                    <p id="playing-source" class="text-[8px] font-bold text-pink-500 uppercase tracking-[0.2em] mt-0.5">Server: Initializing...</p>
                 </div>
-                <div class="w-32 flex justify-end gap-2">
-                    <button class="p-2 rounded-lg glass text-zinc-400">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/><path d="M12 8v4l3 3"/></svg>
+                <div class="flex items-center gap-2">
+                    <button onclick="cycleSource()" class="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-pink-600/20 transition-all flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L22 22M15 5l-2 2M11 2l2 2"/></svg>
+                        Try Next Server
                     </button>
                 </div>
             </nav>
             <div class="flex-1 relative bg-black">
                 <div id="player-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-black z-20">
                     <div class="w-12 h-12 border-4 border-pink-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest animate-pulse">Initializing Stream...</p>
+                    <p class="text-[10px] font-black uppercase tracking-widest animate-pulse">Bypassing Blocks...</p>
                 </div>
                 <iframe id="video-iframe" src="" class="w-full h-full border-none" allowfullscreen allow="autoplay; fullscreen"></iframe>
             </div>
@@ -260,43 +261,51 @@
             `).join('');
         }
 
+        let playerState = { id: '', type: 'movie', sourceIdx: 0 };
+        const MIRRORS = [
+            { name: 'Vidsrc To', url: 'https://vidsrc.to/embed/' },
+            { name: 'Vidsrc Me', url: 'https://vidsrc.me/embed/' },
+            { name: 'Embed SU', url: 'https://embed.su/embed/' },
+            { name: '2Embed', url: 'https://www.2embed.cc/embed/' },
+            { name: 'AutoEmbed', url: 'https://autoembed.to/embed/' }
+        ];
+
         function playMovie(id, title, type = 'movie') {
             const modal = document.getElementById('player-modal');
-            const iframe = document.getElementById('video-iframe');
             const titleEl = document.getElementById('playing-title');
+            
+            playerState = { id, type, sourceIdx: 0 };
+            modal.classList.remove('hidden');
+            titleEl.textContent = title;
+            loadSource();
+        }
+
+        function loadSource() {
+            const iframe = document.getElementById('video-iframe');
             const sourceEl = document.getElementById('playing-source');
             const loader = document.getElementById('player-loader');
             
-            modal.classList.remove('hidden');
             loader.classList.remove('hidden');
             iframe.src = '';
-            titleEl.textContent = title;
-
-            // Simple cycle simulation
-            let sourceIdx = 0;
-            const trySource = () => {
-                if (sourceIdx >= currentSources.length) {
-                    sourceEl.textContent = "No sources available";
-                    loader.innerHTML = '<p class="text-red-500 font-black">All sources failed.</p>';
-                    return;
-                }
-                const source = currentSources[sourceIdx];
-                sourceEl.textContent = `Attempting Source: ${source.name}...`;
-                
-                // Using vidsrc for actual playback
-                const provider = type === 'tv' ? `https://vidsrc.to/embed/tv/${id}` : `https://vidsrc.to/embed/movie/${id}`;
-                
-                iframe.src = provider;
-                iframe.onload = () => {
-                    setTimeout(() => {
-                        loader.classList.add('hidden');
-                        sourceEl.textContent = `Connected: ${source.name}`;
-                        window.parent.postMessage({ type: 'CINEMA_PLAYING', title, url: provider }, '*');
-                    }, 1000);
-                };
+            
+            const mirror = MIRRORS[playerState.sourceIdx];
+            const path = playerState.type === 'tv' ? `tv/${playerState.id}` : `movie/${playerState.id}`;
+            const provider = `${mirror.url}${path}`;
+            
+            sourceEl.textContent = `Server: ${mirror.name} (${playerState.sourceIdx + 1}/${MIRRORS.length})`;
+            
+            iframe.src = provider;
+            iframe.onload = () => {
+                setTimeout(() => {
+                    loader.classList.add('hidden');
+                    window.parent.postMessage({ type: 'CINEMA_PLAYING', title: document.getElementById('playing-title').textContent, url: provider }, '*');
+                }, 1500);
             };
+        }
 
-            trySource();
+        function cycleSource() {
+            playerState.sourceIdx = (playerState.sourceIdx + 1) % MIRRORS.length;
+            loadSource();
         }
 
         function closePlayer() {
