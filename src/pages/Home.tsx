@@ -434,7 +434,7 @@ export const VideoItem: React.FC<{
   video: Video & { user: User; feedId?: string };
   onDelete?: (id: string) => void;
 }> = ({ video, onDelete }) => {
-  const { currentUser, setCurrentUser } = useAppStore();
+  const { currentUser, setCurrentUser, isGameActive } = useAppStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const ytPlayerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -482,7 +482,7 @@ export const VideoItem: React.FC<{
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && !isGameActive) {
           shouldPlayYoutube.current = true;
           if (video.isYouTube && ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === 'function') {
             try {
@@ -535,7 +535,28 @@ export const VideoItem: React.FC<{
     
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [hasViewed, video.id, currentUser, video.isYouTube]);
+  }, [hasViewed, video.id, currentUser, video.isYouTube, isGameActive]);
+
+  // Effect to pause/play when game state changes
+  useEffect(() => {
+    if (isGameActive) {
+      shouldPlayYoutube.current = false;
+      if (video.isYouTube && ytPlayerRef.current && typeof ytPlayerRef.current.pauseVideo === 'function') {
+        ytPlayerRef.current.pauseVideo();
+      } else if (videoRef.current && typeof videoRef.current.pause === 'function') {
+        videoRef.current.pause();
+      }
+      setIsPlaying(false);
+    } else if (isActive) {
+      shouldPlayYoutube.current = true;
+      if (video.isYouTube && ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === 'function') {
+        try { ytPlayerRef.current.playVideo(); } catch (err) {}
+      } else if (videoRef.current && typeof videoRef.current.play === 'function') {
+        videoRef.current.play().catch(() => {});
+      }
+      if (!video.isYouTube) setIsPlaying(true);
+    }
+  }, [isGameActive]);
 
   const handleYtReady = (e: YouTubeEvent) => {
     ytPlayerRef.current = e.target;

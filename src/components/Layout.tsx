@@ -300,18 +300,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Forum Announcement Toast (Triggered immediately when user comes online) */}
       {forumToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[130] w-[94%] max-w-md bg-[#1e1f22] text-white border border-[#5865F2] rounded-2xl p-3.5 shadow-2xl animate-in slide-in-from-top-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#5865F2] flex items-center justify-center shrink-0 text-white font-bold text-lg shadow-md">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[1000] w-[94%] max-w-md bg-[#1e1f22] text-white border border-[#5865F2] rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in slide-in-from-top-10 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#5865F2] flex items-center justify-center shrink-0 text-white font-bold text-2xl shadow-lg animate-pulse">
             📢
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-[#5865F2] uppercase tracking-wide">Forum Announcement</span>
-              <span className="text-[11px] text-zinc-400 truncate">@{forumToast.authorName}</span>
+              <span className="text-[10px] font-black text-[#5865F2] uppercase tracking-[0.2em]">Announcement</span>
+              <span className="text-[10px] text-zinc-400 truncate font-bold">@{forumToast.authorName}</span>
             </div>
-            <p className="text-sm font-semibold truncate text-white mt-0.5">{forumToast.title}</p>
+            <p className="text-sm font-black truncate text-white mt-0.5">{forumToast.title}</p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={async () => {
                 if (currentUser && forumToast.id.startsWith('notif_')) {
@@ -322,7 +322,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 setForumToast(null);
                 navigate('/forum');
               }}
-              className="px-3 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold rounded-lg transition-colors shadow"
+              className="px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white text-[11px] font-black rounded-xl transition-all shadow-lg active:scale-95"
             >
               View
             </button>
@@ -335,23 +335,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 }
                 setForumToast(null);
               }}
-              className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
+              className="p-2 text-zinc-500 hover:text-white rounded-xl hover:bg-white/5 transition-colors"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
         </div>
       )}
 
       {messageToast && (
-        <button onClick={() => { navigate(`/messages/${messageToast.handle}`); setMessageToast(null); }} className="fixed top-4 left-1/2 -translate-x-1/2 z-[120] flex items-center gap-3 rounded-xl bg-white dark:bg-zinc-900 border border-pink-200 dark:border-pink-800 px-4 py-3 shadow-2xl animate-in slide-in-from-top-8">
-          <img src={messageToast.avatarUrl} alt="" className="w-10 h-10 rounded-full" />
-          <span className="text-left"><strong className="block">{messageToast.username}</strong><span className="text-sm text-zinc-500">New messages was sent</span></span>
+        <button 
+          onClick={() => { navigate(`/messages/${messageToast.handle}`); setMessageToast(null); }} 
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-4 rounded-2xl bg-white dark:bg-zinc-900 border border-pink-200 dark:border-pink-800 px-5 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in slide-in-from-top-10 transition-transform hover:scale-105 active:scale-95"
+        >
+          <div className="relative">
+            <img src={messageToast.avatarUrl} alt="" className="w-12 h-12 rounded-full border-2 border-pink-500" />
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-pink-600 rounded-full border-2 border-white dark:border-zinc-900" />
+          </div>
+          <div className="text-left">
+            <strong className="block text-zinc-900 dark:text-white font-black tracking-tight">{messageToast.username}</strong>
+            <span className="text-xs font-bold text-zinc-500 flex items-center gap-1">
+              <MessageSquare size={10} className="text-pink-600" /> New message received
+            </span>
+          </div>
         </button>
       )}
 
       {rewardToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[130] w-[90%] max-w-sm flex items-center gap-4 rounded-2xl bg-indigo-600 text-white p-4 shadow-[0_20px_50px_rgba(79,70,229,0.3)] animate-in slide-in-from-top-12 duration-500 border border-white/20">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[1000] w-[94%] max-w-sm flex items-center gap-4 rounded-2xl bg-indigo-600 text-white p-4 shadow-[0_20px_50px_rgba(79,70,229,0.3)] animate-in slide-in-from-top-10 duration-500 border border-white/20">
           <div className="relative shrink-0">
              <img src={rewardToast.fromUserAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=owner'} alt="" className="w-12 h-12 rounded-full border-2 border-white/30" />
              <div className="absolute -bottom-1 -right-1 bg-white text-indigo-600 rounded-full p-1 shadow-lg">
