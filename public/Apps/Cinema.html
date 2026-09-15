@@ -204,40 +204,47 @@
             });
         }
 
+        const fallbackMovies = [
+            { id: 'tt15327088', title: 'Oppenheimer', release_date: '2023', media_type: 'movie', poster_path: 'https://image.tmdb.org/t/p/w500/8Gxv0mYnrLSZ97pSThGbiCGS9S8.jpg' },
+            { id: 'tt1160419', title: 'Dune: Part Two', release_date: '2024', media_type: 'movie', poster_path: 'https://image.tmdb.org/t/p/w500/czembS0RhiERbt6n9S8QI3nC39P.jpg' },
+            { id: 'tt6718170', title: 'Spider-Man: Across the Spider-Verse', release_date: '2023', media_type: 'movie', poster_path: 'https://image.tmdb.org/t/p/w500/8Vtbb9rs9tKE13Fb7uMvMGv6Y1U.jpg' },
+            { id: 'tt10648342', title: 'Thor: Love and Thunder', release_date: '2022', media_type: 'movie', poster_path: 'https://image.tmdb.org/t/p/w500/pIkRyV12AWZgh3vVZv3mAEIJS91.jpg' },
+            { id: 'tt15239678', title: 'Dune', release_date: '2021', media_type: 'movie', poster_path: 'https://image.tmdb.org/t/p/w500/d5NXSklZfsNcioo2EMZqiSafe9L.jpg' }
+        ];
+
         async function fetchTrending() {
             try {
+                // Pre-render fallbacks so the user sees content instantly
+                renderMovies(fallbackMovies);
+
                 const res = await fetch(TMDB_TRENDING);
-                if (!res.ok) throw new Error('API Error');
+                if (!res.ok) throw new Error('API Key Error');
+                
                 const data = await res.json();
-                if (data.results && data.results.length > 0) {
+                if (data.results && Array.isArray(data.results)) {
                     renderMovies(data.results);
-                } else {
-                    renderMovies(fallbackMovies);
                 }
             } catch (e) { 
-                console.error('TMDB Fetch Failed, using fallbacks:', e);
-                renderMovies(fallbackMovies);
+                console.warn('CinemaTok: Using high-quality local fallbacks due to API connection issue.');
+                // Fallbacks are already rendered, no action needed
             }
         }
 
-        const fallbackMovies = [
-            { id: 'tt15327088', title: 'Oppenheimer', release_date: '2023', media_type: 'movie', poster_path: '/8Gxv0mYnrLSZ97pSThGbiCGS9S8.jpg' },
-            { id: 'tt1160419', title: 'Dune: Part Two', release_date: '2024', media_type: 'movie', poster_path: '/czembS0RhiERbt6n9S8QI3nC39P.jpg' },
-            { id: 'tt6718170', title: 'Spider-Man: Across the Spider-Verse', release_date: '2023', media_type: 'movie', poster_path: '/8Vtbb9rs9tKE13Fb7uMvMGv6Y1U.jpg' },
-            { id: 'tt10648342', title: 'Thor: Love and Thunder', release_date: '2022', media_type: 'movie', poster_path: '/pIkRyV12AWZgh3vVZv3mAEIJS91.jpg' },
-            { id: 'tt15239678', title: 'Dune', release_date: '2021', media_type: 'movie', poster_path: '/d5NXSklZfsNcioo2EMZqiSafe9L.jpg' }
-        ];
-
         function renderMovies(data) {
             const grid = document.getElementById('movie-grid');
-            if (!data || data.length === 0) {
-                grid.innerHTML = `<div class="col-span-full py-20 text-center text-zinc-600 font-black uppercase tracking-widest">No Movies Found</div>`;
+            const items = Array.isArray(data) ? data : [];
+            
+            if (items.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-20 text-center text-zinc-600 font-black uppercase tracking-widest">Searching Cinema...</div>`;
                 return;
             }
-            grid.innerHTML = data.map(movie => `
+            
+            grid.innerHTML = items.map(movie => `
                 <div class="movie-card group cursor-pointer animate-in" onclick="playMovie('${movie.id}', '${movie.title || movie.name}', '${movie.media_type}')">
                     <div class="relative aspect-[2/3] rounded-[1.5rem] overflow-hidden mb-4 border border-white/5 bg-zinc-900 shadow-xl">
-                        <img src="${movie.poster_path ? (movie.poster_path.startsWith('http') ? movie.poster_path : POSTER_BASE + movie.poster_path) : 'https://via.placeholder.com/500x750'}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" onerror="this.src='https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&q=80&w=400'">
+                        <img src="${movie.poster_path ? (movie.poster_path.startsWith('http') ? movie.poster_path : POSTER_BASE + movie.poster_path) : 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&q=80&w=400'}" 
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                             onerror="this.src='https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&q=80&w=400'">
                         <div class="play-overlay absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 transition-all duration-300 backdrop-blur-[2px]">
                             <div class="w-14 h-14 rounded-full bg-pink-600 flex items-center justify-center shadow-2xl shadow-pink-600/50 transform scale-75 group-hover:scale-100 transition-transform duration-500">
                                 <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -246,7 +253,7 @@
                     </div>
                     <h3 class="font-black text-sm truncate group-hover:text-pink-500 transition-colors px-1">${movie.title || movie.name}</h3>
                     <div class="flex items-center justify-between px-1 mt-1">
-                        <p class="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">${(movie.release_date || movie.first_air_date || '2024').split('-')[0]}</p>
+                        <p class="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">${(String(movie.release_date || movie.first_air_date || '2024')).split('-')[0]}</p>
                         <span class="text-[8px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 font-black uppercase text-zinc-400">${movie.media_type || 'MOVIE'}</span>
                     </div>
                 </div>
