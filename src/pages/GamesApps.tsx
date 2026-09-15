@@ -148,7 +148,7 @@ export function GamesApps() {
               animate={{ opacity: 1, scale: 1 }}
               onMouseEnter={() => setHoveredGame('solar-smash')}
               onMouseLeave={() => setHoveredGame(null)}
-              onClick={() => launchItem('/Games/SolarSmash.html')}
+              onClick={() => launchItem('Games/SolarSmash.html')}
               className="group cursor-pointer relative"
             >
               <AnimatePresence>
@@ -220,7 +220,7 @@ export function GamesApps() {
               animate={{ opacity: 1, scale: 1 }}
               onMouseEnter={() => setHoveredGame('cinema')}
               onMouseLeave={() => setHoveredGame(null)}
-              onClick={() => launchItem('/Apps/Cinema.html')}
+              onClick={() => launchItem('Apps/Cinema.html')}
               className="group cursor-pointer relative"
             >
               <AnimatePresence>
