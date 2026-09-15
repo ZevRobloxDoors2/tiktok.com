@@ -127,6 +127,9 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L22 22M15 5l-2 2M11 2l2 2"/></svg>
                         Next
                     </button>
+                    <button onclick="openDirect()" class="p-2 rounded-xl glass hover:bg-white/10 text-zinc-400 hover:text-white transition-all" title="Open in New Tab">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+                    </button>
                 </div>
             </nav>
             <div class="flex-1 relative bg-black">
@@ -134,15 +137,15 @@
                     <div class="w-12 h-12 border-4 border-pink-600 border-t-transparent rounded-full animate-spin mb-4"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest animate-pulse">Bypassing Blocks...</p>
                 </div>
-                <iframe id="video-iframe" src="" class="w-full h-full border-none" allow="autoplay; fullscreen"></iframe>
+                <iframe id="video-iframe" src="" class="w-full h-full border-none" allow="autoplay; fullscreen; picture-in-picture"></iframe>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
-        const TMDB_SEARCH = "https://api.themoviedb.org/3/search/multi?api_key=5d3c8c886861f4c39843a9b1c7130541&query=";
-        const TMDB_TRENDING = "https://api.themoviedb.org/3/trending/all/week?api_key=5d3c8c886861f4c39843a9b1c7130541";
+        const TMDB_SEARCH = "https://api.themoviedb.org/3/search/multi?api_key=4fb21935b3781621f30ce376484a9c72&query=";
+        const TMDB_TRENDING = "https://api.themoviedb.org/3/trending/all/week?api_key=4fb21935b3781621f30ce376484a9c72";
         const POSTER_BASE = "https://image.tmdb.org/t/p/w500";
 
         let currentSources = [
@@ -308,60 +311,26 @@
         let playerState = { id: '', type: 'movie', sourceIdx: 0 };
         const MIRRORS = [
             { name: 'Vidsrc PM', url: 'https://vidsrc.pm/embed/' },
+            { name: 'SuperEmbed', url: 'https://superembed.stream/embed/' },
+            { name: 'VidCore', url: 'https://vidcore.org/embed/' },
             { name: 'Vidsrc Pro', url: 'https://vidsrc.pro/embed/' },
+            { name: 'VidLink Pro', url: 'https://vidlink.pro/embed/' },
+            { name: 'Embed SU', url: 'https://embed.su/embed/' },
             { name: 'Vidsrc To', url: 'https://vidsrc.to/embed/' },
             { name: 'Vidsrc Me', url: 'https://vidsrc.me/embed/' },
-            { name: 'Vidsrc CC', url: 'https://vidsrc.cc/embed/' },
-            { name: 'Vidsrc XYZ', url: 'https://vidsrc.xyz/embed/' },
-            { name: 'Vidsrc In', url: 'https://vidsrc.in/embed/' },
-            { name: 'Vidsrc Net', url: 'https://vidsrc.net/embed/' },
-            { name: 'VidLink Pro', url: 'https://vidlink.pro/embed/' },
-            { name: 'VidLink CC', url: 'https://vidlink.cc/embed/' },
-            { name: 'Embed SU', url: 'https://embed.su/embed/' },
             { name: '2Embed CC', url: 'https://www.2embed.cc/embed/' },
-            { name: '2Embed Org', url: 'https://www.2embed.org/embed/' },
-            { name: '2Embed To', url: 'https://www.2embed.to/embed/' },
-            { name: '2Embed Skin', url: 'https://www.2embed.skin/embed/' },
-            { name: 'SuperEmbed', url: 'https://superembed.stream/embed/' },
-            { name: 'Smashy Stream', url: 'https://smashystream.com/embed/' },
-            { name: 'Smashy Stream 2', url: 'https://embed.smashystream.com/play/' },
             { name: 'AutoEmbed', url: 'https://autoembed.to/embed/' },
             { name: 'MultiEmbed', url: 'https://multiembed.com/embed/' },
             { name: 'YapGrid', url: 'https://yapgrid.com/embed/' },
             { name: 'Vidify', url: 'https://vidify.com/embed/' },
-            { name: 'VidCore', url: 'https://vidcore.org/embed/' },
             { name: 'AnyEmbed', url: 'https://anyembed.to/embed/' },
             { name: 'Gomo To', url: 'https://gomo.to/embed/' },
-            { name: 'Gomo Player', url: 'https://gomoplayer.com/embed/' },
             { name: 'DB GDrive', url: 'https://databasegdrive.top/player.php?tmdb=' },
-            { name: 'GDrive Player', url: 'https://gdriveplayer.me/embed/' },
             { name: 'MovieAPI', url: 'https://movieapi.stream/embed/' },
-            { name: 'MovieEmbed', url: 'https://movieembed.online/embed/' },
-            { name: 'StreamLar', url: 'https://streamlar.com/embed/' },
-            { name: 'WarezCDN', url: 'https://warezcdn.com/embed/' },
-            { name: 'Fshare', url: 'https://fshare.eu/embed/' },
-            { name: 'Soapertv', url: 'https://soapertv.ac/embed/' },
             { name: 'Sflix', url: 'https://sflix.to/embed/' },
-            { name: 'MovieFFM', url: 'https://movieffm.net/embed/' },
-            { name: 'WatchFree', url: 'https://watch-free.tv/embed/' },
             { name: '123Movies', url: 'https://123movies.net/embed/' },
-            { name: 'MoviesAPI Club', url: 'https://moviesapi.club/embed/' },
-            { name: 'VidJet', url: 'https://api.vidjet.io/embed/' },
-            { name: 'StreamPlay', url: 'https://streamplay.to/embed/' },
-            { name: 'JetEmbed', url: 'https://jetembed.com/embed/' },
-            { name: 'Moviely', url: 'https://moviely.app/embed/' },
-            { name: 'FlixQuest', url: 'https://flixquest.to/embed/' },
-            { name: 'CinemaLib', url: 'https://cinemalib.cc/embed/' },
-            { name: 'NetStream', url: 'https://netstream.tv/embed/' },
-            { name: 'UltraStream', url: 'https://ultrastream.xyz/embed/' },
-            { name: 'StreamX', url: 'https://streamx.pro/embed/' },
-            { name: 'MegaEmbed', url: 'https://megaembed.com/embed/' },
-            { name: 'PrimeStream', url: 'https://primestream.to/embed/' },
-            // Adding more mirrors to reach ~100
-            ...Array.from({length: 50}, (_, i) => ({
-                name: `Global Mirror ${i + 1}`,
-                url: `https://mirror${i + 1}.streaming-api.xyz/embed/`
-            }))
+            { name: 'Global Mirror 1', url: 'https://mirror1.streaming-api.xyz/embed/' },
+            { name: 'Global Mirror 2', url: 'https://mirror2.streaming-api.xyz/embed/' }
         ];
 
         function playMovie(id, title, type = 'movie') {
@@ -414,6 +383,14 @@
         function jumpToSource(idx) {
             playerState.sourceIdx = parseInt(idx);
             loadSource();
+        }
+
+        function openDirect() {
+            const mirror = MIRRORS[playerState.sourceIdx];
+            const cleanId = playerState.id.startsWith('tt_fallback') ? 'tt15327088' : playerState.id;
+            const path = playerState.type === 'tv' ? `tv/${cleanId}` : `movie/${cleanId}`;
+            const provider = `${mirror.url}${path}`;
+            window.open(provider, '_blank');
         }
 
         function closePlayer() {
