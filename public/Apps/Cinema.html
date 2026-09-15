@@ -871,7 +871,7 @@
       
       <div class="modal-body">
         <div class="video-area">
-          <iframe id="videoFrame" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
+          <iframe id="videoFrame" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write"></iframe>
           
           <div class="video-placeholder" id="videoPlaceholder">
             <div class="spinner"></div>
@@ -1043,12 +1043,29 @@
       retryCount: 0,
       lastLoadTime: 0,
       isLoading: false,
+      timer: null,
+
+      startLoadTimer() {
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => {
+          const placeholder = document.getElementById('videoPlaceholder');
+          if (placeholder) placeholder.style.display = 'none';
+        }, CONFIG.LOAD_TIMEOUT);
+      },
+
+      handleLoadFailure(msg) {
+        this.isLoading = false;
+        this.showError(msg);
+      },
       
       methods: {
         direct(url) {
           const frame = document.getElementById('videoFrame');
           frame.src = 'about:blank';
-          setTimeout(() => { frame.src = url; UnblockEngine.startLoadTimer(); }, 50);
+          setTimeout(() => { 
+            frame.src = url; 
+            UnblockEngine.startLoadTimer(); 
+          }, 50);
           return true;
         },
 
@@ -1057,19 +1074,8 @@
           frame.src = 'about:blank';
           
           const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-    iframe { width: 100%; height: 100%; border: none; }
-  </style>
-</head>
-<body>
-  <iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
-</body>
-</html>`;
+<html><head><meta charset="UTF-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;}iframe{width:100%;height:100%;border:none;}</style></head>
+<body><iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write"></iframe></body></html>`;
           
           setTimeout(() => {
             try {
@@ -1079,7 +1085,7 @@
               UnblockEngine.startLoadTimer();
             } catch(e) {
               console.error('about:blank write failed:', e);
-              UnblockEngine.handleLoadFailure('about:blank blocked');
+              UnblockEngine.handleLoadFailure('Stream blocked');
             }
           }, 100);
           return true;
@@ -1088,18 +1094,8 @@
         datauri(url) {
           const frame = document.getElementById('videoFrame');
           const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-    iframe { width: 100%; height: 100%; border: none; }
-  </style>
-</head>
-<body>
-  <iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
-</body>
-</html>`;
+<html><head><meta charset="UTF-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;}iframe{width:100%;height:100%;border:none;}</style></head>
+<body><iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write"></iframe></body></html>`;
           
           const base64 = btoa(unescape(encodeURIComponent(html)));
           frame.src = `data:text/html;base64,${base64}`;
@@ -1110,18 +1106,8 @@
         blob(url) {
           const frame = document.getElementById('videoFrame');
           const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-    iframe { width: 100%; height: 100%; border: none; }
-  </style>
-</head>
-<body>
-  <iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
-</body>
-</html>`;
+<html><head><meta charset="UTF-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;}iframe{width:100%;height:100%;border:none;}</style></head>
+<body><iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write"></iframe></body></html>`;
           
           if (frame._currentBlob) {
             URL.revokeObjectURL(frame._currentBlob);
@@ -1132,7 +1118,6 @@
           frame._currentBlob = blobUrl;
           frame.src = blobUrl;
           UnblockEngine.startLoadTimer();
-          
           return true;
         }
       },
