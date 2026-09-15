@@ -683,26 +683,27 @@
     /* Mini Player Styling */
     .mini-player {
       position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 320px;
+      top: 84px;
+      left: 24px;
+      width: 340px;
       aspect-ratio: 16/9;
-      background: rgba(10, 10, 15, 0.8);
-      backdrop-filter: blur(20px) saturate(180%);
+      background: rgba(15, 15, 25, 0.7);
+      backdrop-filter: blur(25px) saturate(200%);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 20px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
+      box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(99, 102, 241, 0.15);
       z-index: 10000;
       overflow: hidden;
       display: none;
       flex-direction: column;
-      animation: miniPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: miniGlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    @keyframes miniPop {
-      from { transform: translateY(50px) scale(0.9) rotate(2deg); opacity: 0; }
-      to { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+    @keyframes miniGlideIn {
+      from { transform: translate(-50vw, -50vh) scale(1.5); opacity: 0; filter: blur(20px); }
+      to { transform: translate(0, 0) scale(1); opacity: 1; filter: blur(0); }
     }
+    .mini-player:hover { border-color: var(--primary); box-shadow: 0 40px 80px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.3); }
     .mini-player.show { display: flex; }
     .mini-player-header {
       padding: 10px 14px;
@@ -732,6 +733,26 @@
     }
     .mini-btn:hover { background: var(--primary); border-color: var(--primary-light); transform: scale(1.1); box-shadow: 0 0 10px var(--primary-glow); }
     .mini-btn.close:hover { background: var(--danger); border-color: #fca5a5; }
+
+    .paused-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: var(--danger);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      animation: badgePulse 2s infinite;
+    }
+    @keyframes badgePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(0.95); } }
+    .continue-card { border-color: var(--primary) !important; box-shadow: 0 0 25px rgba(99, 102, 241, 0.3) !important; }
 
     @media (max-width: 1024px) { .sidebar { width: 320px; } .movie-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
     @media (max-width: 768px) {
@@ -848,6 +869,13 @@
 
   <!-- Content -->
   <div class="content">
+    <div id="continueWatchingSection" style="display: none; margin-bottom: 40px;">
+      <div class="section-header">
+        <h2 class="section-title">Continue Watching</h2>
+      </div>
+      <div class="movie-grid" id="continueGrid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 250px));"></div>
+    </div>
+
     <div class="section-header">
       <h2 class="section-title" id="sectionTitle">Trending Now</h2>
       <span class="see-all">See all →</span>
@@ -880,8 +908,8 @@
           <button class="icon-btn" onclick="toggleMiniPlayer()" title="Mini Player" style="width: 36px; height: 36px; border-radius: 50%;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><rect x="13" y="13" width="5" height="5" rx="1" ry="1"/></svg>
           </button>
-          <button class="btn btn-secondary" id="closeModal" style="padding: 8px 16px; font-size: 12px; height: 36px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          <button class="btn btn-danger" id="closeModal" style="padding: 8px 20px; font-size: 13px; height: 40px; background: var(--danger); color: white; border: none; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
             Exit
           </button>
         </div>
@@ -989,6 +1017,7 @@
     <div class="mini-player-header" id="miniPlayerHeader">
       <span class="mini-player-title" id="miniTitle">AuraFlix Mini</span>
       <div class="mini-player-controls">
+        <button class="mini-btn" onclick="toggleFullscreenMini()" title="Toggle Fullscreen">⛶</button>
         <button class="mini-btn" onclick="nextServerFromMini()" title="Next Server">⏭</button>
         <button class="mini-btn" onclick="restoreFromMini()" title="Restore Content">⤴</button>
         <button class="mini-btn close" onclick="closeMiniPlayer()" title="Close Player">×</button>
@@ -1195,6 +1224,15 @@
     // ==========================================
     
     const VideoSources = [
+      // VidSrc PM - Now Priority 1 (Default)
+      { 
+        name: 'VidSrc PM', 
+        url: 'https://vidsrc.pm/embed/${t}?tmdb=${id}${sea}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 1,
+        note: 'Default Server'
+      },
       { 
         name: '111movies', 
         url: 'https://111movies.com/embed/\${t}/\${id}', 
@@ -1210,15 +1248,6 @@
         speed: 'fast',
         priority: 1,
         note: 'Best for Anime'
-      },
-      // VidSrc PM - Now Priority 1 (Default)
-      { 
-        name: 'VidSrc PM', 
-        url: 'https://vidsrc.pm/embed/${t}?tmdb=${id}${sea}', 
-        quality: 'HD', 
-        speed: 'fast',
-        priority: 1,
-        note: 'Default Server'
       },
       { 
         name: 'VidSrc CC ', 
@@ -1750,6 +1779,20 @@
       const videoArea = document.querySelector('.video-area');
       const mini = document.getElementById('miniPlayer');
       
+      // Save current state before closing
+      if (currentItem) {
+        const isTv = currentItem.media_type === 'tv' || currentItem.first_air_date;
+        const state = {
+          item: currentItem,
+          server: currentServer,
+          season: isTv ? document.getElementById('seasonSelect').value : null,
+          episode: isTv ? document.getElementById('episodeSelect').value : null,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('aura_last_watched', JSON.stringify(state));
+        renderContinueWatching();
+      }
+
       frame.src = 'about:blank';
       videoArea.appendChild(frame);
       mini.classList.remove('show');
@@ -1757,6 +1800,66 @@
       
       // Also reset modal placeholders
       document.getElementById('videoPlaceholder').style.display = 'flex';
+    }
+
+    function toggleFullscreenMini() {
+      const mini = document.getElementById('miniPlayer');
+      if (!document.fullscreenElement) {
+        mini.requestFullscreen().catch(err => {
+          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function renderContinueWatching() {
+      const last = localStorage.getItem('aura_last_watched');
+      const container = document.getElementById('continueWatchingSection');
+      if (!last || !container) return;
+
+      try {
+        const state = JSON.parse(last);
+        container.style.display = 'block';
+        const grid = document.getElementById('continueGrid');
+        grid.innerHTML = '';
+        
+        const card = createCard(state.item);
+        card.classList.add('continue-card');
+        
+        const badge = document.createElement('div');
+        badge.className = 'paused-badge';
+        badge.innerHTML = `<span>⏸</span> PAUSED ${state.season ? `S${state.season} E${state.episode}` : ''}`;
+        card.appendChild(badge);
+
+        // Override click to resume state
+        card.onclick = () => {
+          openModal(state.item);
+          // If it's a TV show, we need to wait for seasons to load then set the correct ones
+          if (state.season) {
+            const checkLoad = setInterval(() => {
+              const sSelect = document.getElementById('seasonSelect');
+              const eSelect = document.getElementById('episodeSelect');
+              if (sSelect && sSelect.options.length > 1) {
+                sSelect.value = state.season;
+                sSelect.dispatchEvent(new Event('change'));
+                
+                const checkEp = setInterval(() => {
+                  if (eSelect && eSelect.options.length > 0) {
+                    eSelect.value = state.episode;
+                    eSelect.dispatchEvent(new Event('change'));
+                    clearInterval(checkEp);
+                  }
+                }, 100);
+                
+                clearInterval(checkLoad);
+              }
+            }, 100);
+          }
+        };
+
+        grid.appendChild(card);
+      } catch(e) { console.error('Continue watching error:', e); }
     }
 
     function nextServerFromMini() {
@@ -1946,6 +2049,7 @@
     
     document.addEventListener('DOMContentLoaded', function() {
       console.log('DOM loaded, attaching event listeners');
+      renderContinueWatching();
       
       const agreeBtn = document.getElementById('agreeBtn');
       if (agreeBtn) {
