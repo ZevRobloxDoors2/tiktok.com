@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>AuraFlix - Ultimate Streaming</title>
+  <title>Echo Flix - Ultimate Streaming</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -569,40 +569,6 @@
     }
     .close-btn:hover { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); color: var(--danger); transform: rotate(90deg); }
 
-    /* Ad-Shield Layer */
-    #ad-shield {
-      position: absolute;
-      inset: 0;
-      z-index: 100;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-    #ad-shield.hidden {
-      opacity: 0;
-      pointer-events: none;
-      visibility: hidden;
-    }
-    .shield-glass {
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(8px);
-    }
-    .shield-card {
-      background: #000;
-      border: 1px solid var(--border);
-      padding: 32px;
-      border-radius: 24px;
-      text-align: center;
-      position: relative;
-      z-index: 101;
-      max-width: 300px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-    }
-
     .disclaimer-overlay {
       position: fixed;
       inset: 0;
@@ -713,6 +679,44 @@
     .error-subtext { font-size: 14px; color: var(--text-muted); }
     .retry-btn { background: var(--primary); color: white; border: none; padding: 12px 32px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
     .retry-btn:hover { background: var(--primary-dark); }
+
+    /* Mini Player Styling */
+    .mini-player {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 320px;
+      aspect-ratio: 16/9;
+      background: #000;
+      border: 2px solid var(--primary);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      z-index: 10000;
+      overflow: hidden;
+      display: none;
+      flex-direction: column;
+      animation: miniSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes miniSlideIn {
+      from { transform: translateY(100%) scale(0.8); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .mini-player.show { display: flex; }
+    .mini-player-header {
+      padding: 8px 12px;
+      background: rgba(10, 10, 15, 0.95);
+      backdrop-filter: blur(10px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: move;
+      user-select: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .mini-player-title { font-size: 10px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; text-transform: uppercase; letter-spacing: 1px; }
+    .mini-player-controls { display: flex; gap: 8px; }
+    .mini-btn { width: 24px; height: 24px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.2s; }
+    .mini-btn:hover { background: var(--primary); border-color: var(--primary-light); transform: scale(1.1); }
 
     @media (max-width: 1024px) { .sidebar { width: 320px; } .movie-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
     @media (max-width: 768px) {
@@ -858,8 +862,8 @@
           <div class="unblock-indicator secure" id="unblockIndicator">
             <span>🔒</span> Secure Stream
           </div>
-          <button onclick="openDirect()" class="icon-btn" title="Open in New Tab" style="width: 36px; height: 36px; border-radius: 50%;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+          <button class="icon-btn" onclick="toggleMiniPlayer()" title="Mini Player" style="width: 36px; height: 36px; border-radius: 50%;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><rect x="13" y="13" width="5" height="5" rx="1" ry="1"/></svg>
           </button>
           <button class="close-btn" id="closeModal">×</button>
         </div>
@@ -867,19 +871,6 @@
       
       <div class="modal-body">
         <div class="video-area">
-          <!-- Ad-Shield Protection Layer -->
-          <div id="ad-shield" class="hidden" onclick="hideShield()">
-            <div class="shield-glass"></div>
-            <div class="shield-card">
-              <div style="width: 48px; height: 48px; background: rgba(99, 102, 241, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              </div>
-              <h4 style="color: white; font-weight: 800; font-size: 14px; margin-bottom: 8px;">Safe-Shield Active</h4>
-              <p style="color: #64748b; font-size: 11px; margin-bottom: 24px;">Popups and inappropriate ads have been isolated. Click to unlock player.</p>
-              <button style="width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 12px;">Unlock Player</button>
-            </div>
-          </div>
-
           <iframe id="videoFrame" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
           
           <div class="video-placeholder" id="videoPlaceholder">
@@ -975,6 +966,18 @@
     </div>
   </div>
 
+  <!-- Mini Player Container -->
+  <div class="mini-player" id="miniPlayer">
+    <div class="mini-player-header" id="miniPlayerHeader">
+      <span class="mini-player-title" id="miniTitle">AuraFlix Mini</span>
+      <div class="mini-player-controls">
+        <button class="mini-btn" onclick="restoreFromMini()" title="Restore Content">⤴</button>
+        <button class="mini-btn" onclick="closeMiniPlayer()" title="Close Player">×</button>
+      </div>
+    </div>
+    <div style="flex: 1; background: #000;" id="miniVideoContainer"></div>
+  </div>
+
   <script>
     // ==========================================
     // GLOBAL FUNCTIONS (Must be defined before DOMContentLoaded)
@@ -1009,6 +1012,9 @@
         localStorage.setItem(`skip_${type}`, isActive);
         
         console.log(`Skip ${type}: ${isActive ? 'ON' : 'OFF'}`);
+        
+        // Note: Actual skipping requires server-side support or video analysis
+        // This is a UI placeholder for future implementation
       }
     }
 
@@ -1017,9 +1023,10 @@
     // ==========================================
     
     const CONFIG = {
-      API_KEY: '4fb21935b3781621f30ce376484a9c72',
+      API_KEY: '3a73619bbb8fc6d47742d1b5b2b707b5',
       BASE_URL: 'https://api.themoviedb.org/3',
       IMG_URL: 'https://image.tmdb.org/t/p/w500',
+      // VidSrc PM is now the default server
       DEFAULT_METHOD: 'blob',
       CURRENT_CATEGORY: 'all',
       MAX_RETRIES: 3,
@@ -1041,7 +1048,7 @@
         direct(url) {
           const frame = document.getElementById('videoFrame');
           frame.src = 'about:blank';
-          setTimeout(() => { frame.src = url; }, 50);
+          setTimeout(() => { frame.src = url; UnblockEngine.startLoadTimer(); }, 50);
           return true;
         },
 
@@ -1049,15 +1056,30 @@
           const frame = document.getElementById('videoFrame');
           frame.src = 'about:blank';
           
-          const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; } iframe { width: 100%; height: 100%; border: none; }</style></head><body><iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe></body></html>`;
+          const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
+</body>
+</html>`;
           
           setTimeout(() => {
             try {
               frame.contentDocument.open();
               frame.contentDocument.write(html);
               frame.contentDocument.close();
+              UnblockEngine.startLoadTimer();
             } catch(e) {
               console.error('about:blank write failed:', e);
+              UnblockEngine.handleLoadFailure('about:blank blocked');
             }
           }, 100);
           return true;
@@ -1065,30 +1087,67 @@
 
         datauri(url) {
           const frame = document.getElementById('videoFrame');
-          const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; } iframe { width: 100%; height: 100%; border: none; }</style></head><body><iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe></body></html>`;
+          const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
+</body>
+</html>`;
+          
           const base64 = btoa(unescape(encodeURIComponent(html)));
           frame.src = `data:text/html;base64,${base64}`;
+          UnblockEngine.startLoadTimer();
           return true;
         },
 
         blob(url) {
           const frame = document.getElementById('videoFrame');
-          const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; } iframe { width: 100%; height: 100%; border: none; }</style></head><body><iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe></body></html>`;
-          if (frame._currentBlob) URL.revokeObjectURL(frame._currentBlob);
+          const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <iframe src="${url}" allowfullscreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
+</body>
+</html>`;
+          
+          if (frame._currentBlob) {
+            URL.revokeObjectURL(frame._currentBlob);
+          }
+          
           const blob = new Blob([html], { type: 'text/html' });
           const blobUrl = URL.createObjectURL(blob);
           frame._currentBlob = blobUrl;
           frame.src = blobUrl;
+          UnblockEngine.startLoadTimer();
+          
           return true;
         }
       },
 
       load(url, method = this.currentMethod) {
         const now = Date.now();
-        if (now - this.lastLoadTime < 500) return false;
+        if (now - this.lastLoadTime < 500) {
+          console.log('Rate limited: too many rapid load attempts');
+          return false;
+        }
+
         this.lastLoadTime = now;
         this.isLoading = true;
         this.currentMethod = method;
+
         const fn = this.methods[method];
         if (fn) {
           fn(url);
@@ -1098,14 +1157,21 @@
         return false;
       },
 
+      
+
+      
+
       updateUI(method) {
         document.querySelectorAll('.method-tab').forEach(tab => {
           tab.classList.toggle('active', tab.dataset.method === method);
         });
+        
         const indicator = document.getElementById('unblockIndicator');
         const isSecure = method === 'blob' || method === 'datauri';
         indicator.className = `unblock-indicator ${isSecure ? 'secure' : ''}`;
-        indicator.innerHTML = isSecure ? '<span>🔒</span> Secure Stream' : '<span>⚡</span> Fast Stream';
+        indicator.innerHTML = isSecure ? 
+          '<span>🔒</span> Secure Stream' : 
+          '<span>⚡</span> Fast Stream';
       },
 
       showError(msg) {
@@ -1121,24 +1187,371 @@
     };
 
     // ==========================================
-    // VIDEO SOURCES
+    // VIDEO SOURCES - VidSrc CC [Recommended] is Priority 1
     // ==========================================
     
     const VideoSources = [
-      { name: '111movies', url: 'https://111movies.com/embed/${t}/${id}', quality: 'HD', speed: 'fast', priority: 1, note: 'Default Movie Server' },
-      { name: 'Videasy', url: 'https://videasy.net/embed/${t}/${id}', quality: 'HD', speed: 'fast', priority: 1, note: 'Best for Anime' },
-      { name: 'VidSrc PM', url: 'https://vidsrc.pm/embed/${t}?tmdb=${id}${sea}', quality: 'HD', speed: 'fast', priority: 1, note: '✓ SAFE', safe: true },
-      { name: 'VidSrc CC', url: 'https://vidsrc.cc/v2/embed/${t}/${id}${se}', quality: 'HD', speed: 'fast', priority: 1, note: 'Reliable' },
-      { name: 'VidLink Pro', url: 'https://vidlink.pro/${t}/${id}${se}', quality: '4K', speed: 'fast', priority: 1, note: '✓ SAFE', safe: true },
-      { name: 'Embed.su', url: 'https://embed.su/embed/${t}/${id}${se}', quality: 'HD', speed: 'fast', priority: 1, note: '✓ SAFE', safe: true },
-      { name: 'VidSrc Pro', url: 'https://vidsrc.xyz/embed/${t}?tmdb=${id}${sea}', quality: 'HD', speed: 'fast', priority: 1, note: '✓ SAFE', safe: true },
-      { name: 'AutoEmbed', url: 'https://player.autoembed.cc/embed/${t}/${id}${se}', quality: 'HD', speed: 'medium', priority: 2 },
-      { name: '2Embed', url: 'https://www.2embed.cc/embed/${t}/${id}${se}', quality: 'HD', speed: 'medium', priority: 2 },
-      { name: 'VidSrc Me', url: 'https://vidsrc.me/embed/${t}?tmdb=${id}${sea}', quality: 'HD', speed: 'fast', priority: 2 },
-      { name: 'VidSrc Net', url: 'https://vidsrc.net/embed/${t}?tmdb=${id}${sea}', quality: 'HD', speed: 'medium', priority: 2 },
-      { name: 'VidStack', url: 'https://vidstack.io/embed/${t}/${id}${se}', quality: '4K', speed: 'fast', priority: 1 },
-      { name: 'Sflix', url: 'https://sflix.to/embed/${t}/${id}${se}', quality: 'HD', speed: 'medium', priority: 2 },
-      { name: '123Movies', url: 'https://123movies.net/embed/${t}/${id}${se}', quality: 'SD', speed: 'slow', priority: 3 }
+      { 
+        name: '111movies', 
+        url: 'https://111movies.com/embed/\${t}/\${id}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 1,
+        note: 'Default Movie Server'
+      },
+      {
+        name: 'Videasy',
+        url: 'https://videasy.net/embed/\${t}/\${id}',
+        quality: 'HD',
+        speed: 'fast',
+        priority: 1,
+        note: 'Best for Anime'
+      },
+      // VidSrc PM - Now Priority 1 (Default)
+      { 
+        name: 'VidSrc PM', 
+        url: 'https://vidsrc.pm/embed/${t}?tmdb=${id}${sea}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 1,
+        note: 'Default Server'
+      },
+      { 
+        name: 'VidSrc CC ', 
+        url: 'https://vidsrc.cc/v2/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 1,
+        note: 'Reliable - 637M visits/month'
+      },
+      
+      // Priority 1 alternatives
+      { 
+        name: 'VidLink Pro', 
+        url: 'https://vidlink.pro/${t}/${id}${se}', 
+        quality: '4K', 
+        speed: 'fast',
+        priority: 1,
+        note: 'Launched Aug 2024'
+      },
+      { 
+        name: 'Embed.su', 
+        url: 'https://embed.su/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 1 
+      },
+      
+      // Priority 2
+      { 
+        name: 'Vidora', 
+        url: 'https://vidora.su/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 2 
+      },
+      { 
+        name: 'VidSrc Pro', 
+        url: 'https://vidsrc.xyz/embed/${t}?tmdb=${id}${sea}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 2 
+      },
+      
+      // Priority 3
+      { 
+        name: 'AutoEmbed', 
+        url: 'https://player.autoembed.cc/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3 
+      },
+      { 
+        name: 'MoviesAPI', 
+        url: 'https://moviesapi.club/${t}/${id}${sed}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3 
+      },
+      
+      // Priority 4
+      { 
+        name: '2Embed', 
+        url: 'https://www.2embed.cc/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4 
+      },
+      { 
+        name: 'SuperEmbed', 
+        url: 'https://multiembed.mov/?video_id=${id}&tmdb=1${ses}', 
+        quality: 'SD', 
+        speed: 'slow',
+        priority: 4 
+      },
+      { 
+        name: 'Flicky', 
+        url: 'https://flicky.host/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4 
+      },
+      { 
+        name: 'Smashy', 
+        url: 'https://player.smashy.stream/${t}/${id}${se}', 
+        quality: '4K', 
+        speed: 'medium',
+        priority: 4 
+      },
+      
+      // Priority 5-6
+      { 
+        name: 'VidSrc ICU', 
+        url: 'https://vidsrc.icu/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'slow',
+        priority: 5 
+      },
+      { 
+        name: 'MovieKex', 
+        url: 'https://moviekex.online/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'slow',
+        priority: 5 
+      },
+
+      // NEW SERVERS ADDED
+      { 
+        name: 'VidBinge', 
+        url: 'https://www.vidbinge.to/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 1,
+        note: 'MoviesAPI successor - Reliable'
+      },
+      { 
+        name: 'VidSrc VIP', 
+        url: 'https://vidsrc.vip/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 1,
+        note: 'Premium VidSrc instance'
+      },
+      { 
+        name: 'VidSrc Me', 
+        url: 'https://vidsrc.me/embed/${t}?tmdb=${id}${sea}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 2,
+        note: 'Alternative VidSrc domain'
+      },
+      { 
+        name: 'VidSrc In', 
+        url: 'https://vidsrc.in/embed/${t}?tmdb=${id}${sea}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 2,
+        note: 'Indian VidSrc mirror'
+      },
+      
+      { 
+        name: 'VidSrc Net', 
+        url: 'https://vidsrc.net/embed/${t}?tmdb=${id}${sea}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 2,
+        note: 'Network mirror'
+      },
+      { 
+        name: 'VidSrc Stream', 
+        url: 'https://vidsrc.stream/embed/${t}?tmdb=${id}${sea}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 2,
+        note: 'Streaming optimized'
+      },
+      { 
+        name: 'VidSrc Icu', 
+        url: 'https://vidsrc.icu/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'slow',
+        priority: 2,
+        note: 'ICU domain'
+      },
+      { 
+        name: '2Embed Russian', 
+        url: 'https://www.2embed.ru/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3,
+        note: '2Embed mirror'
+      },
+      { 
+        name: '2Embed Skin', 
+        url: 'https://www.2embed.skin/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3,
+        note: '2Embed skin domain'
+      },
+      { 
+        name: 'Embed CIA', 
+        url: 'https://embed.cia/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3,
+        note: 'CIA embed service'
+      },
+      { 
+        name: 'MultiEmbed VIP', 
+        url: 'https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1${ses}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3,
+        note: 'Direct stream variant'
+      },
+      { 
+        name: 'VidPlay', 
+        url: 'https://vidplay.online/e/${id}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 2,
+        type: 'movie',
+        note: 'VidPlay hosting'
+      },
+      { 
+        name: 'FileMoon', 
+        url: 'https://filemoon.sx/e/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4,
+        type: 'movie',
+        note: 'FileMoon hosting'
+      },
+      { 
+        name: 'StreamWish', 
+        url: 'https://streamwish.to/e/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4,
+        type: 'movie',
+        note: 'StreamWish hosting'
+      },
+      { 
+        name: 'VidHide', 
+        url: 'https://vidhidepro.com/v/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4,
+        type: 'movie',
+        note: 'VidHide hosting'
+      },
+      { 
+        name: 'VidStack', 
+        url: 'https://vidstack.io/embed/${t}/${id}${se}', 
+        quality: '4K', 
+        speed: 'fast',
+        priority: 1,
+        note: 'VidStack player'
+      },
+      { 
+        name: 'NSBX', 
+        url: 'https://nsbx.wtf/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'fast',
+        priority: 2,
+        note: 'NSBX streaming'
+      },
+      { 
+        name: 'CineSync', 
+        url: 'https://cinesync.app/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3,
+        note: 'CineSync player'
+      },
+      { 
+        name: 'PrimeWire', 
+        url: 'https://www.primewire.tf/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4,
+        note: 'PrimeWire embed'
+      },
+      { 
+        name: '123Embed', 
+        url: 'https://123embed.net/embed/${t}/${id}${se}', 
+        quality: 'SD', 
+        speed: 'slow',
+        priority: 5,
+        note: '123Movies embed'
+      },
+      { 
+        name: 'VidGuard', 
+        url: 'https://vidguard.to/e/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4,
+        type: 'movie',
+        note: 'VidGuard hosting'
+      },
+      { 
+        name: 'UpCloud', 
+        url: 'https://upcloud.to/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 3,
+        note: 'UpCloud streaming'
+      },
+      { 
+        name: 'VidMoly', 
+        url: 'https://vidmoly.to/embed/${t}/${id}${se}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 4,
+        note: 'VidMoly hosting'
+      },
+      { 
+        name: 'DoodStream', 
+        url: 'https://doodstream.com/e/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 5,
+        type: 'movie',
+        note: 'DoodStream hosting'
+      },
+      { 
+        name: 'MixDrop', 
+        url: 'https://mixdrop.co/e/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        priority: 5,
+        type: 'movie',
+        note: 'MixDrop hosting'
+      },
+      { 
+        name: 'GoMovies', 
+        url: 'https://gomo.to/${t}/${id}${se}', 
+        quality: 'SD', 
+        speed: 'slow',
+        priority: 6 
+      },
+      { 
+        name: 'StreamTape', 
+        url: 'https://streamtape.com/e/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        type: 'movie',
+        priority: 6 
+      },
+      { 
+        name: 'DoodStream', 
+        url: 'https://dood.ws/e/${id}', 
+        quality: 'HD', 
+        speed: 'medium',
+        type: 'movie',
+        priority: 6 
+      }
     ];
 
     // ==========================================
@@ -1157,39 +1570,33 @@
       seasonSelect: document.getElementById('seasonSelect'),
       episodeSelect: document.getElementById('episodeSelect'),
       tvSection: document.getElementById('tvSection'),
+      // NEW: Skip section elements
       tvSkipSection: document.getElementById('tvSkipSection'),
-      movieSkipSection: document.getElementById('movieSkipSection'),
-      adShield: document.getElementById('ad-shield')
+      movieSkipSection: document.getElementById('movieSkipSection')
     };
 
     // ==========================================
     // CORE FUNCTIONS
     // ==========================================
-
-    function hideShield() {
-      DOM.adShield.classList.add('hidden');
-    }
     
     function buildUrl(source, item, season, episode) {
       let url = source.url;
       const isTv = item.media_type === 'tv' || item.first_air_date;
       const t = isTv ? 'tv' : 'movie';
+      
       url = url.replace('${t}', t).replace('${id}', item.id);
+      
       if (isTv && season && episode) {
-        url = url.replace('${se}', `/${season}/${episode}`).replace('${sea}', `&season=${season}&episode=${episode}`).replace('${sed}', `-${season}-${episode}`).replace('${ses}', `&s=${season}&e=${episode}`);
+        url = url.replace('${se}', `/${season}/${episode}`)
+                 .replace('${sea}', `&season=${season}&episode=${episode}`)
+                 .replace('${sed}', `-${season}-${episode}`)
+                 .replace('${ses}', `&s=${season}&e=${episode}`);
       } else {
-        url = url.replace('${se}', '').replace('${sea}', '').replace('${sed}', '').replace('${ses}', '');
+        url = url.replace('${se}', '').replace('${sea}', '')
+                 .replace('${sed}', '').replace('${ses}', '');
       }
+      
       return url;
-    }
-
-    function openDirect() {
-      if (!currentItem) return;
-      const source = VideoSources[currentServer];
-      const season = DOM.seasonSelect?.value;
-      const episode = DOM.episodeSelect?.value;
-      const url = buildUrl(source, currentItem, season, episode);
-      window.open(url, '_blank');
     }
 
     function renderServers(item, season, episode) {
@@ -1204,7 +1611,7 @@
         
         btn.innerHTML = `
           <div class="server-info">
-            <div class="server-name">${source.name} ${source.safe ? '<span style="color:var(--success); font-size:9px;">✓ SAFE</span>' : ''}</div>
+            <div class="server-name">${source.name}</div>
             <div class="server-quality">${source.quality} • ${source.speed}${source.note ? ' • ' + source.note : ''}</div>
           </div>
           <div class="server-ping ${speedClass}"></div>
@@ -1216,15 +1623,18 @@
           currentServer = idx;
           loadVideo(source, item, season, episode);
         };
+        
         DOM.serverGrid.appendChild(btn);
       });
-      if (sources.length) setTimeout(() => loadVideo(sources[0], item, season, episode), 100);
+      
+      if (sources.length) {
+        setTimeout(() => loadVideo(sources[0], item, season, episode), 100);
+      }
     }
 
     function loadVideo(source, item, season, episode) {
       const url = buildUrl(source, item, season, episode);
       DOM.placeholder.style.display = 'none';
-      DOM.adShield.classList.remove('hidden');
       UnblockEngine.hideError();
       UnblockEngine.load(url, UnblockEngine.currentMethod);
     }
@@ -1234,10 +1644,15 @@
         .then(r => r.json())
         .then(data => {
           DOM.tvSection.style.display = 'block';
+          // NEW: Show TV skip options
           DOM.tvSkipSection.style.display = 'block';
           DOM.movieSkipSection.style.display = 'none';
+          
+          // Restore skip preferences
           restoreSkipPreferences();
+          
           DOM.seasonSelect.innerHTML = '';
+          
           (data.seasons || []).forEach(s => {
             if (s.season_number > 0) {
               const opt = document.createElement('option');
@@ -1246,6 +1661,7 @@
               DOM.seasonSelect.appendChild(opt);
             }
           });
+          
           DOM.seasonSelect.onchange = () => loadEpisodes(item.id, DOM.seasonSelect.value);
           DOM.seasonSelect.dispatchEvent(new Event('change'));
         });
@@ -1256,13 +1672,18 @@
         .then(r => r.json())
         .then(data => {
           DOM.episodeSelect.innerHTML = '';
+          
           (data.episodes || []).forEach(e => {
             const opt = document.createElement('option');
             opt.value = e.episode_number;
             opt.text = `E${e.episode_number}: ${e.name}`;
             DOM.episodeSelect.appendChild(opt);
           });
-          DOM.episodeSelect.onchange = () => renderServers(currentItem, seasonNum, DOM.episodeSelect.value);
+          
+          DOM.episodeSelect.onchange = () => {
+            renderServers(currentItem, seasonNum, DOM.episodeSelect.value);
+          };
+          
           if (data.episodes?.length > 0) {
             DOM.episodeSelect.selectedIndex = 0;
             DOM.episodeSelect.dispatchEvent(new Event('change'));
@@ -1270,28 +1691,129 @@
         });
     }
 
+    // NEW: Restore skip preferences from localStorage
     function restoreSkipPreferences() {
       ['intro', 'outro', 'credits'].forEach(type => {
         const pref = localStorage.getItem(`skip_${type}`);
-        const toggle = document.getElementById(type === 'intro' ? 'skipIntroToggle' : type === 'outro' ? 'skipOutroToggle' : 'skipCreditsToggle');
-        if (toggle && pref === 'true') toggle.classList.add('active');
+        const toggle = document.getElementById(type === 'intro' ? 'skipIntroToggle' : 
+                                               type === 'outro' ? 'skipOutroToggle' : 
+                                               'skipCreditsToggle');
+        if (toggle && pref === 'true') {
+          toggle.classList.add('active');
+        }
       });
+    }
+
+    // Mini Player Logic
+    function toggleMiniPlayer() {
+      if (!currentItem) return;
+      
+      const frame = document.getElementById('videoFrame');
+      const mini = document.getElementById('miniPlayer');
+      const miniContainer = document.getElementById('miniVideoContainer');
+      const miniTitleLabel = document.getElementById('miniTitle');
+      const modal = document.getElementById('modalOverlay');
+      
+      miniTitleLabel.textContent = currentItem.title || currentItem.name;
+      
+      // Move iframe to mini player
+      miniContainer.appendChild(frame);
+      mini.classList.add('show');
+      
+      // Hide modal but keep state
+      modal.classList.remove('show');
+      
+      // Initialize drag
+      makeDraggable(mini, document.getElementById('miniPlayerHeader'));
+    }
+
+    function restoreFromMini() {
+      const frame = document.getElementById('videoFrame');
+      const videoArea = document.querySelector('.video-area');
+      const mini = document.getElementById('miniPlayer');
+      const modal = document.getElementById('modalOverlay');
+      
+      // Move iframe back to modal
+      videoArea.appendChild(frame);
+      mini.classList.remove('show');
+      
+      // Show modal
+      modal.classList.add('show');
+    }
+
+    function closeMiniPlayer() {
+      const frame = document.getElementById('videoFrame');
+      const videoArea = document.querySelector('.video-area');
+      const mini = document.getElementById('miniPlayer');
+      
+      frame.src = 'about:blank';
+      videoArea.appendChild(frame);
+      mini.classList.remove('show');
+      currentItem = null;
+    }
+
+    function makeDraggable(el, handle) {
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      handle.onmousedown = dragMouseDown;
+
+      function dragMouseDown(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        el.style.top = (el.offsetTop - pos2) + "px";
+        el.style.left = (el.offsetLeft - pos1) + "px";
+        el.style.bottom = "auto";
+        el.style.right = "auto";
+      }
+
+      function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+      }
     }
 
     function openModal(item) {
       currentItem = item;
+      // Close mini player if opening a new item
+      const mini = document.getElementById('miniPlayer');
+      if (mini.classList.contains('show')) {
+        closeMiniPlayer();
+      }
+      
       document.getElementById('modalTitle').textContent = item.title || item.name;
-      document.getElementById('modalMeta').textContent = `${(item.release_date || item.first_air_date || '').substring(0,4)} • ${item.media_type === 'tv' ? 'TV Series' : 'Movie'} • ⭐ ${item.vote_average?.toFixed(1) || 'N/A'}`;
+      document.getElementById('modalMeta').textContent = 
+        `${(item.release_date || item.first_air_date || '').substring(0,4)} • ${item.media_type === 'tv' ? 'TV Series' : 'Movie'} • ⭐ ${item.vote_average?.toFixed(1) || 'N/A'}`;
       document.getElementById('modalPoster').src = CONFIG.IMG_URL + (item.poster_path || '');
+      
+      UnblockEngine.retryCount = 0;
+      UnblockEngine.isLoading = false;
+      
       DOM.modal.classList.add('show');
       DOM.placeholder.style.display = 'flex';
       DOM.tvSection.style.display = 'none';
+      // NEW: Hide skip sections by default
       DOM.tvSkipSection.style.display = 'none';
       DOM.movieSkipSection.style.display = 'none';
+      
       UnblockEngine.currentMethod = CONFIG.DEFAULT_METHOD;
       UnblockEngine.updateUI(CONFIG.DEFAULT_METHOD);
-      if (item.media_type === 'tv' || item.first_air_date) setupTv(item);
-      else {
+      
+      if (item.media_type === 'tv' || item.first_air_date) {
+        setupTv(item);
+      } else {
+        // NEW: Show movie skip options
         DOM.movieSkipSection.style.display = 'block';
         restoreSkipPreferences();
         renderServers(item);
@@ -1300,33 +1822,56 @@
 
     function closeModal() {
       DOM.modal.classList.remove('show');
-      if (DOM.frame._currentBlob) URL.revokeObjectURL(DOM.frame._currentBlob);
-      DOM.frame.src = 'about:blank';
-      DOM.placeholder.style.display = 'flex';
-      DOM.adShield.classList.add('hidden');
-      UnblockEngine.hideError();
+      
+      // Also ensure mini player is cleared if we are fully closing from the modal
+      const mini = document.getElementById('miniPlayer');
+      if (!mini.classList.contains('show')) {
+        if (DOM.frame._currentBlob) {
+          URL.revokeObjectURL(DOM.frame._currentBlob);
+          DOM.frame._currentBlob = null;
+        }
+        DOM.frame.src = 'about:blank';
+        DOM.placeholder.style.display = 'flex';
+        UnblockEngine.hideError();
+      }
     }
 
     function createCard(item) {
       const card = document.createElement('div');
       card.className = 'movie-card';
-      const img = item.poster_path ? CONFIG.IMG_URL + item.poster_path : 'https://via.placeholder.com/500x750/1a1a25/6366f1?text=No+Image';
+      
+      const img = item.poster_path ? CONFIG.IMG_URL + item.poster_path : 
+        'https://via.placeholder.com/500x750/1a1a25/6366f1?text=No+Image';
+      
       const year = (item.release_date || item.first_air_date || '').substring(0,4);
       const rating = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
-      card.innerHTML = `<img src="${img}" loading="lazy" alt="${item.title || item.name}"><div class="movie-info"><div class="movie-title">${item.title || item.name}</div><div class="movie-meta"><span>${year}</span><span class="rating">★ ${rating}</span></div></div>`;
+      
+      card.innerHTML = `
+        <img src="${img}" loading="lazy" alt="${item.title || item.name}">
+        <div class="movie-info">
+          <div class="movie-title">${item.title || item.name}</div>
+          <div class="movie-meta">
+            <span>${year}</span>
+            <span class="rating">★ ${rating}</span>
+          </div>
+        </div>
+      `;
+      
       card.onclick = () => openModal(item);
       return card;
     }
 
     async function loadContent(category = 'all', page = 1) {
       DOM.grid.innerHTML = '<div class="skeleton" style="aspect-ratio:2/3"></div>'.repeat(6);
+      
       try {
         if (category === 'all') {
           const [movies, shows] = await Promise.all([
             fetch(`${CONFIG.BASE_URL}/movie/popular?api_key=${CONFIG.API_KEY}&page=${page}`).then(r => r.json()),
             fetch(`${CONFIG.BASE_URL}/tv/popular?api_key=${CONFIG.API_KEY}&page=${page}`).then(r => r.json())
           ]);
-          const combined = [...(movies.results||[]), ...(shows.results||[])].sort(() => Math.random() - 0.5);
+          const combined = [...(movies.results||[]), ...(shows.results||[])]
+            .sort(() => Math.random() - 0.5);
           DOM.grid.innerHTML = '';
           combined.forEach(item => DOM.grid.appendChild(createCard(item)));
         } else {
@@ -1336,12 +1881,19 @@
           DOM.grid.innerHTML = '';
           (data.results || []).forEach(item => DOM.grid.appendChild(createCard(item)));
         }
-      } catch (e) { console.error('Load error:', e); }
+      } catch (e) {
+        console.error('Load error:', e);
+      }
     }
 
     async function searchContent(query) {
-      if (!query.trim()) { loadContent('all'); return; }
+      if (!query.trim()) {
+        loadContent('all');
+        return;
+      }
+      
       DOM.grid.innerHTML = '<div class="skeleton" style="aspect-ratio:2/3"></div>'.repeat(6);
+      
       try {
         const res = await fetch(`${CONFIG.BASE_URL}/search/multi?api_key=${CONFIG.API_KEY}&query=${encodeURIComponent(query)}`);
         const data = await res.json();
@@ -1349,17 +1901,40 @@
         DOM.grid.innerHTML = '';
         filtered.forEach(item => DOM.grid.appendChild(createCard(item)));
         document.getElementById('sectionTitle').textContent = `Search: "${query}"`;
-      } catch (e) { console.error('Search error:', e); }
+      } catch (e) {
+        console.error('Search error:', e);
+      }
     }
 
+    // ==========================================
+    // EVENT LISTENERS
+    // ==========================================
+    
     document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM loaded, attaching event listeners');
+      
+      const agreeBtn = document.getElementById('agreeBtn');
+      if (agreeBtn) {
+        agreeBtn.addEventListener('click', function(e) {
+          console.log('Button clicked via addEventListener');
+          e.preventDefault();
+          enterExperience();
+        });
+      }
+      
       document.querySelectorAll('.category-pill').forEach(pill => {
         pill.addEventListener('click', () => {
           document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
           pill.classList.add('active');
           const cat = pill.dataset.cat;
           CONFIG.CURRENT_CATEGORY = cat;
-          const catNames = { 'all': 'Trending Now', '28': 'Action Movies', '35': 'Comedy Movies', '18': 'Drama Movies', '27': 'Horror Movies', '878': 'Sci-Fi Movies', '10749': 'Romance Movies', '16': 'Animation', '80': 'Crime Movies', '14': 'Fantasy Movies', '9648': 'Mystery Movies', '10752': 'War Movies', '37': 'Western Movies' };
+          
+          const catNames = {
+            'all': 'Trending Now', '28': 'Action Movies', '35': 'Comedy Movies', '18': 'Drama Movies',
+            '27': 'Horror Movies', '878': 'Sci-Fi Movies', '10749': 'Romance Movies', '16': 'Animation',
+            '80': 'Crime Movies', '14': 'Fantasy Movies', '9648': 'Mystery Movies', '10752': 'War Movies', '37': 'Western Movies'
+          };
+          
           document.getElementById('sectionTitle').textContent = catNames[cat] || 'Movies';
           loadContent(cat);
         });
@@ -1370,13 +1945,18 @@
           const method = e.target.dataset.method;
           UnblockEngine.currentMethod = method;
           UnblockEngine.updateUI(method);
+          
           const activeServer = document.querySelector('.server-btn.active');
-          if (activeServer && currentItem) activeServer.click();
+          if (activeServer && currentItem) {
+            activeServer.click();
+          }
         }
       });
 
       document.getElementById('closeModal').addEventListener('click', closeModal);
-      DOM.modal.addEventListener('click', (e) => { if (e.target === DOM.modal) closeModal(); });
+      DOM.modal.addEventListener('click', (e) => {
+        if (e.target === DOM.modal) closeModal();
+      });
 
       let searchTimeout;
       document.getElementById('searchInput').addEventListener('input', (e) => {
