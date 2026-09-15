@@ -8,7 +8,7 @@ import { Video, User } from '../types';
 import { useAppStore } from '../store';
 import { 
   Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, 
-  User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock, AlertCircle 
+  User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock, AlertCircle, Maximize2 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -436,8 +436,16 @@ export function Home() {
 export const VideoItem: React.FC<{ 
   video: Video & { user: User; feedId?: string };
   onDelete?: (id: string) => void;
-}> = ({ video, onDelete }) => {
-  const { currentUser, setCurrentUser, isGameActive } = useAppStore();
+  onMinimize?: () => void;
+}> = ({ video, onDelete, onMinimize }) => {
+  const { 
+    currentUser, 
+    setCurrentUser, 
+    isGameActive,
+    setMiniPlayerActive,
+    setMiniPlayerUrl,
+    setMiniPlayerTitle
+  } = useAppStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const ytPlayerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -910,6 +918,22 @@ export const VideoItem: React.FC<{
                 <Share2 size={28} className="fill-current" />
               </div>
               <span className="text-xs font-bold text-white drop-shadow-md">Share</span>
+            </button>
+
+            <button 
+              className="flex flex-col items-center gap-1 group" 
+              onClick={() => {
+                const url = video.isYouTube ? `https://www.youtube.com/watch?v=${video.videoId}` : (video.videoUrl || '');
+                setMiniPlayerUrl(url);
+                setMiniPlayerTitle(video.description || video.title || 'Video');
+                setMiniPlayerActive(true);
+                if (onMinimize) onMinimize();
+              }}
+            >
+              <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-all">
+                <Maximize2 size={28} className="fill-current" />
+              </div>
+              <span className="text-xs font-bold text-white drop-shadow-md">Minimize</span>
             </button>
 
             {canDelete && (

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Maximize2, X, Play, Pause, Square } from 'lucide-react';
+import { motion, AnimatePresence, useDragControls } from 'motion/react';
+import { Maximize2, X, Play, Pause, Square, Move, SkipForward, SkipBack, Volume2, VolumeX } from 'lucide-react';
 import { useAppStore } from '../store';
+import YouTube, { YouTubePlayer } from 'react-youtube';
 
 export function MiniPlayer() {
   const { 
@@ -13,84 +14,186 @@ export function MiniPlayer() {
   
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [position, setPosition] = useState({ x: 20, y: 20 });
-  const playerRef = useRef<HTMLDivElement>(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const playerRef = useRef<YouTubePlayer | null>(null);
+  const dragControls = useDragControls();
+
+  // Reset state when URL changes
+  useEffect(() => {
+    setIsPlaying(true);
+  }, [miniPlayerUrl]);
 
   if (!miniPlayerActive) return null;
+
+  const isYoutube = miniPlayerUrl.includes('youtube.com') || miniPlayerUrl.includes('youtu.be');
+  const videoId = isYoutube ? (miniPlayerUrl.match(/[?&]v=([^&]+)/)?.[1] || miniPlayerUrl.split('/').pop()?.split('?')[0]) : null;
+
+  const handleTogglePlay = () => {
+    if (playerRef.current) {
+      if (isPlaying) {
+        playerRef.current.pauseVideo();
+      } else {
+        playerRef.current.playVideo();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleToggleMute = () => {
+    if (playerRef.current) {
+      if (isMuted) {
+        playerRef.current.unMute();
+      } else {
+        playerRef.current.mute();
+      }
+      setIsMuted(!isMuted);
+    }
+  };
 
   return (
     <AnimatePresence>
       <motion.div
-        ref={playerRef}
-        initial={{ opacity: 0, scale: 1.5, x: "50vw", y: "50vh", rotate: 5, filter: "blur(20px)" }}
+        initial={{ opacity: 0, scale: 0.8, y: 20 }}
         animate={{ 
           opacity: 1, 
           scale: 1, 
-          x: position.x, 
-          y: position.y,
-          rotate: 0,
-          filter: "blur(0px)",
-          width: isExpanded ? '90vw' : '360px',
-          height: isExpanded ? '85vh' : '202px',
+          y: 0,
+          width: isExpanded ? '640px' : '420px', // "Little huger"
+          height: isExpanded ? '360px' : '236px',
         }}
-        exit={{ opacity: 0, scale: 0.5, x: -100, y: -100, filter: "blur(10px)" }}
+        exit={{ opacity: 0, scale: 0.8, y: 20 }}
         drag
+        dragControls={dragControls}
+        dragListener={false}
         dragMomentum={false}
-        onDragStart={() => setIsDragging(true)}
-        onDragEnd={(e, info) => {
-          setIsDragging(false);
-          setPosition({ x: position.x + info.offset.x, y: position.y + info.offset.y });
+        whileDrag={{ 
+          scale: 1.02,
+          rotate: [0, -1.5, 1.5, -1.5, 0],
+          transition: { 
+            rotate: { 
+              repeat: Infinity, 
+              duration: 0.25,
+              ease: "easeInOut"
+            } 
+          }
         }}
-        transition={{ type: "spring", damping: 25, stiffness: 120 }}
-        className={`fixed z-[2000] rounded-[2.5rem] overflow-hidden shadow-[0_40px_100px_-12px_rgba(0,0,0,0.8)] border border-white/10 backdrop-blur-[40px] bg-white/5 saturate-150 group ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className="fixed bottom-6 right-6 z-[2000] rounded-[2rem] overflow-hidden shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] border border-white/10 backdrop-blur-xl bg-zinc-900/90 group"
       >
-        {/* Glow Effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-indigo-500/10 opacity-50 pointer-events-none" />
-        
-        {/* Header / Draggable Area */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30 bg-gradient-to-b from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-[-10px] group-hover:translate-y-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.8)] animate-pulse" />
-            <span className="text-[11px] font-black text-white uppercase tracking-[0.15em] truncate max-w-[180px] drop-shadow-md">
-              {miniPlayerTitle || 'AuraFlix Live'}
+        {/* Header / Draggable Handle */}
+        <div 
+          onPointerDown={(e) => dragControls.start(e)}
+          className="absolute top-0 left-0 right-0 h-12 flex items-center justify-between px-4 z-50 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity cursor-move"
+        >
+          <div className="flex items-center gap-2">
+            <Move size={14} className="text-white/60" />
+            <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[200px]">
+              {miniPlayerTitle || 'Mini Player'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
-              }}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all hover:scale-110 active:scale-90 border border-white/5"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all"
             >
-              <Maximize2 size={14} />
+              <Maximize2 size={12} />
             </button>
             <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setMiniPlayerActive(false);
-              }}
-              className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500 text-white transition-all hover:scale-110 active:scale-90 border border-red-500/20"
+              onClick={() => setMiniPlayerActive(false)}
+              className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500 text-white transition-all"
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           </div>
         </div>
 
-        {/* Video Container */}
-        <div className="w-full h-full bg-black/40 relative">
-          <iframe 
-            src={miniPlayerUrl}
-            className="w-full h-full border-none pointer-events-auto"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-          {/* Invisible drag shield - only active when dragging */}
-          {isDragging && <div className="absolute inset-0 z-40 bg-transparent" />}
+        {/* Video Content */}
+        <div className="w-full h-full bg-black relative">
+          {videoId ? (
+            <YouTube
+              videoId={videoId}
+              opts={{
+                width: '100%',
+                height: '100%',
+                playerVars: {
+                  autoplay: 1,
+                  controls: 0,
+                  modestbranding: 1,
+                  rel: 0,
+                },
+              }}
+              onReady={(e) => {
+                playerRef.current = e.target;
+              }}
+              onStateChange={(e) => {
+                setIsPlaying(e.data === 1);
+              }}
+              className="w-full h-full"
+              iframeClassName="w-full h-full pointer-events-none" // Block iframe interaction so custom controls work
+            />
+          ) : (
+            <iframe 
+              src={miniPlayerUrl}
+              className="w-full h-full border-none"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          )}
+
+          {/* Custom Controls Overlay */}
+          <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none">
+            <div className="flex items-center justify-center gap-6 mb-2 pointer-events-auto">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (playerRef.current) playerRef.current.seekTo(playerRef.current.getCurrentTime() - 10);
+                }}
+                className="p-2 rounded-full hover:bg-white/10 text-white transition-all"
+              >
+                <SkipBack size={20} fill="currentColor" />
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTogglePlay();
+                }}
+                className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+              >
+                {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} className="ml-1" fill="currentColor" />}
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (playerRef.current) playerRef.current.seekTo(playerRef.current.getCurrentTime() + 10);
+                }}
+                className="p-2 rounded-full hover:bg-white/10 text-white transition-all"
+              >
+                <SkipForward size={20} fill="currentColor" />
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-between pointer-events-auto">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleMute();
+                }}
+                className="p-2 rounded-full hover:bg-white/10 text-white transition-all"
+              >
+                {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              </button>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-white/60">1080p</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Glass Border Accent */}
-        <div className="absolute inset-0 border border-white/10 rounded-[2.5rem] pointer-events-none" />
+        {/* Glossy Border */}
+        <div className="absolute inset-0 border border-white/10 rounded-[2rem] pointer-events-none" />
       </motion.div>
     </AnimatePresence>
   );

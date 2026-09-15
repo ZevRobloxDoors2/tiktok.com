@@ -234,7 +234,10 @@ export function Explore() {
             <X size={24} />
           </button>
           <div className="w-full h-full max-w-[500px] relative bg-zinc-950">
-            <VideoItem video={{...selectedVideo, feedId: selectedVideo.id} as any} />
+            <VideoItem 
+              video={{...selectedVideo, feedId: selectedVideo.id} as any} 
+              onMinimize={() => setSelectedVideo(null)}
+            />
           </div>
         </div>
       )}
