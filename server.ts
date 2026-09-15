@@ -117,6 +117,27 @@ Answer any questions the user has about this video, explain what is happening in
     }
   };
 
+  async function getGlobalSettings() {
+    try {
+      const projectId = process.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0065963524";
+      const databaseId = "ai-studio-centraltok-20b3b741-dd0c-4874-8036-490f35162ac6";
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/app_settings/global`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const fields = data.fields || {};
+        return {
+          youtubeApiKeyIndex: parseInt(fields.youtubeApiKeyIndex?.integerValue || '0'),
+          useCache: fields.useCache?.booleanValue ?? true,
+          serverCrashed: fields.serverCrashed?.booleanValue ?? false,
+        };
+      }
+    } catch (err) {
+      console.warn("Settings fetch failed, using defaults", err);
+    }
+    return { youtubeApiKeyIndex: 0, useCache: true, serverCrashed: false };
+  }
+
   // Support both /api/chat and wildcard paths to avoid 405
   app.all("/api/chat", handleChat);
   app.all("*/api/chat", handleChat);
@@ -161,6 +182,11 @@ Return ONLY a valid JSON array of these objects. No markdown formatting, no extr
 
   app.get("/api/youtube-shorts", async (req, res) => {
     try {
+      const settings = await getGlobalSettings();
+      if (settings.serverCrashed) {
+        return res.status(503).json({ error: "Servers has crashed" });
+      }
+
       const apiKeys = Array.from({length: 20}, (_, index) => process.env[`YOUTUBE_API_KEY_${index + 1}`]).filter(Boolean) as string[];
       if (apiKeys.length === 0) {
         return res.status(500).json({ error: "YOUTUBE_API_KEY_1 through YOUTUBE_API_KEY_20 are required" });
@@ -172,7 +198,13 @@ Return ONLY a valid JSON array of these objects. No markdown formatting, no extr
       const searchQuery = req.query.q as string || randomFallback;
       const maxResults = req.query.maxResults as string || '8';
       
-      for (const apiKey of apiKeys) {
+      // Select keys based on strategy
+      let keysToTry = apiKeys;
+      if (settings.youtubeApiKeyIndex > 0 && settings.youtubeApiKeyIndex <= apiKeys.length) {
+        keysToTry = [apiKeys[settings.youtubeApiKeyIndex - 1]];
+      }
+
+      for (const apiKey of keysToTry) {
         const queryParams = new URLSearchParams({
           part: 'snippet', 
           maxResults, 

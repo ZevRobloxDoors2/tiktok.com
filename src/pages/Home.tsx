@@ -2,13 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { 
   getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, 
   ensureVideoInDB, getMessages, saveMessages, getNotifications, 
-  saveNotifications, subscribeToVideo, deleteVideoFromDB, getAppSettings 
+  saveNotifications, subscribeToVideo, deleteVideoFromDB, getAppSettings, subscribeToAppSettings 
 } from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
 import { 
   Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, 
-  User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock 
+  User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock, AlertCircle 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -29,6 +29,7 @@ export function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [youtubeOverloaded, setYoutubeOverloaded] = useState(false);
+  const [serverCrashed, setServerCrashed] = useState(false);
   const [ytPageToken, setYtPageToken] = useState('');
   const seenFeedIds = useRef<Set<string>>(new Set());
   const advanceRequested = useRef(false);
@@ -36,6 +37,13 @@ export function Home() {
   const guestSwipeCount = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsub = subscribeToAppSettings((settings) => {
+      setServerCrashed(settings.serverCrashed);
+    });
+    return () => unsub();
+  }, []);
 
   const fetchBatch = async (isRefresh = false) => {
     if (loadingBatch) return;
@@ -283,6 +291,26 @@ export function Home() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  if (serverCrashed) {
+    return (
+      <div className="h-full w-full bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+          <AlertCircle size={40} className="text-red-500" />
+        </div>
+        <h1 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter">Servers has crashed</h1>
+        <p className="text-zinc-500 max-w-xs leading-relaxed">
+          We are currently experiencing a critical server failure. Please wait shortly for a fix.
+        </p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-8 px-6 py-3 bg-zinc-800 text-white rounded-xl font-bold hover:bg-zinc-700 transition-colors"
+        >
+          Retry Connection
+        </button>
+      </div>
+    );
+  }
 
   if (introPhase !== 'done') {
     return (

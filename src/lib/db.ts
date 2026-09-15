@@ -235,22 +235,57 @@ export const getAppSettings = async () => {
     const docRef = doc(db, 'app_settings', 'global');
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      return snap.data() as { useCache: boolean };
+      return snap.data() as { 
+        useCache: boolean; 
+        youtubeApiKeyIndex: number; 
+        serverCrashed: boolean; 
+        gamesAppsCrashed: boolean; 
+      };
     }
-    return { useCache: true };
+    return { 
+      useCache: true, 
+      youtubeApiKeyIndex: 0, 
+      serverCrashed: false, 
+      gamesAppsCrashed: false 
+    };
   } catch (err) {
     console.error("Error fetching app settings:", err);
-    return { useCache: true };
+    return { 
+      useCache: true, 
+      youtubeApiKeyIndex: 0, 
+      serverCrashed: false, 
+      gamesAppsCrashed: false 
+    };
   }
 };
 
-export const saveAppSettings = async (settings: { useCache: boolean }) => {
+export const saveAppSettings = async (settings: { 
+  useCache: boolean; 
+  youtubeApiKeyIndex?: number; 
+  serverCrashed?: boolean; 
+  gamesAppsCrashed?: boolean; 
+}) => {
   try {
     const docRef = doc(db, 'app_settings', 'global');
-    await setDoc(docRef, settings);
+    await setDoc(docRef, settings, { merge: true });
   } catch (err) {
     console.error("Error saving app settings:", err);
   }
+};
+
+export const subscribeToAppSettings = (callback: (settings: any) => void) => {
+  return onSnapshot(doc(db, 'app_settings', 'global'), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data());
+    } else {
+      callback({ 
+        useCache: true, 
+        youtubeApiKeyIndex: 0, 
+        serverCrashed: false, 
+        gamesAppsCrashed: false 
+      });
+    }
+  });
 };
 
 export const clearDb = async () => {};

@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings } from '../lib/db';
 import { User, Report, Appeal, AuditLog, Video } from '../types';
-import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2 } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 export function Admin() {
   const { currentUser } = useAppStore();
@@ -14,9 +15,25 @@ export function Admin() {
   const [appeals, setAppeals] = useState<Appeal[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
-  const [appSettings, setAppSettings] = useState<{ useCache: boolean }>({ useCache: true });
+  const [appSettings, setAppSettings] = useState<{ 
+    useCache: boolean; 
+    youtubeApiKeyIndex: number; 
+    serverCrashed: boolean; 
+    gamesAppsCrashed: boolean; 
+  }>({ 
+    useCache: true, 
+    youtubeApiKeyIndex: 0, 
+    serverCrashed: false, 
+    gamesAppsCrashed: false 
+  });
   
   const [logSearch, setLogSearch] = useState('');
+
+  // Pin & Countdown State
+  const [pinModal, setPinModal] = useState<{ isOpen: boolean; action: () => void; title: string }>({ isOpen: false, action: () => {}, title: '' });
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -259,10 +276,72 @@ export function Admin() {
 
   const toggleCache = async () => {
     if (!isOwner) return;
-    const newSettings = { useCache: !appSettings.useCache };
+    const newSettings = { ...appSettings, useCache: !appSettings.useCache };
     setAppSettings(newSettings);
     await saveAppSettings(newSettings);
     await logAction('toggle_cache', 'system', `Toggled cached data to ${newSettings.useCache ? 'ON' : 'OFF'}`);
+  };
+
+  const updateApiIndex = async (index: number) => {
+    if (!isOwner) return;
+    const newSettings = { ...appSettings, youtubeApiKeyIndex: index };
+    setAppSettings(newSettings);
+    await saveAppSettings(newSettings);
+    await logAction('update_api_index', 'system', `Updated YouTube API strategy to ${index === 0 ? 'Automatic' : `Key ${index}`}`);
+  };
+
+  const handleCrashAction = (type: 'server' | 'games', currentStatus: boolean) => {
+    if (!isOwner) return;
+    setPinInput('');
+    setPinError(false);
+    setPinModal({
+      isOpen: true,
+      title: currentStatus ? `Recover ${type === 'server' ? 'Server' : 'Games & Apps'}` : `Shutdown ${type === 'server' ? 'Server' : 'Games & Apps'}`,
+      action: async () => {
+        if (currentStatus) {
+           // Direct recovery
+           const newSettings = type === 'server' 
+             ? { ...appSettings, serverCrashed: false } 
+             : { ...appSettings, gamesAppsCrashed: false };
+           setAppSettings(newSettings);
+           await saveAppSettings(newSettings);
+           await logAction(`${type}_recover`, 'system', `Recovered ${type}`);
+        } else {
+           // Start countdown
+           setCountdown(10);
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      const executeCrash = async () => {
+        const type = pinModal.title.includes('Server') ? 'server' : 'games';
+        const newSettings = type === 'server' 
+          ? { ...appSettings, serverCrashed: true } 
+          : { ...appSettings, gamesAppsCrashed: true };
+        setAppSettings(newSettings);
+        await saveAppSettings(newSettings);
+        await logAction(`${type}_crash`, 'system', `Crashed ${type} intentionally`);
+        setTimeout(() => setCountdown(null), 3000);
+      };
+      executeCrash();
+    }
+  }, [countdown]);
+
+  const verifyPin = () => {
+    if (pinInput === '1205') {
+      setPinModal(prev => ({ ...prev, isOpen: false }));
+      pinModal.action();
+    } else {
+      setPinError(true);
+      setTimeout(() => setPinError(false), 2000);
+    }
   };
 
   const filteredLogs = logs.filter(log => {
@@ -529,34 +608,91 @@ export function Admin() {
                 <h2 className="text-xl font-bold mb-2">Global App Settings</h2>
                 <p className="text-zinc-500 text-sm mb-6">Manage high-level system behaviors. These changes affect all users instantly.</p>
                 
-                <div className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-lg">YouTube Data Caching</h3>
-                      <p className="text-sm text-zinc-500 max-w-md mt-1">
-                        When enabled, the app will prefer using the pre-fetched video feed to save YouTube API quota. 
-                        Turn this off to force the app to use live API keys from GitHub Secrets.
-                      </p>
-                    </div>
-                    <button 
-                      onClick={toggleCache}
-                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none ${
-                        appSettings.useCache ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                          appSettings.useCache ? 'translate-x-7' : 'translate-x-1'
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* YouTube Cache */}
+                  <div className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="font-bold text-lg">YouTube Data Caching</h3>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Prefer pre-fetched feed to save quota.
+                        </p>
+                      </div>
+                      <button 
+                        onClick={toggleCache}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none ${
+                          appSettings.useCache ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'
                         }`}
-                      />
-                    </button>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                            appSettings.useCache ? 'translate-x-7' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
                     <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
                       appSettings.useCache ? 'bg-green-100 text-green-600 dark:bg-green-900/30' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800'
                     }`}>
-                      Status: {appSettings.useCache ? 'Cached Data ON (Default)' : 'Cached Data OFF (Live API)'}
+                      Status: {appSettings.useCache ? 'ON' : 'OFF'}
                     </span>
+                  </div>
+
+                  {/* API Strategy */}
+                  <div className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="font-bold text-lg mb-2">YouTube API Strategy</h3>
+                    <p className="text-xs text-zinc-500 mb-4">Choose a specific key or use automatic rotation.</p>
+                    <select 
+                      value={appSettings.youtubeApiKeyIndex}
+                      onChange={(e) => updateApiIndex(parseInt(e.target.value))}
+                      className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-lg outline-none focus:border-pink-500"
+                    >
+                      <option value={0}>Automatic (Rotation)</option>
+                      {Array.from({ length: 20 }, (_, i) => i + 1).map(idx => (
+                        <option key={idx} value={idx}>YOUTUBE API KEY {idx}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Crash Buttons */}
+                  <div className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                    <div className="flex items-center justify-between mb-4">
+                       <div className="flex items-center gap-2">
+                         <Power className={appSettings.serverCrashed ? 'text-red-500' : 'text-green-500'} />
+                         <h3 className="font-bold">System Server</h3>
+                       </div>
+                       <button 
+                         onClick={() => handleCrashAction('server', appSettings.serverCrashed)}
+                         className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-tighter transition-all ${
+                           appSettings.serverCrashed 
+                             ? 'bg-green-600 text-white hover:bg-green-700' 
+                             : 'bg-red-600 text-white hover:bg-red-700'
+                         }`}
+                       >
+                         {appSettings.serverCrashed ? 'Recover Server' : 'Self Crash'}
+                       </button>
+                    </div>
+                    <p className="text-xs text-zinc-500">Crashes the entire video feed system for all users.</p>
+                  </div>
+
+                  <div className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                    <div className="flex items-center justify-between mb-4">
+                       <div className="flex items-center gap-2">
+                         <Gamepad2 className={appSettings.gamesAppsCrashed ? 'text-red-500' : 'text-green-500'} />
+                         <h3 className="font-bold">Games & Apps</h3>
+                       </div>
+                       <button 
+                         onClick={() => handleCrashAction('games', appSettings.gamesAppsCrashed)}
+                         className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-tighter transition-all ${
+                           appSettings.gamesAppsCrashed 
+                             ? 'bg-green-600 text-white hover:bg-green-700' 
+                             : 'bg-red-600 text-white hover:bg-red-700'
+                         }`}
+                       >
+                         {appSettings.gamesAppsCrashed ? 'Enable' : 'Shutdown'}
+                       </button>
+                    </div>
+                    <p className="text-xs text-zinc-500">Disables access to the Games & Apps section.</p>
                   </div>
                 </div>
               </div>
@@ -565,6 +701,81 @@ export function Admin() {
 
         </div>
       </div>
+
+      {/* PIN Modal */}
+      {pinModal.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl border border-zinc-800 text-center"
+          >
+            <Settings className="w-12 h-12 mx-auto mb-4 text-pink-600" />
+            <h3 className="text-2xl font-black mb-2 uppercase tracking-tighter">{pinModal.title}</h3>
+            <p className="text-zinc-500 text-sm mb-6">Enter Owner PIN to proceed</p>
+            
+            <div className="space-y-4">
+              <input 
+                type="password"
+                maxLength={4}
+                value={pinInput}
+                onChange={e => setPinInput(e.target.value)}
+                className={`w-full bg-zinc-100 dark:bg-zinc-950 border-2 ${pinError ? 'border-red-500' : 'border-zinc-800'} rounded-2xl py-4 text-center text-3xl font-black tracking-[1em] outline-none transition-all`}
+                autoFocus
+              />
+              {pinError && <p className="text-red-500 text-xs font-bold uppercase animate-bounce">Invalid PIN</p>}
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setPinModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 py-4 font-black bg-zinc-200 dark:bg-zinc-800 rounded-2xl uppercase text-xs"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={verifyPin}
+                  className="flex-1 py-4 font-black bg-pink-600 text-white rounded-2xl uppercase text-xs shadow-lg shadow-pink-600/30"
+                >
+                  Verify
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Crash Animation Overlay */}
+      <AnimatePresence>
+        {countdown !== null && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center text-white"
+          >
+            <motion.div 
+              animate={{ 
+                scale: [1, 1.2, 1],
+                opacity: [0.5, 1, 0.5]
+              }}
+              transition={{ repeat: Infinity, duration: 1 }}
+              className="text-[12rem] font-black leading-none"
+            >
+              {countdown}
+            </motion.div>
+            <p className="text-xl font-bold uppercase tracking-[0.5em] mt-8 text-red-500">Executing Payload</p>
+            {countdown === 0 && (
+               <motion.div 
+                 initial={{ scale: 0 }}
+                 animate={{ scale: 1 }}
+                 className="mt-8 text-2xl font-black text-red-600 uppercase"
+               >
+                 {pinModal.title.includes('Server') ? 'Servers has crashed' : 'Games & Apps has crashed'}
+               </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Confirmation Modal */}
       {confirmModal.isOpen && (

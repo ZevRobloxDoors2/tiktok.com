@@ -1,8 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Gamepad2, Rocket, Stars, Sparkles } from 'lucide-react';
+import { Gamepad2, Rocket, Stars, Sparkles, AlertCircle } from 'lucide-react';
+import { subscribeToAppSettings } from '../lib/db';
 
 export function GamesApps() {
+  const [isCrashed, setIsCrashed] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeToAppSettings((settings) => {
+      setIsCrashed(settings.gamesAppsCrashed || settings.serverCrashed);
+    });
+    return () => unsub();
+  }, []);
+
+  if (isCrashed) {
+    return (
+      <div className="h-full w-full bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+          <AlertCircle size={40} className="text-red-500" />
+        </div>
+        <h1 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter">Games & Apps has crashed</h1>
+        <p className="text-zinc-500 max-w-xs leading-relaxed">
+          We are currently experiencing a technical issue with the games and applications service. Please wait shortly for a fix.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 transition-colors overflow-hidden relative">
       {/* Background Decorative Elements */}
