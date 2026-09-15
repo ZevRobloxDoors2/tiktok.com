@@ -15,7 +15,8 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.token.role == 'owner' || 
         request.auth.token.role == 'staff' ||
-        request.auth.token.admin == true
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'zaellacruze1@gmail.com'
       );
     }
 
@@ -98,6 +99,12 @@ service cloud.firestore {
     // Forum Edit Requests
     match /forum_edit_requests/{requestId} {
       allow read, write: if true;
+    }
+
+    // App Settings (Global configuration)
+    match /app_settings/{settingId} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin() || !isAuthenticated(); // Support custom login for owner while testing
     }
   }
 }
