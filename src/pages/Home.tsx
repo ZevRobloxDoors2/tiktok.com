@@ -70,7 +70,7 @@ export function Home() {
         catch { return []; }
       })();
       const unseenUgvs = allDbVideos.filter(video => {
-        if (video.isYouTube || seenFeedIds.current.has(video.id) || localViewed.includes(video.id)) return false;
+        if (video.isYouTube || video.isRemoved || seenFeedIds.current.has(video.id) || localViewed.includes(video.id)) return false;
 
         // Post Visibility & Friendship check
         const isAuthor = currentUser?.id === video.userId;

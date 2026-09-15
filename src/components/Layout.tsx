@@ -19,6 +19,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     authorName: string;
     authorAvatar?: string;
   } | null>(null);
+  const [rewardToast, setRewardToast] = useState<{
+    id: string;
+    message: string;
+    fromUserHandle: string;
+    fromUserAvatar?: string;
+  } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const knownMessageIds = useRef<Set<string>>(new Set());
   const location = useLocation();
@@ -82,10 +88,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const unsubscribe = subscribeToNotifications(currentUser.id, async (unreadForumNotifs) => {
-      const pending = unreadForumNotifs.filter(n => n.type === 'forum_announcement' && !n.read);
-      if (pending.length > 0) {
-        const latest = pending.sort((a, b) => b.timestamp - a.timestamp)[0];
+    const unsubscribe = subscribeToNotifications(currentUser.id, async (allUnreadNotifs) => {
+      // Handle Forum Announcements
+      const pendingForum = allUnreadNotifs.filter(n => n.type === 'forum_announcement' && !n.read);
+      if (pendingForum.length > 0) {
+        const latest = pendingForum.sort((a, b) => b.timestamp - a.timestamp)[0];
         const sessionKey = `ct_shown_forum_${latest.id}`;
         if (!sessionStorage.getItem(sessionKey)) {
           sessionStorage.setItem(sessionKey, 'true');
@@ -101,6 +108,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('📢 CentralTok Announcement', {
               body: latest.title || 'New Forum announcement posted',
+              icon: author?.avatarUrl
+            });
+          }
+        }
+      }
+
+      // Handle Tradient Rewards
+      const pendingRewards = allUnreadNotifs.filter(n => n.type === 'tradient_reward' && !n.read);
+      if (pendingRewards.length > 0) {
+        const latest = pendingRewards.sort((a, b) => b.timestamp - a.timestamp)[0];
+        const sessionKey = `ct_shown_reward_${latest.id}`;
+        if (!sessionStorage.getItem(sessionKey)) {
+          sessionStorage.setItem(sessionKey, 'true');
+          const users = await getUsers();
+          const author = users.find(u => u.id === latest.fromUserId);
+          setRewardToast({
+            id: latest.id,
+            message: latest.message || '',
+            fromUserHandle: author?.handle || 'eyeshd',
+            fromUserAvatar: author?.avatarUrl
+          });
+
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('🎉 Tradient Reward!', {
+              body: latest.message || 'You earned the Tradient Badge!',
               icon: author?.avatarUrl
             });
           }
@@ -294,6 +326,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <img src={messageToast.avatarUrl} alt="" className="w-10 h-10 rounded-full" />
           <span className="text-left"><strong className="block">{messageToast.username}</strong><span className="text-sm text-zinc-500">New messages was sent</span></span>
         </button>
+      )}
+
+      {rewardToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[130] w-[90%] max-w-sm flex items-center gap-4 rounded-2xl bg-indigo-600 text-white p-4 shadow-[0_20px_50px_rgba(79,70,229,0.3)] animate-in slide-in-from-top-12 duration-500 border border-white/20">
+          <div className="relative shrink-0">
+             <img src={rewardToast.fromUserAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=owner'} alt="" className="w-12 h-12 rounded-full border-2 border-white/30" />
+             <div className="absolute -bottom-1 -right-1 bg-white text-indigo-600 rounded-full p-1 shadow-lg">
+                <ShieldCheck size={14} />
+             </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-sm truncate">Message from @{rewardToast.fromUserHandle}</h4>
+            <p className="text-[11px] leading-tight opacity-90 line-clamp-2 mt-0.5">{rewardToast.message}</p>
+          </div>
+          <button 
+            onClick={async () => {
+              if (currentUser) await markNotificationAsRead(rewardToast.id);
+              setRewardToast(null);
+              navigate(currentUser ? `/profile/${currentUser.handle}` : '/');
+            }}
+            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
       )}
       
       {/* Mobile Bottom Nav */}

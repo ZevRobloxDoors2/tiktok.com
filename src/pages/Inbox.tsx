@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getNotifications, getMessages, getUsers } from '../lib/db';
 import { Notification, Message, User } from '../types';
-import { Heart, MessageCircle, UserPlus, Bell } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function Inbox() {
@@ -118,11 +118,12 @@ export function Inbox() {
                   <div className="relative">
                     <img src={n.fromUser.avatarUrl} alt="" className="w-12 h-12 rounded-full" />
                     <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-zinc-950 flex items-center justify-center text-white
-                      ${n.type === 'like' ? 'bg-pink-600' : n.type === 'follow' ? 'bg-blue-500' : n.type === 'forum_announcement' ? 'bg-[#5865F2]' : 'bg-green-500'}`}>
+                      ${n.type === 'like' ? 'bg-pink-600' : n.type === 'follow' ? 'bg-blue-500' : n.type === 'forum_announcement' ? 'bg-[#5865F2]' : n.type === 'tradient_reward' ? 'bg-indigo-600' : 'bg-green-500'}`}>
                       {n.type === 'like' && <Heart size={12} className="fill-current" />}
                       {n.type === 'follow' && <UserPlus size={12} />}
                       {n.type === 'mention' && <span className="text-[10px] font-bold">@</span>}
                       {n.type === 'forum_announcement' && <span className="text-[10px]">📢</span>}
+                      {n.type === 'tradient_reward' && <ShieldCheck size={12} />}
                     </div>
                   </div>
                   <div className="flex-1">
@@ -131,6 +132,13 @@ export function Inbox() {
                         <>
                           <span className="font-bold text-[#5865F2]">📢 Forum Announcement:</span>{' '}
                           <Link to="/forum" className="font-semibold hover:underline">{n.title || n.message}</Link>
+                        </>
+                      ) : n.type === 'tradient_reward' ? (
+                        <>
+                          <Link to={`/profile/${n.fromUser.handle}`} className="font-bold hover:underline">@{n.fromUser.handle}</Link>
+                          {' '}
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400">awarded you the Tradient Badge!</span>
+                          <p className="mt-1 text-zinc-600 dark:text-zinc-300 italic">"{n.message}"</p>
                         </>
                       ) : (
                         <>

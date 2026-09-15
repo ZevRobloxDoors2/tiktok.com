@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings } from '../lib/db';
-import { User, Report, Appeal, AuditLog, Video } from '../types';
+import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications } from '../lib/db';
+import { User, Report, Appeal, AuditLog, Video, Notification } from '../types';
 import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,6 +15,7 @@ export function Admin() {
   const [appeals, setAppeals] = useState<Appeal[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
   const [appSettings, setAppSettings] = useState<{ 
     useCache: boolean; 
     youtubeApiKeyIndex: number; 
@@ -165,9 +166,42 @@ export function Admin() {
           const vids = await getVideos();
           const vIdx = vids.findIndex(v => v.id === report.videoId);
           if (vIdx !== -1) {
-             vids.splice(vIdx, 1);
+             vids[vIdx].isRemoved = true;
+             vids[vIdx].removalReason = reason;
              await saveVideos(vids);
              setVideos(vids);
+          }
+
+          // Tradient Reward Logic
+          const allUsers = await getUsers();
+          const reporterIdx = allUsers.findIndex(u => u.id === report.reporterId);
+          if (reporterIdx !== -1) {
+            const reporter = allUsers[reporterIdx];
+            reporter.acceptedReportsCount = (reporter.acceptedReportsCount || 0) + 1;
+            
+            if (reporter.acceptedReportsCount === 3 && !(reporter.badges || []).includes('Tradient')) {
+              reporter.badges = [...(reporter.badges || []), 'Tradient'];
+              
+              // Find owner for notification
+              const owner = allUsers.find(u => u.role === 'owner' || u.handle === 'eyeshd');
+              const ownerId = owner?.id || 'system';
+
+              // Send Notification
+              const allNotifs = await getNotifications();
+              const newNotif: Notification = {
+                id: `notif_tradient_${Date.now()}`,
+                userId: reporter.id,
+                type: 'tradient_reward',
+                fromUserId: ownerId,
+                title: '🎉 New Reward Earned!',
+                message: 'Thank you for making our website/community safe, i also gave you a reward on your profile, check it out.',
+                read: false,
+                timestamp: Date.now()
+              };
+              await saveNotifications([...allNotifs, newNotif]);
+            }
+            await saveUsers(allUsers);
+            setUsers(allUsers);
           }
         }
         await logAction(`report_${status}`, report.id, `Report resolved. Notes: ${reason}`);
@@ -252,18 +286,33 @@ export function Admin() {
           await saveAppeals(allAppeals);
           setAppeals(allAppeals);
           
-          const allUsers = await getUsers();
-          const uIdx = allUsers.findIndex(user => user.id === appeal.userId);
-          if (uIdx !== -1) {
+          if (appeal.videoId) {
+            // Video appeal
             if (status === 'accepted') {
-              delete allUsers[uIdx].banStatus;
-            } else {
-              if (allUsers[uIdx].banStatus) {
-                allUsers[uIdx].banStatus!.stillBannedReason = reason;
+              const allVids = await getVideos();
+              const vIdx = allVids.findIndex(v => v.id === appeal.videoId);
+              if (vIdx !== -1) {
+                delete allVids[vIdx].isRemoved;
+                delete allVids[vIdx].removalReason;
+                await saveVideos(allVids);
+                setVideos(allVids);
               }
             }
-            await saveUsers(allUsers);
-            setUsers(allUsers);
+          } else {
+            // Ban appeal
+            const allUsers = await getUsers();
+            const uIdx = allUsers.findIndex(user => user.id === appeal.userId);
+            if (uIdx !== -1) {
+              if (status === 'accepted') {
+                delete allUsers[uIdx].banStatus;
+              } else {
+                if (allUsers[uIdx].banStatus) {
+                  allUsers[uIdx].banStatus!.stillBannedReason = reason;
+                }
+              }
+              await saveUsers(allUsers);
+              setUsers(allUsers);
+            }
           }
           await logAction(`appeal_${status}`, appeal.id, `Appeal ${status}. Reason/Notes: ${reason}`);
         }
@@ -401,8 +450,13 @@ export function Admin() {
                       <p className="text-sm text-zinc-500 mb-2">Reported by: @{repUser?.handle}</p>
                       <p className="text-xs text-zinc-400 mb-4">{new Date(report.timestamp).toLocaleString()}</p>
                       <div className="flex gap-2">
+                        {vid && (
+                          <button onClick={() => setPreviewVideo(vid)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm flex items-center gap-1">
+                            <Search size={16} /> View Video
+                          </button>
+                        )}
                         <button onClick={() => resolveReport(report, 'accepted')} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm flex items-center gap-1">
-                          <Trash2 size={16} /> Delete Video
+                          <Trash2 size={16} /> Take Down
                         </button>
                         <button onClick={() => resolveReport(report, 'rejected')} className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 font-semibold rounded-lg text-sm">
                           Dismiss
@@ -539,12 +593,23 @@ export function Admin() {
 
           {activeTab === 'appeals' && (
             <div className="space-y-4">
-              <h2 className="text-xl font-bold mb-4">Ban Appeals</h2>
+              <h2 className="text-xl font-bold mb-4">Pending Appeals</h2>
               {appeals.filter(a => a.status === 'pending').map(appeal => {
                 const u = users.find(u => u.id === appeal.userId);
+                const vid = appeal.videoId ? videos.find(v => v.id === appeal.videoId) : null;
                 return (
                   <div key={appeal.id} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
-                    <p className="font-bold mb-1">@{u?.handle} <span className="font-normal text-zinc-500 text-sm">({u?.banStatus?.type} ban)</span></p>
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-bold">@{u?.handle}</p>
+                        <p className="text-xs text-zinc-500">{appeal.videoId ? 'Video Removal Appeal' : 'Ban Appeal'}</p>
+                      </div>
+                      {vid && (
+                        <button onClick={() => setPreviewVideo(vid)} className="text-pink-600 text-xs font-bold hover:underline">
+                          View Removed Video
+                        </button>
+                      )}
+                    </div>
                     <div className="bg-zinc-100 dark:bg-zinc-950 p-4 rounded-lg text-sm mb-4">
                       "{appeal.reason}"
                     </div>
@@ -701,6 +766,52 @@ export function Admin() {
 
         </div>
       </div>
+
+      {/* Video Preview Modal */}
+      <AnimatePresence>
+        {previewVideo && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-black rounded-3xl w-full max-w-sm aspect-[9/16] relative overflow-hidden shadow-2xl border border-zinc-800"
+            >
+              <button 
+                onClick={() => setPreviewVideo(null)}
+                className="absolute top-4 right-4 z-10 p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors"
+              >
+                <XCircle size={24} />
+              </button>
+              
+              {previewVideo.isYouTube ? (
+                <iframe 
+                  src={`https://www.youtube.com/embed/${previewVideo.youtubeId}?autoplay=1&mute=0`}
+                  className="w-full h-full border-none"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <video 
+                  src={previewVideo.videoUrl} 
+                  controls 
+                  autoPlay 
+                  className="w-full h-full object-cover"
+                />
+              )}
+              
+              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
+                <p className="text-white font-bold">{previewVideo.description}</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {previewVideo.tags.map(t => (
+                    <span key={t} className="text-pink-400 text-xs">#{t}</span>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* PIN Modal */}
       {pinModal.isOpen && (

@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getUsers, getVideos, saveUsers, deleteVideoFromDB } from '../lib/db';
-import { User, Video } from '../types';
+import { getUsers, getVideos, saveUsers, deleteVideoFromDB, getAppeals, saveAppeals } from '../lib/db';
+import { User, Video, Appeal } from '../types';
 import { useAppStore } from '../store';
 import { isFriend } from '../lib/utils';
 import { 
   Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag, 
-  Hammer, Wrench, Check, Trash2, HelpCircle, Users, Lock, Image as ImageIcon, LogOut 
+  Hammer, Wrench, Check, Trash2, HelpCircle, Users, Lock, Image as ImageIcon, LogOut,
+  AlertTriangle, Send, ShieldCheck, Trophy
 } from 'lucide-react';
 import { VideoItem } from './Home';
 
@@ -20,9 +21,14 @@ export function Profile() {
   const [favoriteVideos, setFavoriteVideos] = useState<Video[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'favorites'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'favorites' | 'removed'>('videos');
   const [showEdit, setShowEdit] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [appealVideo, setAppealVideo] = useState<Video | null>(null);
+  const [appealReason, setAppealReason] = useState('');
+  const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+  const [myAppeals, setMyAppeals] = useState<Appeal[]>([]);
+  const [removedVideos, setRemovedVideos] = useState<Video[]>([]);
 
   const areFriends = isFriend(currentUser, profileUser);
   const isOwnProfile = currentUser?.id === profileUser?.id;
@@ -36,9 +42,10 @@ export function Profile() {
       setIsFollowing(currentUser?.following.includes(user.id) || false);
       
       const allVideos = await getVideos();
-      const userVideos = allVideos.filter(v => v.userId === user.id);
-      const userLikedVideos = allVideos.filter(v => v.likes.includes(user.id));
-      const userFavoriteVideos = allVideos.filter(v => user.favorites?.includes(v.id));
+      const userVideos = allVideos.filter(v => v.userId === user.id && !v.isRemoved);
+      const userRemovedVideos = allVideos.filter(v => v.userId === user.id && v.isRemoved);
+      const userLikedVideos = allVideos.filter(v => v.likes.includes(user.id) && !v.isRemoved);
+      const userFavoriteVideos = allVideos.filter(v => user.favorites?.includes(v.id) && !v.isRemoved);
       
       const fixUrl = (v: Video) => ({
         ...v,
@@ -57,8 +64,14 @@ export function Profile() {
       });
       
       setVideos(visibleVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
+      setRemovedVideos(userRemovedVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
       setLikedVideos(userLikedVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
       setFavoriteVideos(userFavoriteVideos.map(fixUrl).sort((a, b) => b.timestamp - a.timestamp));
+
+      if (isOwnerView) {
+        const allAppeals = await getAppeals();
+        setMyAppeals(allAppeals.filter(a => a.userId === user.id && a.videoId));
+      }
     }
     setLoading(false);
   };
@@ -90,6 +103,33 @@ export function Profile() {
 
   const handleReport = () => {
     alert(`User ${profileUser?.username} has been reported. Our team will review this account.`);
+  };
+
+  const handleSubmitAppeal = async () => {
+    if (!currentUser || !appealVideo || !appealReason.trim()) return;
+    setIsSubmittingAppeal(true);
+    try {
+      const appeals = await getAppeals();
+      const newAppeal: Appeal = {
+        id: `app_${Date.now()}`,
+        userId: currentUser.id,
+        videoId: appealVideo.id,
+        reason: appealReason.trim(),
+        status: 'pending',
+        timestamp: Date.now()
+      };
+      appeals.push(newAppeal);
+      await saveAppeals(appeals);
+      setMyAppeals(prev => [newAppeal, ...prev]);
+      setAppealVideo(null);
+      setAppealReason('');
+      alert("Appeal submitted successfully! Moderators will review it shortly.");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit appeal. Please try again.");
+    } finally {
+      setIsSubmittingAppeal(false);
+    }
   };
 
   const handleDeleteVideo = async (videoId: string) => {
@@ -138,6 +178,26 @@ export function Profile() {
                 <div className="flex gap-0.5 text-blue-500" title="Staff">
                   <Hammer size={20} />
                   <Wrench size={20} />
+                </div>
+              )}
+              
+              {/* Badges Section */}
+              {profileUser.badges && profileUser.badges.length > 0 && (
+                <div className="flex gap-2 ml-2">
+                  {profileUser.badges.map(badge => (
+                    <div 
+                      key={badge} 
+                      title={`${badge} Badge`}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm ${
+                        badge === 'Tradient' 
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/20' 
+                          : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      {badge === 'Tradient' ? <ShieldCheck size={12} /> : <Trophy size={12} />}
+                      {badge}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -220,6 +280,14 @@ export function Profile() {
               <Bookmark size={18} /> Favorites
             </button>
           )}
+          {isOwnProfile && (
+            <button 
+              onClick={() => setActiveTab('removed')}
+              className={`flex-1 py-4 font-semibold flex items-center justify-center gap-2 ${activeTab === 'removed' ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white' : 'text-zinc-500'}`}
+            >
+              <AlertTriangle size={18} /> Removed
+            </button>
+          )}
           {/* Forum button that links to /forum */}
           <button 
             onClick={() => navigate('/forum')}
@@ -231,9 +299,11 @@ export function Profile() {
         
         {/* Tab Content Grid */}
         <div className="grid grid-cols-3 gap-0.5 md:gap-1 p-0.5 md:p-1">
-            {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : favoriteVideos).map(video => {
+            {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : activeTab === 'favorites' ? favoriteVideos : removedVideos).map(video => {
               const canDelete = currentUser?.id === video.userId || isStaffOrOwner;
               const isImage = video.mediaType === 'image';
+              const hasPendingAppeal = myAppeals.some(a => a.videoId === video.id && a.status === 'pending');
+              const hasRejectedAppeal = myAppeals.some(a => a.videoId === video.id && a.status === 'rejected');
               
               return (
                 <div key={video.id} className="aspect-[3/4] relative bg-black group cursor-pointer overflow-hidden rounded-sm">
@@ -241,12 +311,17 @@ export function Profile() {
                     {isImage ? (
                       <img src={video.videoUrl} alt={video.description} className="w-full h-full object-cover" />
                     ) : (
-                      <video src={video.videoUrl} className={`w-full h-full object-cover ${video.filter || ''}`} />
+                      <video src={video.videoUrl} className={`w-full h-full object-cover ${video.filter || ''} ${video.isRemoved ? 'grayscale opacity-50' : ''}`} />
                     )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
                     
                     {/* Media Type & Privacy Badges */}
                     <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                      {video.isRemoved && (
+                        <span className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg">
+                          <AlertTriangle size={10} /> REMOVED
+                        </span>
+                      )}
                       {isImage && (
                         <span className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
                           <ImageIcon size={10} /> Photo
@@ -264,14 +339,37 @@ export function Profile() {
                       )}
                     </div>
 
-                    <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white font-semibold text-xs drop-shadow-md">
-                      <Play size={14} className="fill-current" />
-                      <span>{video.views || 0}</span>
-                    </div>
+                    {!video.isRemoved && (
+                      <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white font-semibold text-xs drop-shadow-md">
+                        <Play size={14} className="fill-current" />
+                        <span>{video.views || 0}</span>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Appeal Button for Removed Content */}
+                  {video.isRemoved && isOwnProfile && !hasPendingAppeal && !hasRejectedAppeal && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAppealVideo(video);
+                      }}
+                      className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                        <Send size={14} /> Appeal
+                      </span>
+                    </button>
+                  )}
+
+                  {video.isRemoved && hasPendingAppeal && (
+                     <div className="absolute inset-0 flex items-center justify-center bg-yellow-600/40 pointer-events-none">
+                        <span className="text-[10px] font-bold text-white bg-yellow-600 px-2 py-0.5 rounded-full uppercase tracking-tighter">Appeal Pending</span>
+                     </div>
+                  )}
+
                   {/* Delete Button on Hover */}
-                  {canDelete && (
+                  {canDelete && !video.isRemoved && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -286,7 +384,7 @@ export function Profile() {
                 </div>
               );
             })}
-            {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : favoriteVideos).length === 0 && (
+            {(activeTab === 'videos' ? videos : activeTab === 'liked' ? likedVideos : activeTab === 'favorites' ? favoriteVideos : removedVideos).length === 0 && (
               <div className="col-span-3 py-20 text-center text-zinc-500">
                 No posts found in this tab.
               </div>
@@ -298,6 +396,69 @@ export function Profile() {
       {showEdit && currentUser && (
         <EditProfileModal user={currentUser} onClose={() => setShowEdit(false)} />
       )}
+
+      {/* Appeal Modal */}
+      <AnimatePresence>
+        {appealVideo && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-md p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl text-red-600">
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Appeal Content Removal</h3>
+                  <p className="text-sm text-zinc-500">Video ID: {appealVideo.id.slice(0, 8)}...</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2 font-semibold">Removal Reason:</p>
+                <div className="p-3 bg-zinc-100 dark:bg-zinc-950 rounded-xl text-sm italic text-zinc-700 dark:text-zinc-300">
+                  "{appealVideo.removalReason || 'Violation of community standards'}"
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-2">Your Appeal Reason</label>
+                  <textarea 
+                    value={appealReason}
+                    onChange={e => setAppealReason(e.target.value)}
+                    placeholder="Explain why your content should be restored..."
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-transparent focus:border-pink-500 rounded-2xl p-4 text-sm outline-none transition-all resize-none h-32"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => {
+                      setAppealVideo(null);
+                      setAppealReason('');
+                    }}
+                    disabled={isSubmittingAppeal}
+                    className="flex-1 py-3 font-bold bg-zinc-100 dark:bg-zinc-800 rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors uppercase text-xs tracking-wider"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleSubmitAppeal}
+                    disabled={!appealReason.trim() || isSubmittingAppeal}
+                    className="flex-1 py-3 font-bold bg-pink-600 text-white rounded-2xl hover:bg-pink-700 disabled:opacity-50 transition-colors shadow-lg shadow-pink-600/20 uppercase text-xs tracking-wider flex items-center justify-center gap-2"
+                  >
+                    {isSubmittingAppeal ? 'Submitting...' : 'Send Appeal'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Video Playback Modal */}
       {selectedVideo && (

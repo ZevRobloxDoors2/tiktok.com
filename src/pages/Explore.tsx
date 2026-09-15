@@ -42,6 +42,7 @@ export function Explore() {
       
       // Find local videos
       const matchedLocalVideos = allVideos.filter(v => {
+        if (v.isRemoved) return false;
         const u = allUsers.find(user => user.id === v.userId);
         return v.description.toLowerCase().includes(q) || v.tags.some(t => t.toLowerCase().includes(q)) || (u && u.username.toLowerCase().includes(q));
       }).map(v => ({...v, user: allUsers.find(u => u.id === v.userId)}));

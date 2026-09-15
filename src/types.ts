@@ -12,6 +12,8 @@ export type User = {
   deviceId?: string;
   role?: 'user' | 'staff' | 'owner';
   interests?: string[];
+  badges?: string[];
+  acceptedReportsCount?: number;
   banStatus?: {
     type: 'temp' | 'perm' | 'hwid';
     until?: number; // timestamp for temp ban
@@ -38,6 +40,7 @@ export type Report = {
 export type Appeal = {
   id: string;
   userId: string;
+  videoId?: string; // Optional: can be for a video or a ban
   reason: string;
   status: 'pending' | 'accepted' | 'rejected';
   adminNotes?: string;
@@ -73,6 +76,8 @@ export type Video = {
   isYouTube?: boolean;
   youtubeId?: string;
   feedId?: string;
+  isRemoved?: boolean;
+  removalReason?: string;
 };
 
 export type Story = {
@@ -160,7 +165,7 @@ export type Message = {
 export type Notification = {
   id: string;
   userId: string; // The user receiving the notification
-  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement';
+  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward';
   fromUserId: string;
   videoId?: string;
   forumPostId?: string;
