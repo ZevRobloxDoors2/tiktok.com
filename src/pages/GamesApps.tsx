@@ -26,7 +26,9 @@ export function GamesApps() {
     });
 
     const handleMessage = (event: MessageEvent) => {
+      // Use event.data.type to identify messages from Cinema.html
       if (event.data.type === 'CINEMA_PLAYING') {
+        console.log('Cinema is playing:', event.data.title);
         setMiniPlayerTitle(event.data.title);
         setMiniPlayerUrl(event.data.url);
       }
@@ -37,7 +39,7 @@ export function GamesApps() {
     return () => {
       unsub();
       window.removeEventListener('message', handleMessage);
-      setIsGameActive(false);
+      // Don't setIsGameActive(false) here, it's handled by handleExit
     };
   }, []);
 
@@ -50,10 +52,13 @@ export function GamesApps() {
   };
 
   const handleExit = () => {
+    // If Cinema app is active and we have a video URL, trigger mini player
     if (activeGameUrl.includes('Cinema.html') && miniPlayerUrl) {
       setMiniPlayerActive(true);
     }
     setIsGameActive(false);
+    // Clear active game URL to prevent accidental triggers
+    setActiveGameUrl('');
   };
 
   if (isCrashed) {

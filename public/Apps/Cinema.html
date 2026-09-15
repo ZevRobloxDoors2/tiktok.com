@@ -1670,6 +1670,15 @@
       DOM.placeholder.style.display = 'none';
       UnblockEngine.hideError();
       UnblockEngine.load(url, UnblockEngine.currentMethod);
+
+      // Notify parent about playing state for mini player
+      if (window.parent !== window) {
+        window.parent.postMessage({
+          type: 'CINEMA_PLAYING',
+          title: item.title || item.name,
+          url: url
+        }, '*');
+      }
     }
 
     function setupTv(item) {
