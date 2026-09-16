@@ -152,7 +152,8 @@ export type Comment = {
 export type Message = {
   id: string;
   fromUserId: string;
-  toUserId: string;
+  toUserId?: string; // Optional for 1:1
+  groupId?: string; // Optional for Group Chats
   content: string;
   imageUrl?: string;
   videoUrl?: string;
@@ -160,6 +161,24 @@ export type Message = {
   timestamp: number;
   sharedVideoId?: string;
   read?: boolean; // unread indicator for DM sidebar counter
+  seenBy?: string[]; // Array of user IDs who have seen the message
+};
+
+export type GroupChat = {
+  id: string;
+  name: string;
+  members: string[]; // Array of user IDs
+  avatarUrl?: string;
+  createdAt: number;
+  lastMessage?: Message;
+};
+
+export type UserStatus = {
+  id: string; // Map to userId
+  userId: string;
+  isTyping: boolean;
+  typingIn?: string; // userId or groupId
+  lastActive: number;
 };
 
 export type Notification = {

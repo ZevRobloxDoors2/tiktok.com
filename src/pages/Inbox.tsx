@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { getNotifications, getMessages, getUsers } from '../lib/db';
-import { Notification, Message, User } from '../types';
-import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck } from 'lucide-react';
+import { getNotifications, getMessages, getUsers, getGroupChats, saveGroupChats } from '../lib/db';
+import { Notification, Message, User, GroupChat } from '../types';
+import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function Inbox() {
   const { currentUser } = useAppStore();
   const [notifications, setNotifications] = useState<(Notification & { fromUser: User })[]>([]);
-  const [conversations, setConversations] = useState<{ user: User, lastMessage: Message }[]>([]);
+  const [conversations, setConversations] = useState<{ user?: User, group?: GroupChat, lastMessage: Message }[]>([]);
   const [activeTab, setActiveTab] = useState<'activity' | 'messages'>('activity');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+  
+  // Group creation state
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [friendsList, setFriendsList] = useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!currentUser) return;
@@ -20,6 +27,7 @@ export function Inbox() {
       const allUsers = await getUsers();
       const allNotifs = await getNotifications();
       const allMsgs = await getMessages();
+      const allGroups = await getGroupChats();
       
       const userNotifs = allNotifs
         .filter(n => n.userId === currentUser.id)
@@ -39,31 +47,91 @@ export function Inbox() {
         }))
         .sort((a, b) => b.timestamp - a.timestamp);
       
-      const userMsgs = allMsgs.filter(m => m.fromUserId === currentUser.id || m.toUserId === currentUser.id);
+      // Filter direct messages
+      const dmMsgs = allMsgs.filter(m => !m.groupId && (m.fromUserId === currentUser.id || m.toUserId === currentUser.id));
       
-      // Group messages by user to form conversations
-      const convosMap = new Map<string, Message>();
-      userMsgs.forEach(m => {
-        const otherId = m.fromUserId === currentUser.id ? m.toUserId : m.fromUserId;
-        const existing = convosMap.get(otherId);
-        if (!existing || existing.timestamp < m.timestamp) {
-          convosMap.set(otherId, m);
+      // Filter group messages
+      const userGroups = allGroups.filter(g => g.members.includes(currentUser.id));
+      const groupIds = userGroups.map(g => g.id);
+      const groupMsgs = allMsgs.filter(m => m.groupId && groupIds.includes(m.groupId));
+      
+      const convosMap = new Map<string, { user?: User, group?: GroupChat, lastMessage: Message }>();
+      
+      // Add DMs to map
+      dmMsgs.forEach(m => {
+        const otherId = m.fromUserId === currentUser.id ? m.toUserId! : m.fromUserId;
+        const existing = convosMap.get(`dm_${otherId}`);
+        if (!existing || existing.lastMessage.timestamp < m.timestamp) {
+          const otherUser = allUsers.find(u => u.id === otherId);
+          if (otherUser) {
+            convosMap.set(`dm_${otherId}`, { user: otherUser, lastMessage: m });
+          }
         }
       });
       
-      const convos = Array.from(convosMap.entries()).map(([otherId, lastMsg]) => ({
-        user: allUsers.find(u => u.id === otherId)!,
-        lastMessage: lastMsg
-      })).sort((a, b) => b.lastMessage.timestamp - a.lastMessage.timestamp);
+      // Add Groups to map
+      userGroups.forEach(g => {
+        const lastMsg = groupMsgs.filter(m => m.groupId === g.id).sort((a, b) => b.timestamp - a.timestamp)[0];
+        if (lastMsg) {
+          convosMap.set(`group_${g.id}`, { group: g, lastMessage: lastMsg });
+        } else {
+          // Placeholder for empty groups
+          convosMap.set(`group_${g.id}`, { 
+            group: g, 
+            lastMessage: { 
+              id: 'initial', 
+              fromUserId: 'system', 
+              content: 'Group created', 
+              timestamp: g.createdAt 
+            } 
+          });
+        }
+      });
+      
+      const convos = Array.from(convosMap.values())
+        .sort((a, b) => b.lastMessage.timestamp - a.lastMessage.timestamp);
+      
+      // Filter friends for group creation (following each other)
+      const friends = allUsers.filter(u => 
+        u.id !== currentUser.id && 
+        currentUser.following?.includes(u.id) && 
+        u.following?.includes(currentUser.id)
+      );
       
       setNotifications(userNotifs);
       setConversations(convos);
+      setFriendsList(friends);
     };
     
     loadInbox();
-    const interval = setInterval(loadInbox, 5000); // Poll for real-time feel
+    const interval = setInterval(loadInbox, 5000);
     return () => clearInterval(interval);
   }, [currentUser]);
+
+  const createGroup = async () => {
+    if (!groupName.trim() || selectedFriends.length === 0 || !currentUser) return;
+    
+    const newGroup: GroupChat = {
+      id: `group_${Date.now()}`,
+      name: groupName.trim(),
+      members: [currentUser.id, ...selectedFriends],
+      createdAt: Date.now(),
+      avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${groupName}`
+    };
+    
+    const allGroups = await getGroupChats();
+    await saveGroupChats([...allGroups, newGroup]);
+    
+    setShowCreateGroup(false);
+    setGroupName('');
+    setSelectedFriends([]);
+  };
+
+  const toggleFriendSelection = (id: string) => {
+    setSelectedFriends(prev => 
+      prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]
+    );
+  };
 
   const chooseNotifications = async (enabled: boolean) => {
     localStorage.setItem('notificationPromptDismissed', 'true');
@@ -74,10 +142,19 @@ export function Inbox() {
   if (!currentUser) return <div className="p-8 text-center">Please log in to view your inbox.</div>;
 
   return (
-    <div className="w-full max-w-2xl mx-auto border-x border-zinc-200 dark:border-zinc-800 h-full flex flex-col bg-white dark:bg-zinc-950">
+    <div className="w-full max-w-2xl mx-auto border-x border-zinc-200 dark:border-zinc-800 h-full flex flex-col bg-white dark:bg-zinc-950 relative">
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md z-10">
         <h1 className="text-xl font-bold">Inbox</h1>
+        {activeTab === 'messages' && (
+          <button 
+            onClick={() => setShowCreateGroup(true)}
+            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-full transition-colors text-pink-600"
+          >
+            <Plus size={24} />
+          </button>
+        )}
       </div>
+      
       {showNotificationPrompt && (
         <div className="m-4 p-4 rounded-xl border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/30 animate-in slide-in-from-top-4">
           <p className="font-semibold">Do you want real time notifications?</p>
@@ -162,21 +239,98 @@ export function Inbox() {
                 <p>Messages will appear here</p>
               </div>
             ) : (
-              conversations.map(c => (
-                <Link to={`/messages/${c.user.handle}`} key={c.user.id} className="p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
-                  <img src={c.user.avatarUrl} alt="" className="w-14 h-14 rounded-full" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold truncate">{c.user.username}</h3>
-                    <p className="text-sm text-zinc-500 truncate">
-                      {c.lastMessage.fromUserId === currentUser.id ? 'You: ' : ''}{c.lastMessage.content}
-                    </p>
-                  </div>
-                </Link>
-              ))
+              conversations.map(c => {
+                const link = c.group ? `/messages/group/${c.group.id}` : `/messages/${c.user!.handle}`;
+                return (
+                  <Link to={link} key={c.group ? c.group.id : c.user!.id} className="p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
+                    <div className="relative">
+                      <img src={c.group ? c.group.avatarUrl : c.user!.avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover" />
+                      {c.group && (
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-pink-600 flex items-center justify-center text-white border-2 border-white dark:border-zinc-950">
+                          <Users size={12} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold truncate">{c.group ? c.group.name : c.user!.username}</h3>
+                      <p className="text-sm text-zinc-500 truncate flex items-center gap-1">
+                        {c.lastMessage.fromUserId === currentUser.id ? 'You: ' : ''}
+                        {c.lastMessage.content || (c.lastMessage.imageUrl ? '📷 Photo' : c.lastMessage.videoUrl ? '🎥 Video' : c.lastMessage.audioUrl ? '🎤 Voice' : '')}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })
             )}
           </div>
         )}
       </div>
+
+      {/* Create Group Modal */}
+      {showCreateGroup && (
+        <div className="absolute inset-0 z-50 bg-white dark:bg-zinc-950 flex flex-col animate-in slide-in-from-bottom-8">
+          <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+            <button onClick={() => setShowCreateGroup(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-full">
+              <X size={24} />
+            </button>
+            <h2 className="font-bold">New Group</h2>
+            <button 
+              onClick={createGroup}
+              disabled={!groupName.trim() || selectedFriends.length === 0}
+              className="px-4 py-1.5 bg-pink-600 text-white rounded-full font-bold disabled:opacity-50"
+            >
+              Create
+            </button>
+          </div>
+          
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="text-xs font-bold text-zinc-500 uppercase px-1">Group Name</label>
+              <input 
+                type="text" 
+                value={groupName}
+                onChange={e => setGroupName(e.target.value)}
+                placeholder="Ex: The Squad"
+                className="w-full mt-1 bg-zinc-100 dark:bg-zinc-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-pink-500"
+              />
+            </div>
+            
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+              <input 
+                type="text" 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search friends..."
+                className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-xl pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-pink-500"
+              />
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto px-4 divide-y divide-zinc-100 dark:divide-zinc-800">
+            {friendsList
+              .filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase()) || f.handle.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map(friend => (
+              <div 
+                key={friend.id} 
+                onClick={() => toggleFriendSelection(friend.id)}
+                className="py-3 flex items-center justify-between cursor-pointer group"
+              >
+                <div className="flex items-center gap-3">
+                  <img src={friend.avatarUrl} alt="" className="w-12 h-12 rounded-full" />
+                  <div>
+                    <p className="font-bold">{friend.username}</p>
+                    <p className="text-xs text-zinc-500">@{friend.handle}</p>
+                  </div>
+                </div>
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedFriends.includes(friend.id) ? 'bg-pink-600 border-pink-600 text-white' : 'border-zinc-300 dark:border-zinc-700'}`}>
+                  {selectedFriends.includes(friend.id) && <Check size={14} />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

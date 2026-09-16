@@ -89,7 +89,7 @@ export function StoriesBar() {
   };
 
   return (
-    <div className="w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/80 py-3 px-3 overflow-x-auto hide-scrollbar z-30">
+    <div className={`w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/80 py-3 px-3 overflow-x-auto hide-scrollbar ${activeGroupIndex !== null ? 'z-[2100]' : 'z-30'} transition-all`}>
       <div className="flex items-center gap-3 min-w-max">
         
         {/* Current User Story Bubble */}
@@ -307,15 +307,18 @@ function StoryViewerModal({ groups, currentGroupIndex, initialStoryIndex, onClos
   if (!currentGroup || !currentStory) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center backdrop-blur-xl animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[2100] bg-black/95 flex items-center justify-center backdrop-blur-2xl animate-in fade-in duration-300">
       
-      {/* Close button */}
+      {/* Close button - High priority for user request */}
       <button 
-        onClick={onClose}
-        className="absolute top-4 right-4 z-50 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="fixed top-6 right-6 z-[2200] p-3 bg-white/10 hover:bg-red-500 hover:scale-110 active:scale-95 text-white rounded-full transition-all border border-white/20 backdrop-blur-md shadow-2xl group"
         title="Close story"
       >
-        <X size={24} />
+        <X size={28} className="group-hover:rotate-90 transition-transform duration-300" />
       </button>
 
       {/* Prev / Next Buttons on Desktop */}
@@ -336,9 +339,9 @@ function StoryViewerModal({ groups, currentGroupIndex, initialStoryIndex, onClos
         </button>
       )}
 
-      {/* Phone Stage */}
+      {/* Phone Stage - Immersive overlay */}
       <div 
-        className="relative w-full max-w-[420px] h-full max-h-[850px] bg-zinc-950 rounded-none md:rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between"
+        className="relative w-full md:max-w-[420px] h-full md:max-h-[850px] bg-zinc-950 rounded-none md:rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between"
         onMouseDown={() => setIsPaused(true)}
         onMouseUp={() => setIsPaused(false)}
         onTouchStart={() => setIsPaused(true)}

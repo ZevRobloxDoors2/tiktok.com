@@ -368,7 +368,7 @@ export function Home() {
   return (
     <div className="relative h-full w-full flex flex-col items-center bg-black md:bg-zinc-950 overflow-hidden">
       {/* 24-Hour Stories Tray */}
-      <div className="w-full max-w-[500px] z-30 shrink-0">
+      <div className="w-full max-w-[500px] shrink-0">
         <StoriesBar />
       </div>
 

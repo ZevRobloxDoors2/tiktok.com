@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus } from '../types';
 
 export const initDb = async () => {};
 
@@ -122,6 +122,35 @@ export const updateVideo = async (videoId: string, update: (video: Video) => Vid
 
 export const getMessages = () => fetchCollection<Message>('messages');
 export const saveMessages = (messages: Message[]) => saveCollection('messages', messages);
+export const deleteMessage = async (messageId: string) => {
+  const msgs = await getMessages();
+  await saveMessages(msgs.filter(m => m.id !== messageId));
+};
+
+export const getGroupChats = () => fetchCollection<GroupChat>('group_chats');
+export const saveGroupChats = (groups: GroupChat[]) => saveCollection('group_chats', groups);
+
+export const getUserStatuses = () => fetchCollection<UserStatus>('user_statuses');
+export const saveUserStatuses = (statuses: UserStatus[]) => saveCollection('user_statuses', statuses);
+
+export const updateTypingStatus = async (userId: string, isTyping: boolean, typingIn?: string) => {
+  const statuses = await getUserStatuses();
+  const idx = statuses.findIndex(s => s.userId === userId);
+  const newStatus: UserStatus = {
+    id: userId,
+    userId,
+    isTyping,
+    typingIn,
+    lastActive: Date.now()
+  };
+
+  if (idx !== -1) {
+    statuses[idx] = newStatus;
+  } else {
+    statuses.push(newStatus);
+  }
+  await saveUserStatuses(statuses);
+};
 
 export const markMessagesFromUserAsRead = async (currentUserId: string, otherUserId: string) => {
   try {
