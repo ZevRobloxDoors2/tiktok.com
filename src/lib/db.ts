@@ -37,6 +37,16 @@ const saveCollection = async <T extends { id: string }>(collName: string, items:
 export const getUsers = () => fetchCollection<User>('users');
 export const saveUsers = (users: User[]) => saveCollection('users', users);
 
+export const updateUser = async (userId: string, data: Partial<User>) => {
+  try {
+    const docRef = doc(db, 'users', userId);
+    await updateDoc(docRef, data);
+  } catch (err) {
+    console.error("Error updating user:", userId, err);
+    throw err;
+  }
+};
+
 export const getVideos = () => fetchCollection<Video>('videos');
 export const saveVideos = (videos: Video[]) => saveCollection('videos', videos);
 

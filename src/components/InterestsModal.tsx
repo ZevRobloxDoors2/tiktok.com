@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, saveUsers } from '../lib/db';
+import { getUsers, saveUsers, updateUser } from '../lib/db';
 import { Loader2 } from 'lucide-react';
 
 const TOPICS = [
@@ -26,13 +26,8 @@ export function InterestsModal() {
     if (selected.length === 0) return;
     setLoading(true);
     try {
-      const allUsers = await getUsers();
-      const idx = allUsers.findIndex(u => u.id === currentUser.id);
-      if (idx !== -1) {
-        allUsers[idx].interests = selected;
-        await saveUsers(allUsers);
-        setCurrentUser(allUsers[idx]);
-      }
+      await updateUser(currentUser.id, { interests: selected });
+      setCurrentUser({ ...currentUser, interests: selected });
     } catch (err) {
       console.error(err);
     } finally {

@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { 
   getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, 
   ensureVideoInDB, getMessages, saveMessages, getNotifications, 
-  saveNotifications, subscribeToVideo, deleteVideoFromDB, getAppSettings, subscribeToAppSettings 
+  saveNotifications, subscribeToVideo, deleteVideoFromDB, getAppSettings, subscribeToAppSettings,
+  updateUser 
 } from '../lib/db';
 import { Video, User } from '../types';
 import { useAppStore } from '../store';
@@ -669,11 +670,10 @@ export const VideoItem: React.FC<{
     const updatedUser = { ...currentUser, favorites: newFavorites };
     setCurrentUser(updatedUser);
     
-    const allUsers = await getUsers();
-    const uIdx = allUsers.findIndex(u => u.id === currentUser.id);
-    if (uIdx !== -1) {
-      allUsers[uIdx] = updatedUser;
-      await saveUsers(allUsers);
+    try {
+      await updateUser(currentUser.id, { favorites: newFavorites });
+    } catch (err) {
+      console.error("Error updating favorites:", err);
     }
     
     await ensureVideoInDB(video);

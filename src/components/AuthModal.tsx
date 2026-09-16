@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, saveUsers } from '../lib/db';
+import { getUsers, saveUsers, updateUser } from '../lib/db';
 import { User } from '../types';
 import { signInWithGoogle } from '../lib/firebase';
 import { Loader2 } from 'lucide-react';
@@ -21,8 +21,8 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     
     if (existingUser) {
       if (!existingUser.deviceId) {
+        await updateUser(existingUser.id, { deviceId });
         existingUser.deviceId = deviceId;
-        await saveUsers(users);
       }
       return existingUser;
     }

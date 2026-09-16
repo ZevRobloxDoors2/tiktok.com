@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { getUsers, getVideos, saveUsers, deleteVideoFromDB, getAppeals, saveAppeals } from '../lib/db';
+import { getUsers, getVideos, saveUsers, deleteVideoFromDB, getAppeals, saveAppeals, updateUser } from '../lib/db';
 import { User, Video, Appeal } from '../types';
 import { useAppStore } from '../store';
 import { isFriend } from '../lib/utils';
+import { compressImage } from '../lib/imageUtils';
 import { 
   Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag, 
   Hammer, Wrench, Check, Trash2, HelpCircle, Users, Lock, Image as ImageIcon, LogOut,
@@ -84,22 +85,31 @@ export function Profile() {
   const handleFollow = async () => {
     if (!currentUser || !profileUser) return;
     
-    const users = await getUsers();
-    const currentIdx = users.findIndex(u => u.id === currentUser.id);
-    const profileIdx = users.findIndex(u => u.id === profileUser.id);
+    const isNowFollowing = !isFollowing;
     
-    if (isFollowing) {
-      users[currentIdx].following = users[currentIdx].following.filter(id => id !== profileUser.id);
-      users[profileIdx].followers = users[profileIdx].followers.filter(id => id !== currentUser.id);
-    } else {
-      users[currentIdx].following.push(profileUser.id);
-      users[profileIdx].followers.push(currentUser.id);
+    try {
+      // Update Current User (following array)
+      const newFollowing = isNowFollowing 
+        ? [...(currentUser.following || []), profileUser.id]
+        : (currentUser.following || []).filter(id => id !== profileUser.id);
+      
+      await updateUser(currentUser.id, { following: newFollowing });
+      
+      // Update Profile User (followers array)
+      const newFollowers = isNowFollowing
+        ? [...(profileUser.followers || []), currentUser.id]
+        : (profileUser.followers || []).filter(id => id !== currentUser.id);
+        
+      await updateUser(profileUser.id, { followers: newFollowers });
+
+      // Update Local State
+      setCurrentUser({ ...currentUser, following: newFollowing });
+      setProfileUser({ ...profileUser, followers: newFollowers });
+      setIsFollowing(isNowFollowing);
+    } catch (err) {
+      console.error("Error toggling follow:", err);
+      alert("Failed to update follow status. Please try again.");
     }
-    
-    await saveUsers(users);
-    setCurrentUser(users[currentIdx]);
-    setProfileUser(users[profileIdx]);
-    setIsFollowing(!isFollowing);
   };
 
   const handleReport = () => {
@@ -510,31 +520,33 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
-    const users = await getUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx !== -1) {
+    try {
       const cleanHandle = handleInput.trim().replace(/^@/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
-      users[idx] = { 
-        ...users[idx], 
-        username, 
-        handle: cleanHandle || user.handle, 
-        bio, 
-        isPrivate, 
-        avatarUrl 
+      const updateData: Partial<User> = {
+        username,
+        handle: cleanHandle || user.handle,
+        bio,
+        isPrivate,
+        avatarUrl
       };
-      await saveUsers(users);
-      setCurrentUser(users[idx]);
+      
+      await updateUser(user.id, updateData);
+      setCurrentUser({ ...user, ...updateData });
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save profile. The image might still be too large or there's a connection issue.");
     }
-    onClose();
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         if (ev.target?.result) {
-          setAvatarUrl(ev.target.result as string);
+          const compressed = await compressImage(ev.target.result as string, 300, 300, 0.6);
+          setAvatarUrl(compressed);
         }
       };
       reader.readAsDataURL(file);
