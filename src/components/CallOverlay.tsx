@@ -197,9 +197,10 @@ export function CallOverlay() {
   };
 
   const handleEndCall = async (shouldUpdateDb = true) => {
-    if (shouldUpdateDb && callIdRef.current) {
-      await updateCall(callIdRef.current, { status: 'ended' });
-      setTimeout(() => deleteCall(callIdRef.current!), 2000);
+    const currentId = callIdRef.current;
+    if (shouldUpdateDb && currentId) {
+      await updateCall(currentId, { status: 'ended' });
+      setTimeout(() => deleteCall(currentId), 2000);
     }
     
     localStream.current?.getTracks().forEach(t => t.stop());
