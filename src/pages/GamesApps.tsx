@@ -6,17 +6,57 @@ import { useAppStore } from '../store';
 import { User } from '../types';
 
 const GAMES = [
-  { id: 'solar-smash', title: 'Solar Smash', url: 'Games/SolarSmash.html', category: 'Planet Destroyer', color: 'pink' },
+  { id: '2048-merge', title: '2048 Merge Run', url: 'Games/2048 Merge Run.html', category: 'Puzzle', color: 'orange' },
+  { id: 'adofai', title: 'A Dance of Fire and Ice', url: 'Games/A Dance of Fire and Ice.html', category: 'Rhythm', color: 'red' },
+  { id: 'adventure-cap', title: 'Adventure Capatalist', url: 'Games/Adventure Capatalist.html', category: 'Idle', color: 'green' },
+  { id: 'ages-conflict', title: 'Ages of Conflict', url: 'Games/Ages of Conflict.html', category: 'Strategy', color: 'blue' },
+  { id: 'amanda', title: 'Amanda the Adventurer', url: 'Games/Amanda the Adventurer.html', category: 'Horror', color: 'purple' },
+  { id: 'basket-bros', title: 'Basket Bros', url: 'Games/Basket Bros.html', category: 'Sports', color: 'orange' },
+  { id: 'basket-random', title: 'Basket Random', url: 'Games/Basket Random.html', category: 'Sports', color: 'amber' },
+  { id: 'basketball-frvr', title: 'Basketball Frvr', url: 'Games/Basketball Frvr.html', category: 'Sports', color: 'orange' },
+  { id: 'basketball-stars', title: 'Basketball Stars', url: 'Games/Basketball Stars.html', category: 'Sports', color: 'blue' },
+  { id: 'bitlife', title: 'BitLife', url: 'Games/BitLife.html', category: 'Life Sim', color: 'red' },
+  { id: 'bowmasters', title: 'Bowmasters', url: 'Games/Bowmasters.html', category: 'Action', color: 'pink' },
+  { id: 'buildnow', title: 'BuildNow.gg', url: 'Games/BuildNow.gg.html', category: 'Shooter', color: 'indigo' },
+  { id: 'car-survival', title: 'Car Survival 3D', url: 'Games/Car Survival 3D.html', category: 'Racing', color: 'zinc' },
+  { id: 'city-defense', title: 'City Defense', url: 'Games/City Defense.html', category: 'Strategy', color: 'blue' },
+  { id: 'city-smash', title: 'City Smash', url: 'Games/City Smash.html', category: 'Action', color: 'red' },
+  { id: 'cluster-rush', title: 'Cluster Rush', url: 'Games/Cluster Rush.html', category: 'Action', color: 'yellow' },
+  { id: 'clustertruck', title: 'ClusterTruck', url: 'Games/ClusterTruck.html', category: 'Action', color: 'orange' },
+  { id: 'cookie-clicker', title: 'Cookie Clicker', url: 'Games/Cookie Clicker.html', category: 'Idle', color: 'brown' },
+  { id: 'drift-boss', title: 'Drift Boss', url: 'Games/Drift Boss.html', category: 'Racing', color: 'purple' },
+  { id: 'drift-hunters', title: 'Drift Hunters', url: 'Games/Drift Hunters.html', category: 'Racing', color: 'blue' },
+  { id: 'fnaf2', title: 'Five Nights at Freddy\'s 2', url: 'Games/Five Nights at Freddy\'s 2.html', category: 'Horror', color: 'red' },
+  { id: 'fnaf3', title: 'Five Nights at Freddy\'s 3', url: 'Games/Five Nights at Freddy\'s 3.html', category: 'Horror', color: 'green' },
+  { id: 'fnaf4', title: 'Five Nights at Freddy\'s 4', url: 'Games/Five Nights at Freddy\'s 4.html', category: 'Horror', color: 'purple' },
+  { id: 'fnf-garcello', title: 'Friday Night Funkin vs. Garcello', url: 'Games/Friday Night Funkin\'_ vs. Garcello.html', category: 'Rhythm', color: 'emerald' },
+  { id: 'fnf-tricky', title: 'Friday Night Funkin vs. Tricky', url: 'Games/Friday Night Funkin\'_ vs. Tricky.html', category: 'Rhythm', color: 'red' },
+  { id: 'fnf', title: 'Friday Night Funkin', url: 'Games/Friday Night Funkin.html', category: 'Rhythm', color: 'pink' },
+  { id: 'fruit-ninja', title: 'Fruit Ninja', url: 'Games/Fruit Ninja.html', category: 'Action', color: 'green' },
+  { id: 'geometry-dash', title: 'Geometry Dash', url: 'Games/Geometry Dash.html', category: 'Rhythm', color: 'emerald' },
+  { id: 'gladihoppers', title: 'Gladihoppers', url: 'Games/Gladihoppers.html', category: 'Action', color: 'brown' },
+  { id: 'gta3', title: 'Grand Theft Auto 3', url: 'Games/Grand Theft Auto 3.html', category: 'Open World', color: 'blue' },
+  { id: 'granny2', title: 'Granny 2', url: 'Games/Granny 2.html', category: 'Horror', color: 'zinc' },
+  { id: 'granny', title: 'Granny', url: 'Games/Granny.html', category: 'Horror', color: 'zinc' },
+  { id: 'happy-wheels', title: 'Happy Wheels', url: 'Games/Happy Wheels.html', category: 'Action', color: 'red' },
+  { id: 'harvest-io', title: 'Harvest.io', url: 'Games/Harvest.io.html', category: 'IO Game', color: 'emerald' },
+  { id: 'hypper-sandbox', title: 'Hypper Sandbox', url: 'Games/Hypper Sandbox.html', category: 'Sandbox', color: 'blue' },
+  { id: 'idle-mining', title: 'Idle Mining Empire', url: 'Games/Idle Mining Empire.html', category: 'Idle', color: 'yellow' },
+  { id: 'just-shapes', title: 'Just Shapes & Beats', url: 'Games/Just Shapes & Beats.html', category: 'Rhythm', color: 'pink' },
+  { id: 'karlson', title: 'Karlson', url: 'Games/Karlson.html', category: 'Action', color: 'cyan' },
+  { id: 'kindergarten', title: 'Kindergarten', url: 'Games/Kindergarten.html', category: 'Puzzle', color: 'yellow' },
+  { id: 'melon-playground', title: 'Melon Playground', url: 'Games/Melon Playground.html', category: 'Sandbox', color: 'green' },
   { id: 'miside', title: 'MiSide', url: 'Games/MiSide.html', category: 'Simulation', color: 'purple' },
   { id: 'minecraft', title: 'Minecraft', url: 'Games/Minecraft Pocket Edition.html', category: 'Sandbox', color: 'green' },
   { id: 'moto-x3m', title: 'Moto X3M', url: 'Games/Moto X3M.html', category: 'Racing', color: 'orange' },
-  { id: 'bowmasters', title: 'Bowmasters', url: 'Games/Bowmasters.html', category: 'Action', color: 'red' },
-  { id: 'bitlife', title: 'BitLife', url: 'Games/BitLife.html', category: 'Life Sim', color: 'blue' },
+  { id: 'ace-attorney', title: 'Ace Attorney', url: 'Games/Phoenix Wright - Ace Attorney.html', category: 'Puzzle', color: 'blue' },
+  { id: 'poly-track', title: 'Poly Track', url: 'Games/Poly Track.html', category: 'Racing', color: 'white' },
   { id: 'ragdoll-archers', title: 'Ragdoll Archers', url: 'Games/Ragdoll Archers.html', category: 'Action', color: 'amber' },
   { id: 'retro-bowl', title: 'Retro Bowl', url: 'Games/Retro Bowl.html', category: 'Sports', color: 'brown' },
-  { id: 'buildnow-gg', title: 'BuildNow.gg', url: 'Games/BuildNow.gg.html', category: 'Shooter', color: 'indigo' },
-  { id: 'harvest-io', title: 'Harvest.io', url: 'Games/Harvest.io.html', category: 'IO Game', color: 'emerald' },
-  { id: 'idle-mining', title: 'Idle Mining Empire', url: 'Games/Idle Mining Empire.html', category: 'Idle', color: 'yellow' },
+  { id: 'schoolboy-runaway', title: 'Schoolboy Runaway', url: 'Games/Schoolboy Runaway.html', category: 'Action', color: 'blue' },
+  { id: 'solar-smash', title: 'Solar Smash', url: 'Games/SolarSmash.html', category: 'Planet Destroyer', color: 'pink' },
+  { id: 'terraria', title: 'Terraria', url: 'Games/Terraria.html', category: 'Sandbox', color: 'green' },
+  { id: 'tabs', title: 'TABS', url: 'Games/Totally Accurate Battle Simulator (TABS).html', category: 'Strategy', color: 'red' },
 ];
 
 const APPS = [
@@ -207,10 +247,14 @@ export function GamesApps() {
                     item.color === 'red' ? 'from-red-500 to-rose-600' :
                     item.color === 'blue' ? 'from-blue-500 to-cyan-600' :
                     item.color === 'amber' ? 'from-amber-500 to-orange-600' :
-                    item.color === 'brown' ? 'from-orange-800 to-zinc-900' :
+                    item.color === 'brown' ? 'from-stone-700 to-zinc-900' :
                     item.color === 'indigo' ? 'from-indigo-500 to-blue-600' :
                     item.color === 'emerald' ? 'from-emerald-500 to-teal-600' :
-                    'from-yellow-500 to-orange-600'
+                    item.color === 'cyan' ? 'from-cyan-400 to-blue-500' :
+                    item.color === 'yellow' ? 'from-yellow-400 to-orange-500' :
+                    item.color === 'zinc' ? 'from-zinc-400 to-zinc-600' :
+                    item.color === 'white' ? 'from-zinc-100 to-zinc-300' :
+                    'from-zinc-500 to-zinc-700'
                   }`}>
                     <div className="absolute inset-0 bg-black/10 mix-blend-overlay" />
                     <Gamepad2 size={48} className="text-white/20 absolute -bottom-4 -right-4 rotate-12 scale-150" />
