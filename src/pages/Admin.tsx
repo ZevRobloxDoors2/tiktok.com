@@ -187,7 +187,7 @@ export function Admin() {
       }
 
       // This helper updates the status and sends the notification to the reporter
-      await dbResolveReport(report.id, currentUser!.id, currentUser!.username);
+      await dbResolveReport(report.id, currentUser!.id, currentUser!.username, reason);
       
       // Update local state
       const updatedReports = await getReports();

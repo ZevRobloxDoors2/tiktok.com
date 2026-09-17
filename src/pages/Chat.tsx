@@ -14,7 +14,7 @@ import {
 
 export function Chat() {
   const { handle, groupId } = useParams<{ handle?: string, groupId?: string }>();
-  const { currentUser } = useAppStore();
+  const { currentUser, setIsCalling, setCallData } = useAppStore();
   const navigate = useNavigate();
   
   const [otherUser, setOtherUser] = useState<User | null>(null);
@@ -351,7 +351,18 @@ export function Chat() {
           )}
           <button 
             className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-            onClick={() => alert("Calls coming soon!")}
+            onClick={() => {
+              if (group) {
+                import('../lib/db').then(({ joinVoiceChannel }) => {
+                  joinVoiceChannel(group.id, currentUser.id);
+                  setCallData({ user: { id: group.id, username: group.name, avatarUrl: group.avatarUrl } as any, type: 'voice' });
+                  setIsCalling(true);
+                });
+              } else if (otherUser) {
+                setCallData({ user: otherUser, type: 'voice' });
+                setIsCalling(true);
+              }
+            }}
           >
             <Phone size={22} />
           </button>

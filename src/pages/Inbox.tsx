@@ -10,7 +10,7 @@ export function Inbox() {
   const { currentUser } = useAppStore();
   const [notifications, setNotifications] = useState<(Notification & { fromUser: User })[]>([]);
   const [conversations, setConversations] = useState<{ user?: User, group?: GroupChat, lastMessage: Message }[]>([]);
-  const [activeTab, setActiveTab] = useState<'activity' | 'messages'>('activity');
+  const [activeTab, setActiveTab] = useState<'activity' | 'messages' | 'groups'>('activity');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   
   // Support state
@@ -209,7 +209,13 @@ export function Inbox() {
           onClick={() => setActiveTab('messages')}
           className={`flex-1 py-4 font-semibold ${activeTab === 'messages' ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white' : 'text-zinc-500'}`}
         >
-          Messages
+          People
+        </button>
+        <button 
+          onClick={() => setActiveTab('groups')}
+          className={`flex-1 py-4 font-semibold ${activeTab === 'groups' ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white' : 'text-zinc-500'}`}
+        >
+          Groups
         </button>
       </div>
       
@@ -268,34 +274,72 @@ export function Inbox() {
               ))
             )}
           </div>
-        ) : (
+        ) : activeTab === 'messages' ? (
           <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {conversations.length === 0 ? (
+            {conversations.filter(c => !c.group).length === 0 ? (
               <div className="p-8 text-center text-zinc-500 flex flex-col items-center">
                 <MessageCircle size={48} className="mb-4 text-zinc-300 dark:text-zinc-700" />
                 <p>Messages will appear here</p>
               </div>
             ) : (
-              conversations.map(c => {
-                const link = c.group ? `/messages/group/${c.group.id}` : `/messages/${c.user!.handle}`;
+              conversations.filter(c => !c.group).map(c => {
+                const link = `/messages/${c.user!.handle}`;
                 return (
-                  <Link to={link} key={c.group ? c.group.id : c.user!.id} className="p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
-                    <div className="relative">
-                      <img src={c.group ? c.group.avatarUrl : c.user!.avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover" />
-                      {c.group && (
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-pink-600 flex items-center justify-center text-white border-2 border-white dark:border-zinc-950">
-                          <Users size={12} />
-                        </div>
-                      )}
-                    </div>
+                  <Link to={link} key={c.user!.id} className="p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
+                    <img src={c.user!.avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover" />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold truncate">{c.group ? c.group.name : c.user!.username}</h3>
+                      <h3 className="font-bold truncate">{c.user!.username}</h3>
                       <p className="text-sm text-zinc-500 truncate flex items-center gap-1">
                         {c.lastMessage.fromUserId === currentUser.id ? 'You: ' : ''}
                         {c.lastMessage.content || (c.lastMessage.imageUrl ? '📷 Photo' : c.lastMessage.videoUrl ? '🎥 Video' : c.lastMessage.audioUrl ? '🎤 Voice' : '')}
                       </p>
                     </div>
                   </Link>
+                );
+              })
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {conversations.filter(c => c.group).length === 0 ? (
+              <div className="p-8 text-center text-zinc-500 flex flex-col items-center">
+                <Users size={48} className="mb-4 text-zinc-300 dark:text-zinc-700" />
+                <p>No group chats yet</p>
+              </div>
+            ) : (
+              conversations.filter(c => c.group).map(c => {
+                const link = `/messages/group/${c.group!.id}`;
+                return (
+                  <div key={c.group!.id} className="p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors group">
+                    <Link to={link} className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="relative">
+                        <img src={c.group!.avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover" />
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-pink-600 flex items-center justify-center text-white border-2 border-white dark:border-zinc-950">
+                          <Users size={12} />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold truncate">{c.group!.name}</h3>
+                        <p className="text-sm text-zinc-500 truncate flex items-center gap-1">
+                          {c.lastMessage.fromUserId === currentUser.id ? 'You: ' : ''}
+                          {c.lastMessage.content || (c.lastMessage.imageUrl ? '📷 Photo' : c.lastMessage.videoUrl ? '🎥 Video' : c.lastMessage.audioUrl ? '🎤 Voice' : '')}
+                        </p>
+                      </div>
+                    </Link>
+                    <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        import('../lib/db').then(({ joinVoiceChannel }) => {
+                          joinVoiceChannel(c.group!.id, currentUser.id);
+                          setCallData({ user: { id: c.group!.id, username: c.group!.name, avatarUrl: c.group!.avatarUrl } as any, type: 'voice' });
+                          setIsCalling(true);
+                        });
+                      }}
+                      className="p-3 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-xl text-pink-600 transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Phone size={20} />
+                    </button>
+                  </div>
                 );
               })
             )}

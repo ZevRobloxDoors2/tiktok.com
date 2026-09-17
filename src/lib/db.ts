@@ -1,5 +1,6 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
+export { db };
 import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus } from '../types';
 
 export const initDb = async () => {};
@@ -134,6 +135,49 @@ export const deleteMessage = async (messageId: string) => {
 export const getGroupChats = () => fetchCollection<GroupChat>('group_chats');
 export const saveGroupChats = (groups: GroupChat[]) => saveCollection('group_chats', groups);
 
+export const updateGroupChat = async (groupId: string, data: Partial<GroupChat>) => {
+  try {
+    const docRef = doc(db, 'group_chats', groupId);
+    await updateDoc(docRef, data);
+  } catch (err) {
+    console.error("Error updating group chat:", err);
+  }
+};
+
+export const joinVoiceChannel = async (groupId: string, userId: string) => {
+  try {
+    const docRef = doc(db, 'group_chats', groupId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return;
+    const group = snap.data() as GroupChat;
+    const voiceChannel = group.voiceChannel || { active: true, participants: [] };
+    if (!voiceChannel.participants.includes(userId)) {
+      voiceChannel.participants.push(userId);
+      await updateDoc(docRef, { voiceChannel: { ...voiceChannel, active: true } });
+    }
+  } catch (err) {
+    console.error("Error joining voice channel:", err);
+  }
+};
+
+export const leaveVoiceChannel = async (groupId: string, userId: string) => {
+  try {
+    const docRef = doc(db, 'group_chats', groupId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return;
+    const group = snap.data() as GroupChat;
+    if (group.voiceChannel) {
+      group.voiceChannel.participants = group.voiceChannel.participants.filter(id => id !== userId);
+      if (group.voiceChannel.participants.length === 0) {
+        group.voiceChannel.active = false;
+      }
+      await updateDoc(docRef, { voiceChannel: group.voiceChannel });
+    }
+  } catch (err) {
+    console.error("Error leaving voice channel:", err);
+  }
+};
+
 export const getUserStatuses = () => fetchCollection<UserStatus>('user_statuses');
 export const saveUserStatuses = (statuses: UserStatus[]) => saveCollection('user_statuses', statuses);
 
@@ -234,7 +278,7 @@ export const addReport = async (report: Omit<Report, 'id'>) => {
   }
 };
 
-export const resolveReport = async (reportId: string, adminId: string, adminUsername: string) => {
+export const resolveReport = async (reportId: string, adminId: string, adminUsername: string, notes?: string) => {
   try {
     const docRef = doc(db, 'reports', reportId);
     const snap = await getDoc(docRef);
@@ -243,7 +287,8 @@ export const resolveReport = async (reportId: string, adminId: string, adminUser
     const report = snap.data() as Report;
     await updateDoc(docRef, {
       status: 'resolved',
-      resolvedBy: adminId
+      resolvedBy: adminId,
+      adminNotes: notes
     });
 
     // Create notification for reporter
@@ -255,7 +300,7 @@ export const resolveReport = async (reportId: string, adminId: string, adminUser
       type: 'support_resolved',
       fromUserId: adminId,
       title: 'Support Resolved',
-      message: `Your issue/support has been solved. Solved by: ${adminUsername}.`,
+      message: `Your issue/support has been solved. Solved by: ${adminUsername}.${notes ? ` Moderator Note: ${notes}` : ''}`,
       read: false,
       timestamp: Date.now()
     };
