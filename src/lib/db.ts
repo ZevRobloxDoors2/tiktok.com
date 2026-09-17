@@ -1,7 +1,54 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 export { db };
 import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus } from '../types';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export const initDb = async () => {};
 
@@ -140,7 +187,7 @@ export const updateGroupChat = async (groupId: string, data: Partial<GroupChat>)
     const docRef = doc(db, 'group_chats', groupId);
     await updateDoc(docRef, data);
   } catch (err) {
-    console.error("Error updating group chat:", err);
+    handleFirestoreError(err, OperationType.UPDATE, `group_chats/${groupId}`);
   }
 };
 
@@ -156,7 +203,7 @@ export const joinVoiceChannel = async (groupId: string, userId: string) => {
       await updateDoc(docRef, { voiceChannel: { ...voiceChannel, active: true } });
     }
   } catch (err) {
-    console.error("Error joining voice channel:", err);
+    handleFirestoreError(err, OperationType.UPDATE, `group_chats/${groupId}/join`);
   }
 };
 
@@ -174,7 +221,7 @@ export const leaveVoiceChannel = async (groupId: string, userId: string) => {
       await updateDoc(docRef, { voiceChannel: group.voiceChannel });
     }
   } catch (err) {
-    console.error("Error leaving voice channel:", err);
+    handleFirestoreError(err, OperationType.UPDATE, `group_chats/${groupId}/leave`);
   }
 };
 
@@ -434,7 +481,7 @@ export const createCall = async (callId: string, callerId: string, receiverId: s
       timestamp: Date.now()
     });
   } catch (err) {
-    console.error("Error creating call:", err);
+    handleFirestoreError(err, OperationType.CREATE, `calls/${callId}`);
   }
 };
 
@@ -443,7 +490,7 @@ export const updateCall = async (callId: string, data: any) => {
     const docRef = doc(db, 'calls', callId);
     await updateDoc(docRef, data);
   } catch (err) {
-    console.error("Error updating call:", err);
+    handleFirestoreError(err, OperationType.UPDATE, `calls/${callId}`);
   }
 };
 
@@ -454,7 +501,7 @@ export const addIceCandidate = async (callId: string, side: 'caller' | 'receiver
       [`${side}Candidates`]: arrayUnion(candidate)
     });
   } catch (err) {
-    console.error("Error adding ice candidate:", err);
+    handleFirestoreError(err, OperationType.UPDATE, `calls/${callId}/ice`);
   }
 };
 
@@ -463,6 +510,8 @@ export const subscribeToCall = (callId: string, callback: (call: any) => void) =
     if (docSnap.exists()) {
       callback(docSnap.data());
     }
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, `calls/${callId}`);
   });
 };
 
@@ -471,6 +520,6 @@ export const deleteCall = async (callId: string) => {
     const docRef = doc(db, 'calls', callId);
     await deleteDoc(docRef);
   } catch (err) {
-    console.error("Error deleting call:", err);
+    handleFirestoreError(err, OperationType.DELETE, `calls/${callId}`);
   }
 };

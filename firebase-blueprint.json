@@ -16,12 +16,48 @@
         "timestamp": { "type": "number" }
       },
       "required": ["id", "callerId", "receiverId", "status", "timestamp"]
+    },
+    "GroupChat": {
+      "title": "Group Chat",
+      "description": "A group chat with a voice channel.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "memberIds": { "type": "array" },
+        "voiceChannel": {
+          "type": "object",
+          "properties": {
+            "active": { "type": "boolean" },
+            "participants": { "type": "array" }
+          }
+        }
+      }
+    },
+    "UserStatus": {
+      "title": "User Status",
+      "description": "Presence and status of a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "status": { "type": "string" },
+        "lastSeen": { "type": "number" }
+      }
     }
   },
   "firestore": {
     "calls/{callId}": {
       "schema": "Call",
       "description": "WebRTC signaling data for calls."
+    },
+    "group_chats/{groupId}": {
+      "schema": "GroupChat",
+      "description": "Group chat data and voice state."
+    },
+    "user_statuses/{userId}": {
+      "schema": "UserStatus",
+      "description": "User presence information."
     }
   }
 }
