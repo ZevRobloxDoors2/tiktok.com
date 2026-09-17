@@ -16,6 +16,8 @@ import { Chat } from './pages/Chat';
 import { BanScreen } from './components/BanScreen';
 import { InterestsModal } from './components/InterestsModal';
 import { MiniPlayer } from './components/MiniPlayer';
+import { GlobalStoryViewer } from './components/StoriesBar';
+import { CallOverlay } from './components/CallOverlay';
 import { Admin } from './pages/Admin';
 import { Forum } from './pages/Forum';
 import { GamesApps } from './pages/GamesApps';
@@ -35,6 +37,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
       {children}
       <InterestsModal />
       <MiniPlayer />
+      <GlobalStoryViewer />
+      <CallOverlay />
     </>
   );
 }

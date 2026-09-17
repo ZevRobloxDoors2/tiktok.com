@@ -13,7 +13,7 @@ interface UserStoriesGroup {
 }
 
 export function StoriesBar() {
-  const { currentUser } = useAppStore();
+  const { currentUser, setActiveStory } = useAppStore();
   const navigate = useNavigate();
   const [storyGroups, setStoryGroups] = useState<UserStoriesGroup[]>([]);
   const [activeGroupIndex, setActiveGroupIndex] = useState<number | null>(null);
@@ -84,12 +84,14 @@ export function StoriesBar() {
   const otherGroups = storyGroups.filter(g => g.user.id !== currentUser?.id);
 
   const openStoryViewer = (groupIndex: number, storyIndex = 0) => {
-    setActiveGroupIndex(groupIndex);
-    setActiveStoryIndex(storyIndex);
+    const group = storyGroups[groupIndex];
+    if (group) {
+      setActiveStory({ userId: group.user.id, user: group.user });
+    }
   };
 
   return (
-    <div className={`w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/80 py-3 px-3 overflow-x-auto hide-scrollbar ${activeGroupIndex !== null ? 'z-[2100]' : 'z-30'} transition-all`}>
+    <div className={`w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/80 py-3 px-3 overflow-x-auto hide-scrollbar z-30 transition-all`}>
       <div className="flex items-center gap-3 min-w-max">
         
         {/* Current User Story Bubble */}
@@ -170,21 +172,71 @@ export function StoriesBar() {
         })}
 
       </div>
-
-      {/* Full-Screen Story Viewer Modal */}
-      {activeGroupIndex !== null && storyGroups[activeGroupIndex] && (
-        <StoryViewerModal 
-          groups={storyGroups}
-          currentGroupIndex={activeGroupIndex}
-          initialStoryIndex={activeStoryIndex}
-          onClose={() => {
-            setActiveGroupIndex(null);
-            loadStories();
-          }}
-          onStoryDeleted={loadStories}
-        />
-      )}
     </div>
+  );
+}
+
+// Global viewer that overlaps the whole app
+export function GlobalStoryViewer() {
+  const { currentUser, activeStory, setActiveStory } = useAppStore();
+  const [storyGroups, setStoryGroups] = useState<UserStoriesGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadStories = async () => {
+    try {
+      const allStories = await getStories();
+      const allUsers = await getUsers();
+      const now = Date.now();
+      const validStories = allStories.filter(s => s.expiresAt > now);
+      const viewableStories = validStories.filter(s => {
+        if (currentUser?.id === s.userId) return true;
+        if (currentUser?.role === 'owner' || currentUser?.role === 'staff') return true;
+        if (s.visibility === 'only_you') return false;
+        if (s.visibility === 'friends') {
+          const author = allUsers.find(u => u.id === s.userId);
+          return isFriend(currentUser, author);
+        }
+        return true;
+      });
+      const groupsMap = new Map<string, Story[]>();
+      viewableStories.forEach(s => {
+        const list = groupsMap.get(s.userId) || [];
+        list.push(s);
+        groupsMap.set(s.userId, list);
+      });
+      const groups: UserStoriesGroup[] = [];
+      groupsMap.forEach((stories, userId) => {
+        const user = allUsers.find(u => u.id === userId);
+        if (user) {
+          stories.sort((a, b) => a.timestamp - b.timestamp);
+          const hasUnseen = stories.some(s => !currentUser || !s.viewers?.includes(currentUser.id));
+          groups.push({ user, stories, hasUnseen });
+        }
+      });
+      setStoryGroups(groups);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeStory) loadStories();
+  }, [activeStory, currentUser?.id]);
+
+  if (!activeStory || loading) return null;
+
+  const currentGroupIndex = storyGroups.findIndex(g => g.user.id === activeStory.userId);
+  if (currentGroupIndex === -1) return null;
+
+  return (
+    <StoryViewerModal 
+      groups={storyGroups}
+      currentGroupIndex={currentGroupIndex}
+      initialStoryIndex={0}
+      onClose={() => setActiveStory(null)}
+      onStoryDeleted={loadStories}
+    />
   );
 }
 

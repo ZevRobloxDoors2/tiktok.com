@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import Cropper from 'react-easy-crop';
 import { getUsers, getVideos, saveUsers, deleteVideoFromDB, getAppeals, saveAppeals, updateUser } from '../lib/db';
 import { User, Video, Appeal } from '../types';
 import { useAppStore } from '../store';
@@ -9,13 +10,37 @@ import { compressImage } from '../lib/imageUtils';
 import { 
   Settings, Play, Edit3, Grid, Heart, X, Upload, Bookmark, Flag, 
   Hammer, Wrench, Check, Trash2, HelpCircle, Users, Lock, Image as ImageIcon, LogOut,
-  AlertTriangle, Send, ShieldCheck, Trophy
+  AlertTriangle, Send, ShieldCheck, Trophy, Phone, Video as VideoIcon, Eye, EyeOff, Key, User as UserIcon
 } from 'lucide-react';
 import { VideoItem } from './Home';
 
+// Helper for cropping
+const getCroppedImg = async (imageSrc: string, pixelCrop: any): Promise<string> => {
+  const image = new Image();
+  image.src = imageSrc;
+  await new Promise(resolve => image.onload = resolve);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height
+  );
+  return canvas.toDataURL('image/jpeg');
+};
+
 export function Profile() {
   const { handle } = useParams<{ handle: string }>();
-  const { currentUser, setCurrentUser } = useAppStore();
+  const { currentUser, setCurrentUser, setIsCalling, setCallData } = useAppStore();
   const navigate = useNavigate();
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -161,13 +186,18 @@ export function Profile() {
         
         {/* Profile Header */}
         <div className="px-4 pt-12 pb-6 flex flex-col md:flex-row items-center md:items-start gap-6 border-b border-zinc-200 dark:border-zinc-800">
-          {profileUser.avatarUrl ? (
-            <img src={profileUser.avatarUrl} alt={profileUser.username} className="w-28 h-28 rounded-full border-2 border-zinc-200 dark:border-zinc-800 object-cover" />
-          ) : (
-            <div className="w-28 h-28 rounded-full border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-800 flex items-center justify-center">
-              <span className="text-zinc-500 font-bold text-2xl">{profileUser.username.charAt(0)}</span>
-            </div>
-          )}
+          <div className="relative group">
+            {profileUser.avatarUrl ? (
+              <img src={profileUser.avatarUrl} alt={profileUser.username} className="w-28 h-28 rounded-full border-2 border-zinc-200 dark:border-zinc-800 object-cover" />
+            ) : (
+              <div className="w-28 h-28 rounded-full border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-800 flex items-center justify-center">
+                <span className="text-zinc-500 font-bold text-2xl">{profileUser.username.charAt(0)}</span>
+              </div>
+            )}
+            {profileUser.currentGame && profileUser.showActivityStatus !== false && (
+              <div className="absolute -bottom-1 -right-1 bg-green-500 w-5 h-5 rounded-full border-4 border-white dark:border-zinc-950 animate-pulse" title={`Playing ${profileUser.currentGame}`} />
+            )}
+          </div>
           
           <div className="flex-1 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-2 mb-1 flex-wrap">
@@ -212,7 +242,14 @@ export function Profile() {
                 </div>
               )}
             </div>
-            <p className="text-zinc-500 font-semibold mb-4">@{profileUser.handle}</p>
+            <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
+              <p className="text-zinc-500 font-semibold">@{profileUser.handle}</p>
+              {profileUser.currentGame && profileUser.showActivityStatus !== false && (
+                <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
+                  Playing {profileUser.currentGame}
+                </span>
+              )}
+            </div>
             
             <div className="flex items-center justify-center md:justify-start gap-6 mb-4">
               <div className="text-center">
@@ -258,6 +295,17 @@ export function Profile() {
                   <Link to={`/messages/${profileUser.handle}`} className="px-6 py-2 border border-zinc-300 dark:border-zinc-700 font-semibold rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
                     Message
                   </Link>
+                  {areFriends && (
+                    <button 
+                      onClick={() => {
+                        setCallData({ user: profileUser, type: 'voice' });
+                        setIsCalling(true);
+                      }} 
+                      className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 font-semibold rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors flex items-center justify-center text-blue-500"
+                    >
+                      <Phone size={18} />
+                    </button>
+                  )}
                   <button onClick={handleReport} className="px-4 py-2 border border-red-200 text-red-500 dark:border-red-900/50 dark:text-red-400 font-semibold rounded-md hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors flex items-center justify-center">
                     <Flag size={18} />
                   </button>
@@ -299,7 +347,6 @@ export function Profile() {
               <AlertTriangle size={18} /> Removed
             </button>
           )}
-          {/* Forum button that links to /forum */}
           <button 
             onClick={() => navigate('/forum')}
             className="flex-1 py-4 font-semibold flex items-center justify-center gap-2 text-zinc-500 hover:text-[#5865F2] transition-colors"
@@ -512,11 +559,22 @@ export function Profile() {
 
 function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }) {
   const { setCurrentUser } = useAppStore();
+  const [modalTab, setModalTab] = useState<'profile' | 'account'>('profile');
   const [username, setUsername] = useState(user.username);
   const [handleInput, setHandleInput] = useState(user.handle);
   const [bio, setBio] = useState(user.bio);
   const [isPrivate, setIsPrivate] = useState(user.isPrivate);
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl);
+  const [password, setPassword] = useState(user.password || '');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showActivityStatus, setShowActivityStatus] = useState(user.showActivityStatus !== false);
+  
+  // Cropping State
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
@@ -527,7 +585,9 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
         handle: cleanHandle || user.handle,
         bio,
         isPrivate,
-        avatarUrl
+        avatarUrl,
+        password,
+        showActivityStatus
       };
       
       await updateUser(user.id, updateData);
@@ -545,79 +605,160 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
       const reader = new FileReader();
       reader.onload = async (ev) => {
         if (ev.target?.result) {
-          const compressed = await compressImage(ev.target.result as string, 300, 300, 0.6);
-          setAvatarUrl(compressed);
+          setImageToCrop(ev.target.result as string);
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCropSave = async () => {
+    if (imageToCrop && croppedAreaPixels) {
+      const cropped = await getCroppedImg(imageToCrop, croppedAreaPixels);
+      const compressed = await compressImage(cropped, 300, 300, 0.6);
+      setAvatarUrl(compressed);
+      setImageToCrop(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+        
         <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
-          <h2 className="text-xl font-bold">Edit Profile</h2>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setModalTab('profile')}
+              className={`text-lg font-bold pb-1 border-b-2 transition-colors ${modalTab === 'profile' ? 'border-pink-600 text-pink-600' : 'border-transparent text-zinc-500'}`}
+            >
+              Profile
+            </button>
+            <button 
+              onClick={() => setModalTab('account')}
+              className={`text-lg font-bold pb-1 border-b-2 transition-colors ${modalTab === 'account' ? 'border-pink-600 text-pink-600' : 'border-transparent text-zinc-500'}`}
+            >
+              Account
+            </button>
+          </div>
           <button onClick={onClose} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full"><X size={20} /></button>
         </div>
         
-        <div className="p-6 space-y-6">
-          <div className="flex flex-col items-center">
-            <div className="relative group cursor-pointer" onClick={() => fileRef.current?.click()}>
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-700" />
-              ) : (
-                <div className="w-24 h-24 rounded-full border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold text-2xl">{username.charAt(0)}</div>
-              )}
-              <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
-                <Upload size={24} />
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {modalTab === 'profile' ? (
+            <>
+              <div className="flex flex-col items-center">
+                <div className="relative group cursor-pointer" onClick={() => fileRef.current?.click()}>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="w-24 h-24 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-700" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold text-2xl">{username.charAt(0)}</div>
+                  )}
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                    <Upload size={24} />
+                  </div>
+                  <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                </div>
+                <p className="mt-2 text-sm text-pink-600 font-semibold cursor-pointer" onClick={() => fileRef.current?.click()}>Change photo</p>
               </div>
-              <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleImageChange} />
-            </div>
-            <p className="mt-2 text-sm text-pink-600 font-semibold cursor-pointer" onClick={() => fileRef.current?.click()}>Change photo</p>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-semibold mb-1">Username</label>
-            <input 
-              value={username} 
-              onChange={e => setUsername(e.target.value)} 
-              className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all"
-            />
-          </div>
+              
+              <div>
+                <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
+                  <UserIcon size={14} /> Username
+                </label>
+                <input 
+                  value={username} 
+                  onChange={e => setUsername(e.target.value)} 
+                  className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-semibold mb-1">Handle (@)</label>
-            <input 
-              value={handleInput} 
-              onChange={e => setHandleInput(e.target.value)} 
-              placeholder="username handle"
-              className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all"
-            />
-            <p className="text-xs text-zinc-500 mt-1">Unique handle for your profile URL.</p>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-semibold mb-1">Bio</label>
-            <textarea 
-              value={bio} 
-              onChange={e => setBio(e.target.value)} 
-              className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all resize-none h-24"
-            />
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold">Private Account</p>
-              <p className="text-sm text-zinc-500">Only approved followers can see your videos.</p>
-            </div>
-            <button 
-              onClick={() => setIsPrivate(!isPrivate)}
-              className={`w-12 h-6 rounded-full transition-colors relative ${isPrivate ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}
-            >
-              <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
-            </button>
-          </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
+                  <ImageIcon size={14} /> Handle (@)
+                </label>
+                <input 
+                  value={handleInput} 
+                  onChange={e => setHandleInput(e.target.value)} 
+                  placeholder="username handle"
+                  className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all"
+                />
+                <p className="text-xs text-zinc-500 mt-1">Unique handle for your profile URL.</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold mb-1">Bio</label>
+                <textarea 
+                  value={bio} 
+                  onChange={e => setBio(e.target.value)} 
+                  className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all resize-none h-24"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">Private Account</p>
+                  <p className="text-sm text-zinc-500">Only approved followers can see your videos.</p>
+                </div>
+                <button 
+                  onClick={() => setIsPrivate(!isPrivate)}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${isPrivate ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                >
+                  <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-semibold mb-1 flex items-center gap-2">
+                  <Key size={14} /> Change Password
+                </label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? 'text' : 'password'}
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    placeholder="New password"
+                    className="w-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 rounded-lg px-4 py-2 outline-none transition-all pr-10"
+                  />
+                  <button 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold flex items-center gap-2">
+                    <Check size={16} className="text-green-500" /> Activity Status
+                  </p>
+                  <p className="text-sm text-zinc-500">Show friends what game you're playing.</p>
+                </div>
+                <button 
+                  onClick={() => setShowActivityStatus(!showActivityStatus)}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${showActivityStatus ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                >
+                  <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${showActivityStatus ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                <h4 className="font-bold text-sm mb-2 flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                  <ShieldCheck size={14} /> Security Info
+                </h4>
+                <p className="text-xs text-zinc-500">
+                  Your password is stored securely in our database. We recommend using a unique password for this site.
+                </p>
+              </div>
+            </>
+          )}
         </div>
         
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-between gap-3">
@@ -633,9 +774,64 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
           </button>
           <div className="flex gap-2">
             <button onClick={onClose} className="px-4 py-2 font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
-            <button onClick={handleSave} className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg transition-colors">Save</button>
+            <button onClick={handleSave} className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-pink-600/20">Save</button>
           </div>
         </div>
+
+        {/* Cropping Modal Overlay */}
+        <AnimatePresence>
+          {imageToCrop && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black flex flex-col"
+            >
+              <div className="relative flex-1">
+                <Cropper
+                  image={imageToCrop}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  onCropChange={setCrop}
+                  onCropComplete={onCropComplete}
+                  onZoomChange={setZoom}
+                  cropShape="round"
+                  showGrid={false}
+                />
+              </div>
+              <div className="p-6 bg-zinc-900 border-t border-zinc-800 space-y-6">
+                <div className="flex items-center gap-4">
+                  <span className="text-white text-sm font-bold">Zoom</span>
+                  <input
+                    type="range"
+                    value={zoom}
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    aria-labelledby="Zoom"
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                    className="flex-1 accent-pink-600"
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setImageToCrop(null)}
+                    className="flex-1 py-3 bg-zinc-800 text-white font-bold rounded-xl hover:bg-zinc-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleCropSave}
+                    className="flex-1 py-3 bg-pink-600 text-white font-bold rounded-xl hover:bg-pink-700 transition-colors shadow-lg shadow-pink-600/20"
+                  >
+                    Apply Crop
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

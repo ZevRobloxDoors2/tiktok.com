@@ -22,6 +22,12 @@ type AppState = {
   setMiniPlayerUrl: (url: string) => void;
   miniPlayerTitle: string;
   setMiniPlayerTitle: (title: string) => void;
+  activeStory: { userId: string; user: User } | null;
+  setActiveStory: (story: { userId: string; user: User } | null) => void;
+  isCalling: boolean;
+  setIsCalling: (val: boolean) => void;
+  callData: { user: User; type: 'voice' | 'video' } | null;
+  setCallData: (data: { user: User; type: 'voice' | 'video' } | null) => void;
 };
 
 const StoreContext = createContext<AppState | null>(null);
@@ -35,6 +41,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [miniPlayerActive, setMiniPlayerActive] = useState(false);
   const [miniPlayerUrl, setMiniPlayerUrl] = useState('');
   const [miniPlayerTitle, setMiniPlayerTitle] = useState('');
+  const [activeStory, setActiveStory] = useState<{ userId: string; user: User } | null>(null);
+  const [isCalling, setIsCalling] = useState(false);
+  const [callData, setCallData] = useState<{ user: User; type: 'voice' | 'video' } | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
@@ -98,7 +107,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       miniPlayerUrl,
       setMiniPlayerUrl,
       miniPlayerTitle,
-      setMiniPlayerTitle
+      setMiniPlayerTitle,
+      activeStory,
+      setActiveStory,
+      isCalling,
+      setIsCalling,
+      callData,
+      setCallData
     }}>
       {children}
     </StoreContext.Provider>

@@ -13,6 +13,9 @@ export type User = {
   role?: 'user' | 'staff' | 'owner';
   interests?: string[];
   badges?: string[];
+  currentGame?: string;
+  showActivityStatus?: boolean;
+  password?: string;
   acceptedReportsCount?: number;
   banStatus?: {
     type: 'temp' | 'perm' | 'hwid';

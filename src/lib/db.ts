@@ -47,6 +47,10 @@ export const updateUser = async (userId: string, data: Partial<User>) => {
   }
 };
 
+export const updateUserGame = async (userId: string, gameTitle: string | null) => {
+  return updateUser(userId, { currentGame: gameTitle || undefined });
+};
+
 export const getVideos = () => fetchCollection<Video>('videos');
 export const saveVideos = (videos: Video[]) => saveCollection('videos', videos);
 
