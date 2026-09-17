@@ -222,6 +222,49 @@ export const announceForumPostToEveryone = async (post: FAQPost, author: User) =
 export const getReports = () => fetchCollection<Report>('reports');
 export const saveReports = (reports: Report[]) => saveCollection('reports', reports);
 
+export const addReport = async (report: Omit<Report, 'id'>) => {
+  try {
+    const id = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const docRef = doc(db, 'reports', id);
+    await setDoc(docRef, { ...report, id });
+    return id;
+  } catch (err) {
+    console.error("Error adding report:", err);
+    throw err;
+  }
+};
+
+export const resolveReport = async (reportId: string, adminId: string, adminUsername: string) => {
+  try {
+    const docRef = doc(db, 'reports', reportId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return;
+    
+    const report = snap.data() as Report;
+    await updateDoc(docRef, {
+      status: 'resolved',
+      resolvedBy: adminId
+    });
+
+    // Create notification for reporter
+    const notifId = `notif_resolved_${reportId}`;
+    const notifRef = doc(db, 'notifications', notifId);
+    const notification: Notification = {
+      id: notifId,
+      userId: report.reporterId,
+      type: 'support_resolved',
+      fromUserId: adminId,
+      title: 'Support Resolved',
+      message: `Your issue/support has been solved. Solved by: ${adminUsername}.`,
+      read: false,
+      timestamp: Date.now()
+    };
+    await setDoc(notifRef, notification);
+  } catch (err) {
+    console.error("Error resolving report:", err);
+  }
+};
+
 export const getAppeals = () => fetchCollection<Appeal>('appeals');
 export const saveAppeals = (appeals: Appeal[]) => saveCollection('appeals', appeals);
 
@@ -332,3 +375,57 @@ export const subscribeToAppSettings = (callback: (settings: any) => void) => {
 };
 
 export const clearDb = async () => {};
+
+// WebRTC Signaling Helpers
+export const createCall = async (callId: string, callerId: string, receiverId: string, offer: any) => {
+  try {
+    const docRef = doc(db, 'calls', callId);
+    await setDoc(docRef, {
+      id: callId,
+      callerId,
+      receiverId,
+      status: 'initiating',
+      offer,
+      timestamp: Date.now()
+    });
+  } catch (err) {
+    console.error("Error creating call:", err);
+  }
+};
+
+export const updateCall = async (callId: string, data: any) => {
+  try {
+    const docRef = doc(db, 'calls', callId);
+    await updateDoc(docRef, data);
+  } catch (err) {
+    console.error("Error updating call:", err);
+  }
+};
+
+export const addIceCandidate = async (callId: string, side: 'caller' | 'receiver', candidate: any) => {
+  try {
+    const docRef = doc(db, 'calls', callId);
+    await updateDoc(docRef, {
+      [`${side}Candidates`]: arrayUnion(candidate)
+    });
+  } catch (err) {
+    console.error("Error adding ice candidate:", err);
+  }
+};
+
+export const subscribeToCall = (callId: string, callback: (call: any) => void) => {
+  return onSnapshot(doc(db, 'calls', callId), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data());
+    }
+  });
+};
+
+export const deleteCall = async (callId: string) => {
+  try {
+    const docRef = doc(db, 'calls', callId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Error deleting call:", err);
+  }
+};

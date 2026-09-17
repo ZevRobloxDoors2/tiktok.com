@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "Call": {
+      "title": "Call",
+      "description": "Represents a WebRTC call session for signaling.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "callerId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "status": { "type": "string", "enum": ["initiating", "ringing", "active", "ended"] },
+        "offer": { "type": "object" },
+        "answer": { "type": "object" },
+        "callerCandidates": { "type": "array" },
+        "receiverCandidates": { "type": "array" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "callerId", "receiverId", "status", "timestamp"]
+    }
+  },
+  "firestore": {
+    "calls/{callId}": {
+      "schema": "Call",
+      "description": "WebRTC signaling data for calls."
+    }
+  }
+}

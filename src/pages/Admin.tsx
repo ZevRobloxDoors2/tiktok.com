@@ -152,17 +152,17 @@ export function Admin() {
   };
 
   // Report actions
-  const resolveReport = (report: Report, status: 'accepted' | 'rejected') => {
+  const handleResolveReport = (report: Report, status: 'accepted' | 'rejected') => {
     executeWithConfirm(`Resolve Report as ${status.toUpperCase()}`, async (reason) => {
-      const allReports = await getReports();
-      const idx = allReports.findIndex(r => r.id === report.id);
-      if (idx !== -1) {
-        allReports[idx].status = status;
-        allReports[idx].adminNotes = reason;
-        await saveReports(allReports);
-        setReports(allReports);
-        
-        if (status === 'accepted') {
+      // Use the centralized resolveReport helper
+      const { resolveReport: dbResolveReport } = await import('../lib/db');
+      
+      if (status === 'accepted') {
+        const allReports = await getReports();
+        const idx = allReports.findIndex(r => r.id === report.id);
+        if (idx !== -1) {
+          // If accepted, we still need to handle video removal and tradient rewards logic here
+          // as it's specific to the admin UI flow
           const vids = await getVideos();
           const vIdx = vids.findIndex(v => v.id === report.videoId);
           if (vIdx !== -1) {
@@ -172,40 +172,28 @@ export function Admin() {
              setVideos(vids);
           }
 
-          // Tradient Reward Logic
           const allUsers = await getUsers();
           const reporterIdx = allUsers.findIndex(u => u.id === report.reporterId);
           if (reporterIdx !== -1) {
             const reporter = allUsers[reporterIdx];
             reporter.acceptedReportsCount = (reporter.acceptedReportsCount || 0) + 1;
-            
             if (reporter.acceptedReportsCount === 3 && !(reporter.badges || []).includes('Tradient')) {
               reporter.badges = [...(reporter.badges || []), 'Tradient'];
-              
-              // Find owner for notification
-              const owner = allUsers.find(u => u.role === 'owner' || u.handle === 'eyeshd');
-              const ownerId = owner?.id || 'system';
-
-              // Send Notification
-              const allNotifs = await getNotifications();
-              const newNotif: Notification = {
-                id: `notif_tradient_${Date.now()}`,
-                userId: reporter.id,
-                type: 'tradient_reward',
-                fromUserId: ownerId,
-                title: '🎉 New Reward Earned!',
-                message: 'Thank you for making our website/community safe, i also gave you a reward on your profile, check it out.',
-                read: false,
-                timestamp: Date.now()
-              };
-              await saveNotifications([...allNotifs, newNotif]);
             }
             await saveUsers(allUsers);
             setUsers(allUsers);
           }
         }
-        await logAction(`report_${status}`, report.id, `Report resolved. Notes: ${reason}`);
       }
+
+      // This helper updates the status and sends the notification to the reporter
+      await dbResolveReport(report.id, currentUser!.id, currentUser!.username);
+      
+      // Update local state
+      const updatedReports = await getReports();
+      setReports(updatedReports);
+      
+      await logAction(`report_${status}`, report.id, `Report resolved. Notes: ${reason}`);
     }, true, 'Moderator Note / Reason', 'State why this report is resolved...');
   };
 
@@ -432,17 +420,21 @@ export function Admin() {
             <div className="space-y-4">
               <h2 className="text-xl font-bold mb-4">Pending Reports and Support</h2>
               {reports.filter(r => r.status === 'pending').map(report => {
-                const vid = videos.find(v => v.id === report.videoId);
+                const vid = report.videoId ? videos.find(v => v.id === report.videoId) : null;
                 const repUser = users.find(u => u.id === report.reporterId);
                 return (
                   <div key={report.id} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col md:flex-row gap-4">
-                    {vid && (
+                    {vid ? (
                       <div className="w-24 h-32 bg-black shrink-0 rounded-lg overflow-hidden relative">
                          {vid.isYouTube ? (
                            <img src={`https://img.youtube.com/vi/${vid.youtubeId}/default.jpg`} className="w-full h-full object-cover opacity-50" />
                          ) : vid.videoUrl ? (
                            <video src={vid.videoUrl} className="w-full h-full object-cover" />
                          ) : null}
+                      </div>
+                    ) : (
+                      <div className="w-24 h-32 bg-zinc-100 dark:bg-zinc-800 shrink-0 rounded-lg flex items-center justify-center text-zinc-400">
+                        <AlertTriangle size={32} />
                       </div>
                     )}
                     <div className="flex-1">
@@ -455,10 +447,11 @@ export function Admin() {
                             <Search size={16} /> View Video
                           </button>
                         )}
-                        <button onClick={() => resolveReport(report, 'accepted')} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm flex items-center gap-1">
-                          <Trash2 size={16} /> Take Down
+                        <button onClick={() => handleResolveReport(report, 'accepted')} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm flex items-center gap-1">
+                          {report.category === 'video' ? <Trash2 size={16} /> : <CheckCircle size={16} />}
+                          {report.category === 'video' ? 'Take Down' : 'Resolve'}
                         </button>
-                        <button onClick={() => resolveReport(report, 'rejected')} className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 font-semibold rounded-lg text-sm">
+                        <button onClick={() => handleResolveReport(report, 'rejected')} className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 font-semibold rounded-lg text-sm">
                           Dismiss
                         </button>
                       </div>

@@ -31,13 +31,14 @@ export type User = {
 
 export type Report = {
   id: string;
-  videoId: string;
+  videoId?: string;
   reporterId: string;
   reason: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'resolved';
   adminNotes?: string;
   timestamp: number;
   category?: 'video' | 'support' | 'bug';
+  resolvedBy?: string; // Admin ID
 };
 
 export type Appeal = {
@@ -187,7 +188,7 @@ export type UserStatus = {
 export type Notification = {
   id: string;
   userId: string; // The user receiving the notification
-  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward';
+  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward' | 'support_resolved';
   fromUserId: string;
   videoId?: string;
   forumPostId?: string;

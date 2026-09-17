@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getNotifications, getMessages, getUsers, getGroupChats, saveGroupChats } from '../lib/db';
 import { Notification, Message, User, GroupChat } from '../types';
-import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check, LifeBuoy } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { addReport } from '../lib/db';
 
 export function Inbox() {
   const { currentUser } = useAppStore();
@@ -11,6 +12,11 @@ export function Inbox() {
   const [conversations, setConversations] = useState<{ user?: User, group?: GroupChat, lastMessage: Message }[]>([]);
   const [activeTab, setActiveTab] = useState<'activity' | 'messages'>('activity');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+  
+  // Support state
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportReason, setSupportReason] = useState('');
+  const [supportSubmitted, setSupportSubmitted] = useState(false);
   
   // Group creation state
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -139,12 +145,38 @@ export function Inbox() {
     if (enabled && 'Notification' in window) await window.Notification.requestPermission();
   };
 
+  const submitSupport = async () => {
+    if (!supportReason.trim() || !currentUser) return;
+    await addReport({
+      reporterId: currentUser.id,
+      reason: supportReason.trim(),
+      status: 'pending',
+      timestamp: Date.now(),
+      category: 'support'
+    });
+    setSupportSubmitted(true);
+    setTimeout(() => {
+      setShowSupportModal(false);
+      setSupportSubmitted(false);
+      setSupportReason('');
+    }, 2000);
+  };
+
   if (!currentUser) return <div className="p-8 text-center">Please log in to view your inbox.</div>;
 
   return (
     <div className="w-full max-w-2xl mx-auto border-x border-zinc-200 dark:border-zinc-800 h-full flex flex-col bg-white dark:bg-zinc-950 relative">
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md z-10">
-        <h1 className="text-xl font-bold">Inbox</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold">Inbox</h1>
+          <button 
+            onClick={() => setShowSupportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors text-xs font-bold"
+          >
+            <LifeBuoy size={14} className="text-pink-600" />
+            Support
+          </button>
+        </div>
         {activeTab === 'messages' && (
           <button 
             onClick={() => setShowCreateGroup(true)}
@@ -216,6 +248,11 @@ export function Inbox() {
                           {' '}
                           <span className="font-bold text-indigo-600 dark:text-indigo-400">awarded you the Tradient Badge!</span>
                           <p className="mt-1 text-zinc-600 dark:text-zinc-300 italic">"{n.message}"</p>
+                        </>
+                      ) : n.type === 'support_resolved' ? (
+                        <>
+                          <span className="font-bold text-green-600 dark:text-green-400">✅ Support Resolved:</span>{' '}
+                          <span className="text-zinc-800 dark:text-zinc-200">{n.message}</span>
                         </>
                       ) : (
                         <>
@@ -328,6 +365,54 @@ export function Inbox() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Support Modal */}
+      {showSupportModal && (
+        <div className="absolute inset-0 z-50 bg-white dark:bg-zinc-950 flex flex-col animate-in slide-in-from-bottom-8">
+          <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+            <button onClick={() => setShowSupportModal(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-full">
+              <X size={24} />
+            </button>
+            <h2 className="font-bold text-pink-600">Contact Support</h2>
+            <div className="w-10" />
+          </div>
+          
+          <div className="p-8 flex-1 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+            {supportSubmitted ? (
+              <div className="space-y-4 animate-in zoom-in-95">
+                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full flex items-center justify-center mx-auto">
+                  <Check size={40} />
+                </div>
+                <h3 className="text-xl font-bold">Request Submitted!</h3>
+                <p className="text-zinc-500 text-sm">Our staff will review your case. You'll receive a notification once it's resolved.</p>
+              </div>
+            ) : (
+              <>
+                <LifeBuoy size={64} className="text-pink-600 mb-6" />
+                <h3 className="text-2xl font-black mb-2 uppercase tracking-tight">How can we help?</h3>
+                <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
+                  Describe your issue or what you need support with. Be as detailed as possible so our moderators can help you faster.
+                </p>
+                
+                <textarea 
+                  value={supportReason}
+                  onChange={e => setSupportReason(e.target.value)}
+                  placeholder="Tell us what's wrong..."
+                  className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl p-4 min-h-[160px] focus:ring-2 focus:ring-pink-500 outline-none resize-none mb-6 text-sm"
+                />
+                
+                <button 
+                  onClick={submitSupport}
+                  disabled={!supportReason.trim()}
+                  className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-2xl shadow-xl shadow-pink-600/20 transition-all disabled:opacity-50 active:scale-95"
+                >
+                  Send Support Request
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

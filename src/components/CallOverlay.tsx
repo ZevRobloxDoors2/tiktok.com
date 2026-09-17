@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   PhoneOff, Mic, MicOff, Volume2, VolumeX, 
@@ -6,6 +6,16 @@ import {
   UserPlus, MessageSquare, Video, VideoOff
 } from 'lucide-react';
 import { useAppStore } from '../store';
+import { createCall, updateCall, addIceCandidate, subscribeToCall, deleteCall } from '../lib/db';
+
+const servers = {
+  iceServers: [
+    {
+      urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
+    },
+  ],
+  iceCandidatePoolSize: 10,
+};
 
 export function CallOverlay() {
   const { isCalling, setIsCalling, callData, currentUser } = useAppStore();
@@ -15,8 +25,134 @@ export function CallOverlay() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [remoteIsSpeaking, setRemoteIsSpeaking] = useState(false);
+  
+  const pc = useRef<RTCPeerConnection | null>(null);
+  const localStream = useRef<MediaStream | null>(null);
+  const remoteStream = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const callIdRef = useRef<string | null>(null);
 
-  // Simulate speaking indicators
+  useEffect(() => {
+    if (!isCalling || !callData || !currentUser) return;
+
+    const setupWebRTC = async () => {
+      pc.current = new RTCPeerConnection(servers);
+      remoteStream.current = new MediaStream();
+
+      // Get local audio
+      try {
+        localStream.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        localStream.current.getTracks().forEach((track) => {
+          if (pc.current && localStream.current) {
+            pc.current.addTrack(track, localStream.current);
+          }
+        });
+      } catch (err) {
+        console.error("Error accessing microphone:", err);
+      }
+
+      // Handle remote stream
+      pc.current.ontrack = (event) => {
+        event.streams[0].getTracks().forEach((track) => {
+          if (remoteStream.current) {
+            remoteStream.current.addTrack(track);
+          }
+        });
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream.current;
+        }
+      };
+
+      // Determine if caller or receiver
+      const isCaller = currentUser.id < callData.user.id;
+      const callId = [currentUser.id, callData.user.id].sort().join('_');
+      callIdRef.current = callId;
+
+      if (isCaller) {
+        // Create offer
+        pc.current.onicecandidate = (event) => {
+          if (event.candidate) {
+            addIceCandidate(callId, 'caller', event.candidate.toJSON());
+          }
+        };
+
+        const offerDescription = await pc.current.createOffer();
+        await pc.current.setLocalDescription(offerDescription);
+
+        await createCall(callId, currentUser.id, callData.user.id, {
+          type: offerDescription.type,
+          sdp: offerDescription.sdp,
+        });
+
+        // Listen for answer and candidates
+        subscribeToCall(callId, async (data) => {
+          if (!pc.current) return;
+          if (data.answer && !pc.current.currentRemoteDescription) {
+            const answerDescription = new RTCSessionDescription(data.answer);
+            await pc.current.setRemoteDescription(answerDescription);
+          }
+          if (data.receiverCandidates) {
+            data.receiverCandidates.forEach((candidate: any) => {
+              pc.current?.addIceCandidate(new RTCIceCandidate(candidate));
+            });
+          }
+        });
+      } else {
+        // Receiver: Wait for offer
+        subscribeToCall(callId, async (data) => {
+          if (!pc.current) return;
+          if (data.offer && !pc.current.currentRemoteDescription) {
+            const offerDescription = new RTCSessionDescription(data.offer);
+            await pc.current.setRemoteDescription(offerDescription);
+
+            const answerDescription = await pc.current.createAnswer();
+            await pc.current.setLocalDescription(answerDescription);
+
+            await updateCall(callId, {
+              answer: {
+                type: answerDescription.type,
+                sdp: answerDescription.sdp,
+              },
+              status: 'active'
+            });
+          }
+          if (data.callerCandidates) {
+            data.callerCandidates.forEach((candidate: any) => {
+              pc.current?.addIceCandidate(new RTCIceCandidate(candidate));
+            });
+          }
+        });
+
+        pc.current.onicecandidate = (event) => {
+          if (event.candidate) {
+            addIceCandidate(callId, 'receiver', event.candidate.toJSON());
+          }
+        };
+      }
+    };
+
+    setupWebRTC();
+
+    return () => {
+      localStream.current?.getTracks().forEach(track => track.stop());
+      pc.current?.close();
+      pc.current = null;
+      if (callIdRef.current) {
+        deleteCall(callIdRef.current);
+      }
+    };
+  }, [isCalling, callData, currentUser]);
+
+  // Handle Mute/Unmute
+  useEffect(() => {
+    if (localStream.current) {
+      localStream.current.getAudioTracks().forEach(track => {
+        track.enabled = !isMuted;
+      });
+    }
+  }, [isMuted]);
+
+  // Simulate speaking indicators (Visual only now, but can be improved with Web Audio API)
   useEffect(() => {
     if (!isCalling) return;
     const interval = setInterval(() => {
@@ -36,11 +172,13 @@ export function CallOverlay() {
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[3000] bg-[#1E1F22] flex flex-col overflow-hidden font-sans"
       >
+        <audio ref={remoteAudioRef} autoPlay />
+        
         {/* Top Header */}
         <div className="h-12 border-b border-black/20 flex items-center justify-between px-4 bg-[#313338]">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-[#23A559] rounded-full" />
-            <span className="text-white font-bold text-sm tracking-tight">{callData.user.username}</span>
+            <div className="w-2 h-2 bg-[#23A559] rounded-full animate-pulse" />
+            <span className="text-white font-bold text-sm tracking-tight">Direct Call: {callData.user.username}</span>
           </div>
           <div className="flex items-center gap-3">
              <button className="text-[#B5BAC1] hover:text-white transition-colors p-1"><UserPlus size={20} /></button>
@@ -62,7 +200,7 @@ export function CallOverlay() {
                    animate={{ 
                      boxShadow: isSpeaking ? "0 0 0 4px #23A559" : "0 0 0 0px #23A559"
                    }}
-                   className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#313338] relative z-10"
+                   className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#313338] relative z-10 transition-shadow duration-150"
                  >
                    {currentUser?.avatarUrl ? (
                      <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -78,14 +216,6 @@ export function CallOverlay() {
                    You
                  </div>
 
-                 {/* Camera Stream Mock */}
-                 {isCameraOn && (
-                   <div className="absolute inset-0 bg-[#2B2D31] flex items-center justify-center">
-                     <span className="text-xs text-[#949BA4] italic font-medium">Your camera is on</span>
-                   </div>
-                 )}
-
-                 {/* Speaking Ring Overlay */}
                  {isSpeaking && (
                    <div className="absolute inset-0 border-[3px] border-[#23A559] rounded-lg pointer-events-none" />
                  )}
@@ -97,7 +227,7 @@ export function CallOverlay() {
                    animate={{ 
                      boxShadow: remoteIsSpeaking ? "0 0 0 4px #23A559" : "0 0 0 0px #23A559"
                    }}
-                   className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#313338] relative z-10"
+                   className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#313338] relative z-10 transition-shadow duration-150"
                  >
                    {callData.user.avatarUrl ? (
                      <img src={callData.user.avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -112,7 +242,6 @@ export function CallOverlay() {
                    {callData.user.username}
                  </div>
 
-                 {/* Remote Speaking Ring Overlay */}
                  {remoteIsSpeaking && (
                    <div className="absolute inset-0 border-[3px] border-[#23A559] rounded-lg pointer-events-none" />
                  )}
@@ -121,7 +250,7 @@ export function CallOverlay() {
              </div>
           </div>
 
-          {/* Screen Share Layer */}
+          {/* Screen Share Layer (MOCKED FOR NOW AS WEB STREAMS) */}
           {isScreenSharing && (
             <div className="absolute inset-0 z-20 bg-[#313338] flex flex-col items-center justify-center p-8">
                <div className="w-full max-w-4xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative border-4 border-[#23A559]">

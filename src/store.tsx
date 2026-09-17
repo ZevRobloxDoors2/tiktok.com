@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Video, Notification } from './types';
 import { getUsers, getVideos, initDb } from './lib/db';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from './lib/firebase';
 
 type AppState = {
   currentUser: User | null;
@@ -59,19 +61,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
     const loadData = async () => {
       await initDb();
       const currentUserId = localStorage.getItem('currentUserId');
       if (currentUserId) {
-        const users = await getUsers();
-        const user = users.find(u => u.id === currentUserId);
-        if (user) {
-          setCurrentUser(user);
-        }
+        // Subscribe to user document in real-time
+        const userDocRef = doc(db, 'users', currentUserId);
+        unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setCurrentUser(docSnap.data() as User);
+          } else {
+            setCurrentUser(null);
+          }
+          setIsLoading(false);
+        }, (err) => {
+          console.error("User subscription error:", err);
+          setIsLoading(false);
+        });
+      } else {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
+    
     loadData();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleSetUser = (user: User | null) => {

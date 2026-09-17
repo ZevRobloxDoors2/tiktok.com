@@ -712,16 +712,17 @@ export const VideoItem: React.FC<{
 
   const submitReport = async () => {
     if (!currentUser || !reportReason) return;
-    const reports = await getReports();
-    reports.push({
-      id: `rep_${Date.now()}`,
+    
+    const { addReport: dbAddReport } = await import('../lib/db');
+    await dbAddReport({
       videoId: video.id,
       reporterId: currentUser.id,
       reason: reportReason,
       status: 'pending',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      category: 'video'
     });
-    await saveReports(reports);
+    
     setReportSubmitted(true);
     setTimeout(() => {
       setShowReport(false);
