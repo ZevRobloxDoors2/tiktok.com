@@ -121,6 +121,8 @@ export function CallOverlay() {
         sdp: offerDescription.sdp,
       });
 
+      const candidatesQueue: RTCIceCandidateInit[] = [];
+
       subscribeToCall(callId, async (data) => {
         if (!pc.current) return;
         if (data.status === 'ended') {
@@ -132,10 +134,19 @@ export function CallOverlay() {
         }
         if (data.answer && !pc.current.currentRemoteDescription) {
           await pc.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+          // Process queued candidates
+          while (candidatesQueue.length > 0) {
+            const cand = candidatesQueue.shift();
+            if (cand) await pc.current.addIceCandidate(new RTCIceCandidate(cand));
+          }
         }
         if (data.receiverCandidates) {
-          data.receiverCandidates.forEach((candidate: any) => {
-            pc.current?.addIceCandidate(new RTCIceCandidate(candidate));
+          data.receiverCandidates.forEach(async (candidate: any) => {
+            if (pc.current?.currentRemoteDescription) {
+              await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+            } else {
+              candidatesQueue.push(candidate);
+            }
           });
         }
       });
@@ -173,6 +184,8 @@ export function CallOverlay() {
       }
     };
 
+    const candidatesQueue: RTCIceCandidateInit[] = [];
+
     subscribeToCall(callIdRef.current, async (data) => {
       if (!pc.current) return;
       if (data.status === 'ended') {
@@ -187,10 +200,19 @@ export function CallOverlay() {
           answer: { type: answer.type, sdp: answer.sdp },
           status: 'active'
         });
+        // Process queued candidates
+        while (candidatesQueue.length > 0) {
+          const cand = candidatesQueue.shift();
+          if (cand) await pc.current.addIceCandidate(new RTCIceCandidate(cand));
+        }
       }
       if (data.callerCandidates) {
-        data.callerCandidates.forEach((candidate: any) => {
-          pc.current?.addIceCandidate(new RTCIceCandidate(candidate));
+        data.callerCandidates.forEach(async (candidate: any) => {
+          if (pc.current?.currentRemoteDescription) {
+            await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+          } else {
+            candidatesQueue.push(candidate);
+          }
         });
       }
     });
@@ -199,8 +221,18 @@ export function CallOverlay() {
   const handleEndCall = async (shouldUpdateDb = true) => {
     const currentId = callIdRef.current;
     if (shouldUpdateDb && currentId) {
-      await updateCall(currentId, { status: 'ended' });
-      setTimeout(() => deleteCall(currentId), 2000);
+      try {
+        await updateCall(currentId, { status: 'ended' });
+        setTimeout(() => {
+          try {
+            deleteCall(currentId);
+          } catch (e) {
+            console.warn("Could not delete call doc:", e);
+          }
+        }, 2000);
+      } catch (err) {
+        console.error("Failed to update call status in DB:", err);
+      }
     }
     
     localStream.current?.getTracks().forEach(t => t.stop());

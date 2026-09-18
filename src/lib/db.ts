@@ -1,7 +1,7 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 export { db };
-import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -229,22 +229,18 @@ export const getUserStatuses = () => fetchCollection<UserStatus>('user_statuses'
 export const saveUserStatuses = (statuses: UserStatus[]) => saveCollection('user_statuses', statuses);
 
 export const updateTypingStatus = async (userId: string, isTyping: boolean, typingIn?: string) => {
-  const statuses = await getUserStatuses();
-  const idx = statuses.findIndex(s => s.userId === userId);
-  const newStatus: UserStatus = {
-    id: userId,
-    userId,
-    isTyping,
-    typingIn,
-    lastActive: Date.now()
-  };
-
-  if (idx !== -1) {
-    statuses[idx] = newStatus;
-  } else {
-    statuses.push(newStatus);
+  try {
+    const docRef = doc(db, 'user_statuses', userId);
+    await setDoc(docRef, {
+      id: userId,
+      userId,
+      isTyping,
+      typingIn,
+      lastActive: Date.now()
+    }, { merge: true });
+  } catch (err) {
+    console.error("Error updating typing status:", err);
   }
-  await saveUserStatuses(statuses);
 };
 
 export const markMessagesFromUserAsRead = async (currentUserId: string, otherUserId: string) => {
@@ -521,5 +517,37 @@ export const deleteCall = async (callId: string) => {
     await deleteDoc(docRef);
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `calls/${callId}`);
+  }
+};
+
+export const getGameData = async (userId: string, gameId: string): Promise<string | null> => {
+  try {
+    const id = `${userId}_${gameId}`;
+    const docRef = doc(db, 'game_data', id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return (snap.data() as GameData).data;
+    }
+    return null;
+  } catch (err) {
+    console.error("Error fetching game data:", err);
+    return null;
+  }
+};
+
+export const saveGameData = async (userId: string, gameId: string, data: string) => {
+  try {
+    const id = `${userId}_${gameId}`;
+    const docRef = doc(db, 'game_data', id);
+    await setDoc(docRef, {
+      id,
+      userId,
+      gameId,
+      data,
+      updatedAt: Date.now()
+    });
+  } catch (err) {
+    console.error("Error saving game data:", err);
+    handleFirestoreError(err, OperationType.WRITE, `game_data/${userId}_${gameId}`);
   }
 };

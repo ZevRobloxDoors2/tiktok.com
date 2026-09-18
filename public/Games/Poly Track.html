@@ -9,6 +9,61 @@
 <html>
 
 <head>
+    <script>
+        // Patch postMessage for cross-origin environments
+        (function() {
+            const originalPostMessage = window.parent.postMessage;
+            try {
+                if (window.parent && window.parent.postMessage) {
+                    window.parent.postMessage = function(message, targetOrigin) {
+                        if (targetOrigin && targetOrigin !== '*' && !targetOrigin.includes(window.location.origin)) {
+                            return originalPostMessage.call(window.parent, message, '*');
+                        }
+                        return originalPostMessage.apply(window.parent, arguments);
+                    };
+                }
+            } catch (e) {
+                console.warn("Could not patch parent.postMessage", e);
+            }
+        })();
+
+        window.ytgame = {
+            game: {
+                loadData: () => {
+                    return new Promise((resolve) => {
+                        const requestId = Math.random().toString(36).substr(2, 9);
+                        const handleResponse = (event) => {
+                            if (event.data && event.data.type === 'LOAD_GAME_DATA_RESPONSE' && event.data.requestId === requestId) {
+                                window.removeEventListener('message', handleResponse);
+                                resolve(event.data.data);
+                            }
+                        };
+                        window.addEventListener('message', handleResponse);
+                        window.parent.postMessage({
+                            type: 'LOAD_GAME_DATA',
+                            gameId: 'poly-track',
+                            requestId
+                        }, '*');
+                    });
+                },
+                saveData: (data) => {
+                    window.parent.postMessage({
+                        type: 'SAVE_GAME_DATA',
+                        gameId: 'poly-track',
+                        data
+                    }, '*');
+                    return Promise.resolve();
+                },
+                firstClick: () => {},
+                gameReady: () => {},
+                firstFrameReady: () => {}
+            },
+            health: { logError: () => {} },
+            engagement: { score: () => {} },
+            system: { isPaused: () => false }
+        };
+    </script>
+
     <base href="https://cdn.jsdelivr.net/gh/bubblfan/polytrack@feb7f045e85fdf07e0d7f7e6d0f08984b9fe20d6/">
     <script>
         window.jkdfgnjkndfg = document.querySelector('base').href;

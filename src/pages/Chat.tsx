@@ -354,7 +354,9 @@ export function Chat() {
             onClick={() => {
               if (group) {
                 import('../lib/db').then(({ joinVoiceChannel }) => {
-                  joinVoiceChannel(group.id, currentUser.id);
+                  joinVoiceChannel(group.id, currentUser.id).catch(err => {
+                    console.error("Failed to sync voice channel state:", err);
+                  });
                   setCallData({ user: { id: group.id, username: group.name, avatarUrl: group.avatarUrl } as any, type: 'voice' });
                   setIsCalling(true);
                 });

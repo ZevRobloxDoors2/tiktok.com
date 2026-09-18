@@ -5,7 +5,16 @@ import { subscribeToAppSettings, getUsers, updateUserGame } from '../lib/db';
 import { useAppStore } from '../store';
 import { User } from '../types';
 
-const GAMES = [
+interface GameItem {
+  id: string;
+  title: string;
+  url: string;
+  category: string;
+  color: string;
+  icon?: string;
+}
+
+const GAMES: GameItem[] = [
   { id: '2048-merge', title: '2048 Merge Run', url: 'Games/2048 Merge Run.html', category: 'Puzzle', color: 'orange', icon: 'https://cdn.jsdelivr.net/gh/Arcticons-Team/Arcticons/icons/black/merge_master.svg' },
   { id: 'adofai', title: 'A Dance of Fire and Ice', url: 'Games/A Dance of Fire and Ice.html', category: 'Rhythm', color: 'red', icon: 'https://cdn.jsdelivr.net/gh/Arcticons-Team/Arcticons/icons/black/dance_of_fire_and_ice.svg' },
   { id: 'adventure-cap', title: 'Adventure Capatalist', url: 'Games/Adventure Capatalist.html', category: 'Idle', color: 'green', icon: 'https://cdn.jsdelivr.net/gh/Arcticons-Team/Arcticons/icons/black/adventure_capitalist.svg' },
@@ -59,7 +68,7 @@ const GAMES = [
   { id: 'tabs', title: 'TABS', url: 'Games/Totally Accurate Battle Simulator (TABS).html', category: 'Strategy', color: 'red', icon: 'https://cdn.jsdelivr.net/gh/Arcticons-Team/Arcticons/icons/black/tabs.svg' },
 ];
 
-const APPS = [
+const APPS: GameItem[] = [
   { id: 'cinema', title: 'CinemaTok', url: 'Apps/Cinema.html', category: 'Global Stream', color: 'pink' },
   { id: 'snapchat', title: 'Snapchat', url: 'https://nhjkdbiondnnd.dila.cl/embed.html#https://snapchat.com/spotlight', category: 'Spotlight View', color: 'yellow' },
 ];

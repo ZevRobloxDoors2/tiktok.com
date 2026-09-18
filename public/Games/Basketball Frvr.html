@@ -18,9 +18,66 @@
       gtag('config', 'G-');
   </script>
     <base href="https://cdn.jsdelivr.net/gh/bubbls/youtube-playables@main/basketball-frvr/">
-      <script src="https://cdn.jsdelivr.net/gh/bubbls/youtube-playables@main/ytgame.js" nonce="-sOJ1RQ8_ggBND0jamQKHQ"></script>
+      <script>
+        // Patch postMessage to handle origin mismatch in different deployment environments
+        (function() {
+            const originalPostMessage = window.parent.postMessage;
+            try {
+                window.parent.postMessage = function(message, targetOrigin) {
+                    if (targetOrigin && targetOrigin !== '*' && !targetOrigin.includes(window.location.origin)) {
+                        return originalPostMessage.call(window.parent, message, '*');
+                    }
+                    return originalPostMessage.apply(window.parent, arguments);
+                };
+            } catch (e) {
+                console.warn("Could not patch parent.postMessage", e);
+            }
+        })();
 
-    <script nonce="-sOJ1RQ8_ggBND0jamQKHQ">
+        window.ytgame = {
+            game: {
+                loadData: () => {
+                    return new Promise((resolve) => {
+                        const requestId = Math.random().toString(36).substr(2, 9);
+                        const handleResponse = (event) => {
+                            if (event.data.type === 'LOAD_GAME_DATA_RESPONSE' && event.data.requestId === requestId) {
+                                window.removeEventListener('message', handleResponse);
+                                resolve(event.data.data);
+                            }
+                        };
+                        window.addEventListener('message', handleResponse);
+                        window.parent.postMessage({
+                            type: 'LOAD_GAME_DATA',
+                            gameId: 'basketball-frvr',
+                            requestId
+                        }, '*');
+                    });
+                },
+                saveData: (data) => {
+                    window.parent.postMessage({
+                        type: 'SAVE_GAME_DATA',
+                        gameId: 'basketball-frvr',
+                        data
+                    }, '*');
+                    return Promise.resolve();
+                },
+                firstClick: () => {},
+                gameReady: () => {},
+                firstFrameReady: () => {}
+            },
+            health: {
+                logError: () => {}
+            },
+            engagement: {
+                score: () => {}
+            },
+            system: {
+                isPaused: () => false
+            }
+        };
+      </script>
+
+    <script>
      window.__FRVR = window.__FRVR || {};
      window.__FRVR.startTime = Date.now();
      window.__FRVR.gameIsLoaded = false;
@@ -551,7 +608,7 @@ preloader loadbar div{
 
 </style>
 
-    <script type="application/json" class="cohort" nonce="-sOJ1RQ8_ggBND0jamQKHQ">{"version":"2.11.8","name":"basketball","gaPath":"basketball/2.11.8/","vpath":"./","spath":"./external.js","legacyCoords":false,"configJs":{"id":"basketball","version":"2.11.8","build":"240219630","gaId":"UA-54081731-1","gaGameId":"UA-54081731-3"},"moreJson":{"ab_tests":{"ab_prize_pacing_2":{"cohorts":["more","normal"]}},"track-frvr":{"state":"{app_version,engine_version,app_build,cohort,channel,development,games_played,play_session_id,play_session_count,days_elapsed,facebook_player_id,facebook_context_type,facebook_entrypoint,utm_source,utm_medium,utm_campaign,utm_term,utm_content,facebook_referral_player_id,remote_user_id,non_interaction,device_width,device_height,global_user_id,web_url,script_version,social_session_id,ab_exp,ab_cohort_name,ab_cohort_weight,page_session_id,fb_instant_game_ad_id,fb_segment}","events":{"default":"name,value,{_merge=state,_merge=_params}"}},"track-ga":{"gaIds":{"all":"UA-54081731-1"},"state":"{appId=app_id,appName=app_name,appVersion=app_version,metric1=play_session_count,dimension2=cohort,dimension4=play_session_id,dimension3=device_id,metric2=days_elapsed,metric3=days_played,dimension5=channel,dimension6=entry_point,dimension7=utm_string,dimension8=screen,dimension9=facebook_context,metric4=currency_amount,metric5=missions_completed,metric6=progression,metric7=games_played}","events":{"default":"name,,value,_params","options_change":"name,option_name:option_value","game_end":"name,,,{_merge=_params,metric8=score,metric9=shots,metric10=max_score,dimension10=context_type,dimension11=total_game_session}","game_play_start,game_continue_used":"name,level_id","keepalive,new_user,mission_success":"name","coin_spent,tutorial_step_completed,session_start":"name,,value","game_loaded":"name,,loading_time","social_engage,engage":"'engage',engage_id:button_placement,1","play_with_friend":"name,,1","share,invite":"name,button_placement,1","cross_promotion_show":"name,button_placement,1","cross_promotion_click,cross_promotion_success,cross_promotion_failure":"name,target_game,1","ad_mandatory_request":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_response":"name,ad_response,value,{_merge=_params,dimension13=provider}","ad_mandatory_show":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_finish":"name,ad_result,value,{_merge=_params,dimension13=provider}","ad_mandatory_blocked":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_pass":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_throttled":"name,throttle_type,value,{_merge=_params,dimension13=provider}","ad_rewarded_request":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_response":"name,ad_response,value,{_merge=_params,dimension13=provider}","ad_rewarded_show":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_finish":"name,ad_result,value,{_merge=_params,dimension13=provider}","ad_rewarded_blocked":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_pass":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_throttled":"name,throttle_type,value,{_merge=_params,dimension13=provider}","chatbot_noshow,chatbot_show,chatbot_success,chatbot_issubscribed,chatbot_useraborted":"name,,","chatbot_error":"name,reason,","game_play_start":"name,,,{_merge=_params,dimension10=context_type}","challenge_show":"name,,,{_merge=_params,dimension10=context_type,dimension11=entry_point}","challenge_confirmation":"name,,,{_merge=_params,dimension10=context_type,dimension11=entry_point}","post_game":"name,,,{_merge=_params,dimension10=context_type,dimension11=action}","invitation_confirmation":"name,,,{_merge=_params,dimension10=context_type,dimension11=entry_point}","screen":"name,,,{_merge=_params,dimension10=context_type,dimension11=name}","ftue":"name,,,{_merge=_params,metric10=step_number,dimension10=context_type,dimension11=step_name}"}},"track-gma":{"currencies":"coin","itemtypes":"unknown","channelMapping":{"web_safari_ios,web_chrome_ios,web_edge,web_firefox,web_opera,web_safari,web_chrome,":"web"},"customDimensions01":"android,ios,samsung_galaxy_store,facebook_instant,facebook_rooms,bixby,samsung_instant_play,huawei_quick_app,crazy_games,discord,microsoft_pwa,frvr,other","events":{"game_loaded":"'addProgressionEvent','Complete',name,,,loading_time","game_play_start":"'addProgressionEvent','Start',level_id","game_continue_used":"'addProgressionEvent','Start',level_id","game_end":"'addProgressionEvent','Complete',level_id,,,value","game_end-lose":"'addProgressionEvent','Fail',level_id,,,value","tutorial_step_completed":"'addDesignEvent',name:value","fps":"'addDesignEvent',name,value"}},"track-facebook_events":{"blacklist":"iap_request_payment,iap_request_payment_success","events":{"default":"name,{_merge=state,_merge=_params}","ftue":"'COMPLETED_TUTORIAL',{SUCCESS=completed,STEP_NUMBER=step_number,STEP_NAME=step_name,STEP_NUMBER=ftue_step_number,STEP_NAME=ftue_step_name}","ad_rewarded_finish":"'AD_IMPRESSION',{AD_TYPE='rewarded_video',SUCCESS=value}","ad_mandatory_finish":"'AD_IMPRESSION',{AD_TYPE='interstitial',SUCCESS=value}","coin_spent":"'SPENT_CREDITS',{AMOUNT=amount,DESCRIPTION='coins',CONTENT=product}","gem_spent":"'SPENT_CREDITS',{AMOUNT=amount,DESCRIPTION='gems',CONTENT=product}","gem_get":"'UNLOCKED_ACHIEVEMENT',{QUANTITY=value,DESCRIPTION='gem_get'}","popup_claim_reward":"'UNLOCKED_ACHIEVEMENT',{DESCRIPTION='claim_reward'}","levelup_newlevel":"'ACHIEVED_LEVEL',{LEVEL=level}","iap_request_payment":"'INITIATED_CHECKOUT',{CONTENT_ID=productId,NUM_ITEMS='1'}","iap_request_payment_success":"'PURCHASED',{CONTENT_ID=productId,NUM_ITEMS='1'}","iap_request_payment_failed":"'CHECKOUT_CANCELED',{CONTENT_ID=productId,NUM_ITEMS='1'}","rate":"'RATED',{MAX_RATING_VALUE=max_rating_value,RATE=rate_value}"}}},"jsSize":500000,"supportedLanguages":["ar","da","de","el","es","es-MX","fi","fr","hi","id","it","ja","ko","ms","nb-NO","nl","pl","pt","pt-BR","ru","sv","th","tl","tr","vi","zh-Hans","zh-Hant"],"buildJson":{"buildTime":"Mon Feb 19 2024 21:59:26 GMT+0100 (Central European Standard Time)","fsxBuildId":"240219630","repos":{"game-basketball":{"branch":"release/2.11.8","hash":"2dacb43aff8c7b616ef478bc7e625f9176e09936","dirty":false,"dir":"$HOME/Documents/FRVR/game-basketball"},"@frvraps/frvr-xs-builder":{"branch":"feat/PNX-792-youtube-playables","hash":"982052260af1ac68b43f63bade0cea9da7a24b78","dirty":true,"dir":"$HOME/Documents/FRVR/frvr-tools/packages/frvr-xs-builder","repository":"git://github.com/frvraps/frvr-tools.git"},"@frvraps/frvr-xs":{"branch":"feat/PNX-792-youtube-playables","hash":"982052260af1ac68b43f63bade0cea9da7a24b78","dirty":true,"dir":"$HOME/Documents/FRVR/frvr-tools/packages/frvr-xs","repository":"git://github.com/frvraps/frvr-tools.git"}},"options":{"gameName":"basketball","verbose":false,"vitejsVerbose":false,"reheatCache":false,"unsloppify":{"hoistBlockFunctions":true,"importify":true,"declareVars":true,"unclashReserved":true,"correctOctals":true,"replaceTopLevelthis":false},"embedImages":["svgoatlas"],"open":false,"vconsole":false,"manifestJson":false,"serviceWorker":false,"oneSignal":false,"emptyOutDir":true,"platform":"youtube","debug":false,"sizeProfiler":false,"minify":false,"beautify":true,"translate":false,"externalJsSync":true,"inlineJs":false,"localizationStyle":"runtime","zipFile":false,"zipPwd":"","preview":false,"https":true,"sprinkle":[],"strictMode":false,"babelify":true,"screenshot":false,"gameAnalytics":false,"buildId":false,"removeOldStyleCp":true,"outDir":"$HOME/Documents/FRVR/frvr-out/Builds/basketball/basketball.youtube"},"timeStamp":1708376366297,"argv":["/opt/homebrew/Cellar/node@16/16.15.1/bin/node","/opt/homebrew/bin/fsx","build","basketball","--platform=youtube"]}}</script>
+    <script type="application/json" class="cohort">{"version":"2.11.8","name":"basketball","gaPath":"basketball/2.11.8/","vpath":"./","spath":"./external.js","legacyCoords":false,"configJs":{"id":"basketball","version":"2.11.8","build":"240219630","gaId":"UA-54081731-1","gaGameId":"UA-54081731-3"},"moreJson":{"ab_tests":{"ab_prize_pacing_2":{"cohorts":["more","normal"]}},"track-frvr":{"state":"{app_version,engine_version,app_build,cohort,channel,development,games_played,play_session_id,play_session_count,days_elapsed,facebook_player_id,facebook_context_type,facebook_entrypoint,utm_source,utm_medium,utm_campaign,utm_term,utm_content,facebook_referral_player_id,remote_user_id,non_interaction,device_width,device_height,global_user_id,web_url,script_version,social_session_id,ab_exp,ab_cohort_name,ab_cohort_weight,page_session_id,fb_instant_game_ad_id,fb_segment}","events":{"default":"name,value,{_merge=state,_merge=_params}"}},"track-ga":{"gaIds":{"all":"UA-54081731-1"},"state":"{appId=app_id,appName=app_name,appVersion=app_version,metric1=play_session_count,dimension2=cohort,dimension4=play_session_id,dimension3=device_id,metric2=days_elapsed,metric3=days_played,dimension5=channel,dimension6=entry_point,dimension7=utm_string,dimension8=screen,dimension9=facebook_context,metric4=currency_amount,metric5=missions_completed,metric6=progression,metric7=games_played}","events":{"default":"name,,value,_params","options_change":"name,option_name:option_value","game_end":"name,,,{_merge=_params,metric8=score,metric9=shots,metric10=max_score,dimension10=context_type,dimension11=total_game_session}","game_play_start,game_continue_used":"name,level_id","keepalive,new_user,mission_success":"name","coin_spent,tutorial_step_completed,session_start":"name,,value","game_loaded":"name,,loading_time","social_engage,engage":"'engage',engage_id:button_placement,1","play_with_friend":"name,,1","share,invite":"name,button_placement,1","cross_promotion_show":"name,button_placement,1","cross_promotion_click,cross_promotion_success,cross_promotion_failure":"name,target_game,1","ad_mandatory_request":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_response":"name,ad_response,value,{_merge=_params,dimension13=provider}","ad_mandatory_show":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_finish":"name,ad_result,value,{_merge=_params,dimension13=provider}","ad_mandatory_blocked":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_pass":"name,,value,{_merge=_params,dimension13=provider}","ad_mandatory_throttled":"name,throttle_type,value,{_merge=_params,dimension13=provider}","ad_rewarded_request":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_response":"name,ad_response,value,{_merge=_params,dimension13=provider}","ad_rewarded_show":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_finish":"name,ad_result,value,{_merge=_params,dimension13=provider}","ad_rewarded_blocked":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_pass":"name,,value,{_merge=_params,dimension13=provider}","ad_rewarded_throttled":"name,throttle_type,value,{_merge=_params,dimension13=provider}","chatbot_noshow,chatbot_show,chatbot_success,chatbot_issubscribed,chatbot_useraborted":"name,,","chatbot_error":"name,reason,","game_play_start":"name,,,{_merge=_params,dimension10=context_type}","challenge_show":"name,,,{_merge=_params,dimension10=context_type,dimension11=entry_point}","challenge_confirmation":"name,,,{_merge=_params,dimension10=context_type,dimension11=entry_point}","post_game":"name,,,{_merge=_params,dimension10=context_type,dimension11=action}","invitation_confirmation":"name,,,{_merge=_params,dimension10=context_type,dimension11=entry_point}","screen":"name,,,{_merge=_params,dimension10=context_type,dimension11=name}","ftue":"name,,,{_merge=_params,metric10=step_number,dimension10=context_type,dimension11=step_name}"}},"track-gma":{"currencies":"coin","itemtypes":"unknown","channelMapping":{"web_safari_ios,web_chrome_ios,web_edge,web_firefox,web_opera,web_safari,web_chrome,":"web"},"customDimensions01":"android,ios,samsung_galaxy_store,facebook_instant,facebook_rooms,bixby,samsung_instant_play,huawei_quick_app,crazy_games,discord,microsoft_pwa,frvr,other","events":{"game_loaded":"'addProgressionEvent','Complete',name,,,loading_time","game_play_start":"'addProgressionEvent','Start',level_id","game_continue_used":"'addProgressionEvent','Start',level_id","game_end":"'addProgressionEvent','Complete',level_id,,,value","game_end-lose":"'addProgressionEvent','Fail',level_id,,,value","tutorial_step_completed":"'addDesignEvent',name:value","fps":"'addDesignEvent',name,value"}},"track-facebook_events":{"blacklist":"iap_request_payment,iap_request_payment_success","events":{"default":"name,{_merge=state,_merge=_params}","ftue":"'COMPLETED_TUTORIAL',{SUCCESS=completed,STEP_NUMBER=step_number,STEP_NAME=step_name,STEP_NUMBER=ftue_step_number,STEP_NAME=ftue_step_name}","ad_rewarded_finish":"'AD_IMPRESSION',{AD_TYPE='rewarded_video',SUCCESS=value}","ad_mandatory_finish":"'AD_IMPRESSION',{AD_TYPE='interstitial',SUCCESS=value}","coin_spent":"'SPENT_CREDITS',{AMOUNT=amount,DESCRIPTION='coins',CONTENT=product}","gem_spent":"'SPENT_CREDITS',{AMOUNT=amount,DESCRIPTION='gems',CONTENT=product}","gem_get":"'UNLOCKED_ACHIEVEMENT',{QUANTITY=value,DESCRIPTION='gem_get'}","popup_claim_reward":"'UNLOCKED_ACHIEVEMENT',{DESCRIPTION='claim_reward'}","levelup_newlevel":"'ACHIEVED_LEVEL',{LEVEL=level}","iap_request_payment":"'INITIATED_CHECKOUT',{CONTENT_ID=productId,NUM_ITEMS='1'}","iap_request_payment_success":"'PURCHASED',{CONTENT_ID=productId,NUM_ITEMS='1'}","iap_request_payment_failed":"'CHECKOUT_CANCELED',{CONTENT_ID=productId,NUM_ITEMS='1'}","rate":"'RATED',{MAX_RATING_VALUE=max_rating_value,RATE=rate_value}"}}},"jsSize":500000,"supportedLanguages":["ar","da","de","el","es","es-MX","fi","fr","hi","id","it","ja","ko","ms","nb-NO","nl","pl","pt","pt-BR","ru","sv","th","tl","tr","vi","zh-Hans","zh-Hant"],"buildJson":{"buildTime":"Mon Feb 19 2024 21:59:26 GMT+0100 (Central European Standard Time)","fsxBuildId":"240219630","repos":{"game-basketball":{"branch":"release/2.11.8","hash":"2dacb43aff8c7b616ef478bc7e625f9176e09936","dirty":false,"dir":"$HOME/Documents/FRVR/game-basketball"},"@frvraps/frvr-xs-builder":{"branch":"feat/PNX-792-youtube-playables","hash":"982052260af1ac68b43f63bade0cea9da7a24b78","dirty":true,"dir":"$HOME/Documents/FRVR/frvr-tools/packages/frvr-xs-builder","repository":"git://github.com/frvraps/frvr-tools.git"},"@frvraps/frvr-xs":{"branch":"feat/PNX-792-youtube-playables","hash":"982052260af1ac68b43f63bade0cea9da7a24b78","dirty":true,"dir":"$HOME/Documents/FRVR/frvr-tools/packages/frvr-xs","repository":"git://github.com/frvraps/frvr-tools.git"}},"options":{"gameName":"basketball","verbose":false,"vitejsVerbose":false,"reheatCache":false,"unsloppify":{"hoistBlockFunctions":true,"importify":true,"declareVars":true,"unclashReserved":true,"correctOctals":true,"replaceTopLevelthis":false},"embedImages":["svgoatlas"],"open":false,"vconsole":false,"manifestJson":false,"serviceWorker":false,"oneSignal":false,"emptyOutDir":true,"platform":"youtube","debug":false,"sizeProfiler":false,"minify":false,"beautify":true,"translate":false,"externalJsSync":true,"inlineJs":false,"localizationStyle":"runtime","zipFile":false,"zipPwd":"","preview":false,"https":true,"sprinkle":[],"strictMode":false,"babelify":true,"screenshot":false,"gameAnalytics":false,"buildId":false,"removeOldStyleCp":true,"outDir":"$HOME/Documents/FRVR/frvr-out/Builds/basketball/basketball.youtube"},"timeStamp":1708376366297,"argv":["/opt/homebrew/Cellar/node@16/16.15.1/bin/node","/opt/homebrew/bin/fsx","build","basketball","--platform=youtube"]}}</script>
   
 </head>
   <body>
@@ -559,11 +616,11 @@ preloader loadbar div{
     <!-- TODO debugcode, move me to provider -->
     <div id="debug" style="position:absolute; color:red; left:40px; z-index: 9999999"></div>
 
-      <script nonce="-sOJ1RQ8_ggBND0jamQKHQ">
+      <script>
        window.__antialias = false
       </script>
 
-      <script nonce="-sOJ1RQ8_ggBND0jamQKHQ">
+      <script>
 
        window.__FRVR.buildTimePlatform = 'youtube';
 
@@ -1711,14 +1768,14 @@ if(!(window.console && console.log)) {
       </script>
 
       <canvas id="gameCanvas"></canvas>
-      <script nonce="-sOJ1RQ8_ggBND0jamQKHQ">
+      <script>
        var cs = document.getElementById('gameCanvas').style;
        cs.width = cs.height = "100%"
       </script>
 
         <div id="overlay"></div>
 
-      <script nonce="-sOJ1RQ8_ggBND0jamQKHQ">
+      <script>
        ;(function () {
   function parseStack(err) {
     var stack = [];
@@ -1826,13 +1883,13 @@ if(!(window.console && console.log)) {
 
       </script>
 
-      <script nonce="-sOJ1RQ8_ggBND0jamQKHQ">
+      <script>
 
       </script>
 
       
 
-    <script nonce="-sOJ1RQ8_ggBND0jamQKHQ">
+    <script>
 
      window.initGoogle();
     </script>
@@ -1841,7 +1898,7 @@ if(!(window.console && console.log)) {
   
 
 
-<script id="main-mashup" src="assets/index.1e7064c0.js" nonce="-sOJ1RQ8_ggBND0jamQKHQ"></script><div id="sidebarad1">
+<script id="main-mashup" src="assets/index.1e7064c0.js"></script><div id="sidebarad1">
   <div class="sidebar-close" onclick="this.parentElement.style.display='none'">✕</div>
 </div>
 <div id="sidebarad2">

@@ -16,8 +16,64 @@
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
 
   <title>YT Game Wrapper WebGL Template</title>
-  <link rel="stylesheet" href="TemplateData/style.css" nonce="_64KQA6KUarKeMBGRRuM3w">
-  <script src="https://cdn.jsdelivr.net/gh/bubbls/youtube-playables@main/ytgame.js" nonce="_64KQA6KUarKeMBGRRuM3w">// Load YT Game API code</script>
+  <link rel="stylesheet" href="TemplateData/style.css">
+  <script>
+    // Patch postMessage to handle origin mismatch in different deployment environments
+    (function() {
+        const originalPostMessage = window.parent.postMessage;
+        try {
+            window.parent.postMessage = function(message, targetOrigin) {
+                if (targetOrigin && targetOrigin !== '*' && !targetOrigin.includes(window.location.origin)) {
+                    return originalPostMessage.call(window.parent, message, '*');
+                }
+                return originalPostMessage.apply(window.parent, arguments);
+            };
+        } catch (e) {
+            console.warn("Could not patch parent.postMessage", e);
+        }
+    })();
+
+    window.ytgame = {
+      game: {
+        loadData: () => {
+          return new Promise((resolve) => {
+            const requestId = Math.random().toString(36).substr(2, 9);
+            const handleResponse = (event) => {
+              if (event.data.type === 'LOAD_GAME_DATA_RESPONSE' && event.data.requestId === requestId) {
+                window.removeEventListener('message', handleResponse);
+                resolve(event.data.data);
+              }
+            };
+            window.addEventListener('message', handleResponse);
+            window.parent.postMessage({
+              type: 'LOAD_GAME_DATA',
+              gameId: 'city-smash',
+              requestId
+            }, '*');
+          });
+        },
+        saveData: (data) => {
+          window.parent.postMessage({
+            type: 'SAVE_GAME_DATA',
+            gameId: 'city-smash',
+            data
+          }, '*');
+          return Promise.resolve();
+        },
+        firstClick: () => {},
+        gameReady: () => {}
+      },
+      health: {
+        logError: () => {}
+      },
+      engagement: {
+        score: () => {}
+      },
+      system: {
+        isPaused: () => false
+      }
+    };
+  </script>
 <style>
 #sidebarad1,
 #sidebarad2 {
@@ -72,8 +128,8 @@
     <div id="unity-warning"> </div>
   </div>
 
-  <script src="unarchiver.min.js" nonce="_64KQA6KUarKeMBGRRuM3w">// used for decompression if zip files are used</script>
-  <script nonce="_64KQA6KUarKeMBGRRuM3w"> // Logic for Unity contianer
+  <script src="unarchiver.min.js">// used for decompression if zip files are used</script>
+  <script> // Logic for Unity contianer
     var container = document.querySelector("#unity-container");
     var canvas = document.querySelector("#unity-canvas");
     var loadingBar = document.querySelector("#unity-loading-bar");

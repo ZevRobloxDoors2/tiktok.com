@@ -175,6 +175,10 @@ export type GroupChat = {
   avatarUrl?: string;
   createdAt: number;
   lastMessage?: Message;
+  voiceChannel?: {
+    active: boolean;
+    participants: string[];
+  };
 };
 
 export type UserStatus = {
@@ -196,4 +200,12 @@ export type Notification = {
   message?: string;
   read: boolean;
   timestamp: number;
+};
+
+export type GameData = {
+  id: string;
+  userId: string;
+  gameId: string;
+  data: string;
+  updatedAt: number;
 };

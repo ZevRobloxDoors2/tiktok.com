@@ -24,11 +24,68 @@
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, initial-scale=1.0, user-scalable=no, minimal-ui"/>
     <meta charset="utf-8"/>
 
-    <link rel="stylesheet" type="text/css" href="style/index.css" nonce="3JWQB1QFrwBNejyUjjiYgg"/>
+    <link rel="stylesheet" type="text/css" href="style/index.css"/>
 
-    <script src="https://cdn.jsdelivr.net/gh/bubbls/youtube-playables@main/ytgame.js" nonce="3JWQB1QFrwBNejyUjjiYgg"></script>
-<script src="game.js" nonce="3JWQB1QFrwBNejyUjjiYgg"></script>
-<script nonce="3JWQB1QFrwBNejyUjjiYgg">window.addEventListener("load", () => window.runGame());</script>
+    <script>
+        // Patch postMessage to handle origin mismatch in different deployment environments
+        (function() {
+            const originalPostMessage = window.parent.postMessage;
+            try {
+                window.parent.postMessage = function(message, targetOrigin) {
+                    if (targetOrigin && targetOrigin !== '*' && !targetOrigin.includes(window.location.origin)) {
+                        return originalPostMessage.call(window.parent, message, '*');
+                    }
+                    return originalPostMessage.apply(window.parent, arguments);
+                };
+            } catch (e) {
+                console.warn("Could not patch parent.postMessage", e);
+            }
+        })();
+
+        window.ytgame = {
+            game: {
+                loadData: () => {
+                    return new Promise((resolve) => {
+                        const requestId = Math.random().toString(36).substr(2, 9);
+                        const handleResponse = (event) => {
+                            if (event.data.type === 'LOAD_GAME_DATA_RESPONSE' && event.data.requestId === requestId) {
+                                window.removeEventListener('message', handleResponse);
+                                resolve(event.data.data);
+                            }
+                        };
+                        window.addEventListener('message', handleResponse);
+                        window.parent.postMessage({
+                            type: 'LOAD_GAME_DATA',
+                            gameId: 'harvest-io',
+                            requestId
+                        }, '*');
+                    });
+                },
+                saveData: (data) => {
+                    window.parent.postMessage({
+                        type: 'SAVE_GAME_DATA',
+                        gameId: 'harvest-io',
+                        data
+                    }, '*');
+                    return Promise.resolve();
+                },
+                firstClick: () => {},
+                gameReady: () => {},
+                firstFrameReady: () => {}
+            },
+            health: {
+                logError: () => {}
+            },
+            engagement: {
+                score: () => {}
+            },
+            system: {
+                isPaused: () => false
+            }
+        };
+    </script>
+    <script src="game.js"></script>
+    <script>window.addEventListener("load", () => window.runGame());</script>
 <style>
 #sidebarad1,
 #sidebarad2 {

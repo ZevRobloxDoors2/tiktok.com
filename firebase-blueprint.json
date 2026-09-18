@@ -40,10 +40,25 @@
       "description": "Presence and status of a user.",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "userId": { "type": "string" },
-        "status": { "type": "string" },
-        "lastSeen": { "type": "number" }
+        "isTyping": { "type": "boolean" },
+        "typingIn": { "type": "string" },
+        "lastActive": { "type": "number" }
       }
+    },
+    "GameData": {
+      "title": "Game Data",
+      "description": "User's progress and state for a specific game.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "gameId": { "type": "string" },
+        "data": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "gameId", "data", "updatedAt"]
     }
   },
   "firestore": {
@@ -58,6 +73,10 @@
     "user_statuses/{userId}": {
       "schema": "UserStatus",
       "description": "User presence information."
+    },
+    "game_data/{gameDataId}": {
+      "schema": "GameData",
+      "description": "Persistent game progress for users."
     }
   }
 }

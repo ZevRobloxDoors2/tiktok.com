@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getNotifications, getMessages, getUsers, getGroupChats, saveGroupChats } from '../lib/db';
 import { Notification, Message, User, GroupChat } from '../types';
-import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check, LifeBuoy } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check, LifeBuoy, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { addReport } from '../lib/db';
 
 export function Inbox() {
-  const { currentUser } = useAppStore();
+  const { 
+    currentUser, 
+    setCallData, 
+    setIsCalling 
+  } = useAppStore();
   const [notifications, setNotifications] = useState<(Notification & { fromUser: User })[]>([]);
   const [conversations, setConversations] = useState<{ user?: User, group?: GroupChat, lastMessage: Message }[]>([]);
   const [activeTab, setActiveTab] = useState<'activity' | 'messages' | 'groups'>('activity');
@@ -330,7 +334,9 @@ export function Inbox() {
                       onClick={(e) => {
                         e.preventDefault();
                         import('../lib/db').then(({ joinVoiceChannel }) => {
-                          joinVoiceChannel(c.group!.id, currentUser.id);
+                          joinVoiceChannel(c.group!.id, currentUser.id).catch(err => {
+                            console.error("Failed to sync voice channel state:", err);
+                          });
                           setCallData({ user: { id: c.group!.id, username: c.group!.name, avatarUrl: c.group!.avatarUrl } as any, type: 'voice' });
                           setIsCalling(true);
                         });
