@@ -171,6 +171,8 @@ export type Message = {
 export type GroupChat = {
   id: string;
   name: string;
+  ownerId: string; // The person who created the group
+  admins: string[]; // List of user IDs with admin privileges
   members: string[]; // Array of user IDs
   avatarUrl?: string;
   createdAt: number;
@@ -213,6 +215,7 @@ export type GameData = {
 export type WatchParty = {
   id: string;
   hostId: string;
+  groupId?: string; // Optional: link to a group chat
   currentVideoId: string;
   participants: string[];
   status: 'playing' | 'paused';

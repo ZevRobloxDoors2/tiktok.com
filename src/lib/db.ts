@@ -189,10 +189,46 @@ export const deleteMessage = async (messageId: string) => {
 export const getGroupChats = () => fetchCollection<GroupChat>('group_chats');
 export const saveGroupChats = (groups: GroupChat[]) => saveCollection('group_chats', groups);
 
-export const updateGroupChat = async (groupId: string, data: Partial<GroupChat>) => {
+export const updateGroupChat = async (groupId: string, data: any) => {
   try {
     const docRef = doc(db, 'group_chats', groupId);
     await updateDoc(docRef, data);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `group_chats/${groupId}`);
+  }
+};
+
+export const addGroupMember = async (groupId: string, userId: string) => {
+  return updateGroupChat(groupId, {
+    members: arrayUnion(userId)
+  });
+};
+
+export const removeGroupMember = async (groupId: string, userId: string) => {
+  try {
+    const docRef = doc(db, 'group_chats', groupId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return;
+    const group = snap.data() as GroupChat;
+    await updateDoc(docRef, {
+      members: group.members.filter(id => id !== userId),
+      admins: group.admins.filter(id => id !== userId)
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `group_chats/${groupId}`);
+  }
+};
+
+export const toggleGroupAdmin = async (groupId: string, userId: string) => {
+  try {
+    const docRef = doc(db, 'group_chats', groupId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return;
+    const group = snap.data() as GroupChat;
+    const isAdmin = group.admins.includes(userId);
+    await updateDoc(docRef, {
+      admins: isAdmin ? group.admins.filter(id => id !== userId) : arrayUnion(userId)
+    });
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `group_chats/${groupId}`);
   }
@@ -559,13 +595,14 @@ export const saveGameData = async (userId: string, gameId: string, data: string)
   }
 };
 
-export const createWatchParty = async (hostId: string, currentVideoId: string): Promise<string> => {
+export const createWatchParty = async (hostId: string, currentVideoId: string, groupId?: string): Promise<string> => {
   try {
     const partyId = Math.random().toString(36).substr(2, 9);
     const partyRef = doc(db, 'watch_parties', partyId);
     const partyData: WatchParty = {
       id: partyId,
       hostId,
+      groupId,
       currentVideoId,
       participants: [hostId],
       status: 'playing',
@@ -602,6 +639,17 @@ export const subscribeToWatchParty = (partyId: string, callback: (party: WatchPa
     }
   }, (err) => {
     handleFirestoreError(err, OperationType.GET, `watch_parties/${partyId}`);
+  });
+};
+
+export const subscribeToWatchPartiesByGroup = (groupId: string, callback: (parties: WatchParty[]) => void) => {
+  const partiesRef = collection(db, 'watch_parties');
+  // We'll use a snapshot and filter client-side for simplicity in the absence of complex indexes
+  return onSnapshot(partiesRef, (snap) => {
+    const parties = snap.docs
+      .map(doc => doc.data() as WatchParty)
+      .filter(p => p.groupId === groupId);
+    callback(parties);
   });
 };
 

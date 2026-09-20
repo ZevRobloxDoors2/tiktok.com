@@ -482,49 +482,6 @@ export function Home() {
           />
         ))}
 
-        {/* Watch Party Controls */}
-        <div className="absolute top-20 right-4 z-[60] flex flex-col gap-3">
-          {!activePartyId ? (
-            <button 
-              onClick={handleStartWatchParty}
-              className="p-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white hover:bg-pink-600 transition-all flex items-center gap-2 group"
-              title="Start Watch Party"
-            >
-              <Tv size={20} className="group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-black uppercase tracking-widest hidden group-hover:block">Start Party</span>
-            </button>
-          ) : (
-            <div className="flex flex-col gap-2 items-end">
-              <div className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-emerald-500/20">
-                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                Party Active
-              </div>
-              <div className="flex -space-x-2">
-                {partyData?.participants.slice(0, 3).map((uid, i) => (
-                  <div key={uid} className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center text-[10px] text-white font-bold overflow-hidden">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`} alt="P" />
-                  </div>
-                ))}
-                {(partyData?.participants.length || 0) > 3 && (
-                  <div className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center text-[10px] text-white font-bold">
-                    +{(partyData?.participants.length || 0) - 3}
-                  </div>
-                )}
-              </div>
-              <button 
-                onClick={() => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.delete('partyId');
-                  window.history.pushState({}, '', url);
-                  setActivePartyId(null);
-                }}
-                className="text-[10px] font-bold text-white/50 hover:text-white"
-              >
-                Leave Party
-              </button>
-            </div>
-          )}
-        </div>
         {hasMore ? (
           <div ref={endRef} className="h-20 snap-start flex items-center justify-center bg-black shrink-0">
             <Loader2 size={32} className="animate-spin text-zinc-500" />

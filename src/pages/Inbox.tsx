@@ -130,6 +130,8 @@ export function Inbox() {
     const newGroup: GroupChat = {
       id: `group_${Date.now()}`,
       name: groupName.trim(),
+      ownerId: currentUser.id,
+      admins: [currentUser.id], // Creator is default admin
       members: [currentUser.id, ...selectedFriends],
       createdAt: Date.now(),
       avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${groupName}`

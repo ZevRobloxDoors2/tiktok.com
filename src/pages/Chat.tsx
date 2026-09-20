@@ -4,12 +4,14 @@ import { useAppStore } from '../store';
 import { 
   getMessages, getUsers, saveMessages, getNotifications, 
   saveNotifications, getGroupChats, deleteMessage, updateTypingStatus, 
-  getUserStatuses 
+  getUserStatuses, createWatchParty, subscribeToWatchPartiesByGroup,
+  joinWatchParty, removeGroupMember, toggleGroupAdmin, addGroupMember
 } from '../lib/db';
-import { Message, User, GroupChat, UserStatus } from '../types';
+import { Message, User, GroupChat, UserStatus, WatchParty } from '../types';
 import { 
   ArrowLeft, Send, Phone, Paperclip, Camera, X, Loader2, 
-  Mic, Square, Trash2, CheckCheck, Users, Info
+  Mic, Square, Trash2, CheckCheck, Users, Info, Tv,
+  ShieldCheck, UserPlus, UserMinus, Shield
 } from 'lucide-react';
 
 export function Chat() {
@@ -30,6 +32,9 @@ export function Chat() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [activeGroupParties, setActiveGroupParties] = useState<WatchParty[]>([]);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,8 +130,29 @@ export function Chat() {
   }, [handle, groupId, currentUser, navigate, otherUser?.id]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, typingUsers]);
+    if (!groupId) {
+      setActiveGroupParties([]);
+      return;
+    }
+    const unsubscribe = subscribeToWatchPartiesByGroup(groupId, (parties) => {
+      setActiveGroupParties(parties);
+    });
+    return () => unsubscribe();
+  }, [groupId]);
+
+  const handleStartParty = async () => {
+    if (!groupId || !currentUser) return;
+    const { getVideos } = await import('../lib/db');
+    const videos = await getVideos();
+    const latestVideo = videos[0];
+    if (!latestVideo) return;
+
+    const partyId = await createWatchParty(currentUser.id, latestVideo.id, groupId);
+    if (partyId) {
+      await sendMessage(`🎉 I've started a Watch Party! Click the button above to join.`, undefined, undefined, undefined, true);
+      navigate(`/?partyId=${partyId}`);
+    }
+  };
 
   // Screenshot Detection (Simulation / Proxy)
   useEffect(() => {
@@ -351,6 +377,13 @@ export function Chat() {
           )}
           <button 
             className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+            onClick={handleStartParty}
+            title="Start Watch Party"
+          >
+            <Tv size={22} />
+          </button>
+          <button 
+            className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
             onClick={() => {
               if (group) {
                 import('../lib/db').then(({ joinVoiceChannel }) => {
@@ -373,6 +406,31 @@ export function Chat() {
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        {/* Active Watch Party Banner */}
+        {activeGroupParties.length > 0 && (
+          <div className="sticky top-0 z-20 mb-4">
+            {activeGroupParties.map(party => (
+              <div key={party.id} className="bg-gradient-to-r from-pink-600 to-indigo-600 p-4 rounded-2xl text-white shadow-xl flex items-center justify-between animate-in slide-in-from-top-10 duration-500 mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                    <Tv size={20} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-tight">Active Watch Party</p>
+                    <p className="text-[10px] font-bold opacity-80">{party.participants.length} watching now</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => navigate(`/?partyId=${party.id}`)}
+                  className="px-6 py-2 bg-white text-pink-600 rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg"
+                >
+                  Join
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {messages.length === 0 ? (
           <div className="text-center text-zinc-500 my-auto">
             {group ? `Welcome to ${group.name}!` : `Say hi to ${otherUser!.username}!`}
@@ -518,28 +576,73 @@ export function Chat() {
       {/* Group Info Drawer */}
       {showGroupInfo && group && (
         <div className="absolute inset-0 z-[60] bg-black/60 flex items-end">
-          <div className="w-full bg-white dark:bg-zinc-950 rounded-t-[2rem] p-6 animate-in slide-in-from-bottom-full duration-300">
+          <div className="w-full bg-white dark:bg-zinc-950 rounded-t-[2rem] p-6 animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-end mb-2">
+              <button onClick={() => setShowGroupInfo(false)} className="p-2 text-zinc-500"><X size={24} /></button>
+            </div>
             <div className="flex flex-col items-center mb-6">
               <img src={group.avatarUrl} alt="" className="w-24 h-24 rounded-full mb-3 object-cover shadow-xl ring-4 ring-white dark:ring-zinc-900" />
               <h3 className="text-xl font-bold">{group.name}</h3>
               <p className="text-sm text-zinc-500">Group · {group.members.length} members</p>
             </div>
             
-            <div className="space-y-1 mb-8 overflow-y-auto max-h-[40vh]">
-              <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 px-2">Members</h4>
+            <div className="space-y-1 mb-8">
+              <div className="flex items-center justify-between mb-3 px-2">
+                <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Members</h4>
+                {(group.ownerId === currentUser.id || group.admins.includes(currentUser.id)) && (
+                  <button 
+                    onClick={() => setShowAddMember(true)}
+                    className="flex items-center gap-1 text-pink-600 text-[10px] font-black uppercase tracking-widest"
+                  >
+                    <UserPlus size={14} /> Add
+                  </button>
+                )}
+              </div>
+              
               {group.members.map(mid => {
                 const u = allUsers.find(x => x.id === mid);
                 if (!u) return null;
+                const isOwner = group.ownerId === mid;
+                const isAdmin = group.admins.includes(mid);
+                const canManage = (group.ownerId === currentUser.id || group.admins.includes(currentUser.id)) && mid !== currentUser.id && !isOwner;
+
                 return (
-                  <div key={mid} className="flex items-center justify-between p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                  <div key={mid} className="flex items-center justify-between p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group/member">
                     <div className="flex items-center gap-3">
                       <img src={u.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
                       <div>
-                        <p className="font-bold text-sm">{u.username}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-sm">{u.username}</p>
+                          {isOwner && <ShieldCheck size={12} className="text-pink-600" title="Owner" />}
+                          {!isOwner && isAdmin && <Shield size={12} className="text-indigo-500" title="Admin" />}
+                        </div>
                         <p className="text-xs text-zinc-500">@{u.handle}</p>
                       </div>
                     </div>
-                    {mid === currentUser.id && <span className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full text-zinc-500 font-bold">YOU</span>}
+                    
+                    <div className="flex items-center gap-2">
+                      {mid === currentUser.id && <span className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full text-zinc-500 font-bold">YOU</span>}
+                      {canManage && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover/member:opacity-100 transition-opacity">
+                          {group.ownerId === currentUser.id && (
+                            <button 
+                              onClick={() => toggleGroupAdmin(group.id, mid)}
+                              className={`p-2 rounded-lg transition-colors ${isAdmin ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30' : 'text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                              title={isAdmin ? "Remove Admin" : "Make Admin"}
+                            >
+                              <Shield size={16} />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => { if(confirm(`Remove ${u.username}?`)) removeGroupMember(group.id, mid); }}
+                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+                            title="Remove from group"
+                          >
+                            <UserMinus size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -548,6 +651,48 @@ export function Chat() {
             <button onClick={() => setShowGroupInfo(false)} className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 rounded-2xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAddMember && (
+        <div className="absolute inset-0 z-[70] bg-black/60 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-[2rem] p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Add Members</h3>
+              <button onClick={() => { setShowAddMember(false); setSearchQuery(''); }} className="p-2 text-zinc-500"><X size={24} /></button>
+            </div>
+            <input 
+              type="text" 
+              placeholder="Search by name or handle..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-xl px-4 py-3 mb-4 outline-none focus:ring-2 focus:ring-pink-500"
+            />
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {allUsers
+                .filter(u => u.id !== currentUser.id && !group?.members.includes(u.id))
+                .filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()) || u.handle.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map(u => (
+                  <button 
+                    key={u.id}
+                    onClick={() => {
+                      addGroupMember(group!.id, u.id);
+                      setShowAddMember(false);
+                      setSearchQuery('');
+                      sendMessage(`${u.username} has joined the chat.`, undefined, undefined, undefined, true);
+                    }}
+                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <img src={u.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    <div className="text-left">
+                      <p className="font-bold text-sm">{u.username}</p>
+                      <p className="text-xs text-zinc-500">@{u.handle}</p>
+                    </div>
+                  </button>
+                ))}
+            </div>
           </div>
         </div>
       )}
