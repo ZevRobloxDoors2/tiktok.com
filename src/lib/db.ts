@@ -1,7 +1,36 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 export { db };
-import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement } from '../types';
+
+export const getAnnouncements = () => fetchCollection<Announcement>('announcements');
+
+export const saveAnnouncement = async (announcement: Announcement) => {
+  try {
+    const docRef = doc(db, 'announcements', announcement.id);
+    await setDoc(docRef, announcement);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `announcements/${announcement.id}`);
+  }
+};
+
+export const deleteAnnouncement = async (id: string) => {
+  try {
+    const docRef = doc(db, 'announcements', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `announcements/${id}`);
+  }
+};
+
+export const subscribeToAnnouncements = (callback: (announcements: Announcement[]) => void) => {
+  return onSnapshot(collection(db, 'announcements'), (snapshot) => {
+    const announcements = snapshot.docs.map(doc => doc.data() as Announcement);
+    callback(announcements);
+  }, (err) => {
+    console.error("Announcement subscription error:", err);
+  });
+};
 
 enum OperationType {
   CREATE = 'create',

@@ -7,6 +7,8 @@ import { AuthModal } from './AuthModal';
 import { MiniPlayer } from './MiniPlayer';
 import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications, saveGameData, getGameData } from '../lib/db';
 
+import AnnouncementBanner from './AnnouncementBanner';
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const { 
     currentUser, 
@@ -262,6 +264,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 overflow-hidden transition-colors">
+      <AnnouncementBanner />
       {/* Sidebar - Desktop */}
       {!isIntro && (
         <motion.div 

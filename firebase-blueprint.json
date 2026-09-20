@@ -74,6 +74,24 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["id", "hostId", "currentVideoId", "participants", "status", "createdAt", "updatedAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "A system-wide or targeted announcement banner.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "type": { "type": "string", "enum": ["global", "page", "game"] },
+        "targetPage": { "type": "string" },
+        "targetGameIds": { "type": "array", "items": { "type": "string" } },
+        "color": { "type": "string" },
+        "size": { "type": "string", "enum": ["sm", "md", "lg"] },
+        "createdAt": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "text", "type", "color", "size", "createdAt", "active"]
     }
   },
   "firestore": {
@@ -96,6 +114,10 @@
     "watch_parties/{partyId}": {
       "schema": "WatchParty",
       "description": "Synchronized video watching sessions."
+    },
+    "announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "System announcements and targeted banners."
     }
   }
 }

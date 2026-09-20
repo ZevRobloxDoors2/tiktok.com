@@ -131,5 +131,11 @@ service cloud.firestore {
     match /watch_parties/{partyId} {
       allow read, write: if true;
     }
+
+    // Announcements
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
   }
 }

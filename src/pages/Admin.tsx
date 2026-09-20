@@ -1,20 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications } from '../lib/db';
-import { User, Report, Appeal, AuditLog, Video, Notification } from '../types';
-import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings } from 'lucide-react';
+import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications, getAnnouncements, saveAnnouncement, deleteAnnouncement } from '../lib/db';
+import { User, Report, Appeal, AuditLog, Video, Notification, Announcement } from '../types';
+import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings, Megaphone, Plus, Calendar, Palette, Maximize, Target, Layout as LayoutIcon, Ghost } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function Admin() {
   const { currentUser } = useAppStore();
-  const [activeTab, setActiveTab] = useState<'reports' | 'users' | 'appeals' | 'logs'>('reports');
+  const [activeTab, setActiveTab] = useState<'reports' | 'users' | 'appeals' | 'logs' | 'announcements' | 'settings'>('reports');
   
   const [reports, setReports] = useState<Report[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [appeals, setAppeals] = useState<Appeal[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  
+  // Announcement Form State
+  const [newAnnouncement, setNewAnnouncement] = useState<Partial<Announcement>>({
+    text: '',
+    type: 'global',
+    color: 'bg-pink-600',
+    size: 'md',
+    active: true,
+    targetGameIds: []
+  });
+  const [announcementDuration, setAnnouncementDuration] = useState('24h');
+
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
   const [appSettings, setAppSettings] = useState<{ 
     useCache: boolean; 
@@ -56,10 +69,51 @@ export function Admin() {
     setAppeals(await getAppeals());
     setLogs(await getAuditLogs());
     setVideos(await getVideos());
+    setAnnouncements(await getAnnouncements());
     if (isOwner) {
       const settings = await getAppSettings();
       setAppSettings(settings);
     }
+  };
+
+  const handleCreateAnnouncement = async () => {
+    if (!newAnnouncement.text) return;
+    
+    const durationMs = announcementDuration === '1h' ? 60 * 60 * 1000 :
+                       announcementDuration === '24h' ? 24 * 60 * 60 * 1000 :
+                       announcementDuration === '7d' ? 7 * 24 * 60 * 60 * 1000 :
+                       announcementDuration === '30d' ? 30 * 24 * 60 * 60 * 1000 : 0;
+    
+    const announcement: Announcement = {
+      id: `ann_${Date.now()}`,
+      text: newAnnouncement.text!,
+      type: newAnnouncement.type as any,
+      targetPage: newAnnouncement.targetPage,
+      targetGameIds: newAnnouncement.targetGameIds,
+      color: newAnnouncement.color!,
+      size: newAnnouncement.size as any,
+      createdAt: Date.now(),
+      expiresAt: durationMs > 0 ? Date.now() + durationMs : undefined,
+      active: true
+    };
+
+    await saveAnnouncement(announcement);
+    setAnnouncements(prev => [announcement, ...prev]);
+    setNewAnnouncement({
+      text: '',
+      type: 'global',
+      color: 'bg-pink-600',
+      size: 'md',
+      active: true,
+      targetGameIds: []
+    });
+    await logAction('create_announcement', announcement.id, `Created ${announcement.type} announcement: ${announcement.text.substring(0, 30)}...`);
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    await deleteAnnouncement(id);
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+    await logAction('delete_announcement', id, `Deleted announcement`);
   };
 
   useEffect(() => {
@@ -399,8 +453,8 @@ export function Admin() {
         </div>
 
         <div className="flex gap-2 mb-6 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto pb-2">
-          {['reports', 'users', 'appeals', 'logs', 'settings'].map(tab => (
-            ((tab !== 'logs' && tab !== 'settings') || isOwner) && (
+          {['reports', 'users', 'appeals', 'logs', 'announcements', 'settings'].map(tab => (
+            ((tab !== 'logs' && tab !== 'announcements' && tab !== 'settings') || isOwner) && (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -656,6 +710,232 @@ export function Admin() {
                   );
                 })}
                 {filteredLogs.length === 0 && <p className="text-zinc-500">No audit logs available.</p>}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'announcements' && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <Megaphone className="text-pink-600" /> Create Announcement
+                </h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Creation Form */}
+                  <div className="space-y-4 bg-zinc-50 dark:bg-zinc-950 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Announcement Text</label>
+                      <textarea
+                        value={newAnnouncement.text}
+                        onChange={e => setNewAnnouncement(prev => ({ ...prev, text: e.target.value }))}
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 outline-none focus:border-pink-500 min-h-[100px] resize-none"
+                        placeholder="Type your announcement here..."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Target Type</label>
+                        <select
+                          value={newAnnouncement.type}
+                          onChange={e => setNewAnnouncement(prev => ({ ...prev, type: e.target.value as any }))}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
+                        >
+                          <option value="global">Global (All Pages)</option>
+                          <option value="page">Specific Page</option>
+                          <option value="game">Specific Games</option>
+                        </select>
+                      </div>
+
+                      {newAnnouncement.type === 'page' && (
+                        <div>
+                          <label className="block text-sm font-semibold mb-2">Target Page</label>
+                          <select
+                            value={newAnnouncement.targetPage}
+                            onChange={e => setNewAnnouncement(prev => ({ ...prev, targetPage: e.target.value }))}
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
+                          >
+                            <option value="">Select Page</option>
+                            <option value="/home">Home / Feed</option>
+                            <option value="/explore">Explore</option>
+                            <option value="/inbox">Inbox</option>
+                            <option value="/games">Games & Apps</option>
+                            <option value="/profile">Profile</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {newAnnouncement.type === 'game' && (
+                        <div className="col-span-2">
+                          <label className="block text-sm font-semibold mb-2">Target Games (IDs or Titles)</label>
+                          <div className="flex flex-wrap gap-2">
+                            {['Bowmasters', 'Drift Boss', 'Basketball FRVR', 'Doodle Jump', 'Geometry Dash'].map(game => (
+                              <button
+                                key={game}
+                                onClick={() => {
+                                  const ids = newAnnouncement.targetGameIds || [];
+                                  if (ids.includes(game)) {
+                                    setNewAnnouncement(prev => ({ ...prev, targetGameIds: ids.filter(id => id !== game) }));
+                                  } else {
+                                    setNewAnnouncement(prev => ({ ...prev, targetGameIds: [...ids, game] }));
+                                  }
+                                }}
+                                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                                  (newAnnouncement.targetGameIds || []).includes(game)
+                                    ? 'bg-pink-600 text-white'
+                                    : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-300'
+                                }`}
+                              >
+                                {game}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2 flex items-center gap-1">
+                          <Palette size={14} /> Color
+                        </label>
+                        <select
+                          value={newAnnouncement.color}
+                          onChange={e => setNewAnnouncement(prev => ({ ...prev, color: e.target.value }))}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
+                        >
+                          <option value="bg-pink-600">Pink</option>
+                          <option value="bg-blue-600">Blue</option>
+                          <option value="bg-green-600">Green</option>
+                          <option value="bg-orange-500">Orange</option>
+                          <option value="bg-red-600">Red</option>
+                          <option value="bg-zinc-900">Black</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold mb-2 flex items-center gap-1">
+                          <Maximize size={14} /> Size
+                        </label>
+                        <select
+                          value={newAnnouncement.size}
+                          onChange={e => setNewAnnouncement(prev => ({ ...prev, size: e.target.value as any }))}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
+                        >
+                          <option value="sm">Small</option>
+                          <option value="md">Medium</option>
+                          <option value="lg">Large</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold mb-2 flex items-center gap-1">
+                          <Calendar size={14} /> Duration
+                        </label>
+                        <select
+                          value={announcementDuration}
+                          onChange={e => setAnnouncementDuration(e.target.value)}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
+                        >
+                          <option value="1h">1 Hour</option>
+                          <option value="24h">24 Hours</option>
+                          <option value="7d">7 Days</option>
+                          <option value="30d">30 Days</option>
+                          <option value="never">Permanent</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleCreateAnnouncement}
+                      className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl shadow-lg shadow-pink-600/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Plus size={20} /> Launch Announcement
+                    </button>
+                  </div>
+
+                  {/* Preview Section */}
+                  <div className="space-y-4">
+                    <label className="block text-sm font-semibold mb-2 text-zinc-500 uppercase tracking-widest">Live Preview</label>
+                    <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 flex items-center justify-center min-h-[200px] bg-zinc-50/50 dark:bg-zinc-950/50">
+                      {newAnnouncement.text ? (
+                        <div className={`relative w-full max-w-md rounded-xl shadow-2xl overflow-hidden border flex items-center gap-4 animate-pulse
+                          ${newAnnouncement.size === 'sm' ? 'p-3 text-sm' : newAnnouncement.size === 'md' ? 'p-4 text-base' : 'p-6 text-lg'}
+                          ${newAnnouncement.color} text-white border-white/20
+                        `}>
+                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md">
+                            <Megaphone size={20} />
+                          </div>
+                          <div className="flex-grow font-bold tracking-tight leading-snug">
+                            {newAnnouncement.text}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-zinc-400 flex flex-col items-center gap-2">
+                          <Ghost size={40} className="opacity-20" />
+                          <p className="text-sm">Enter text to see preview</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-xl">
+                      <div className="flex gap-3 text-blue-600 dark:text-blue-400">
+                        <Target size={20} className="shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-bold">Targeting Summary</p>
+                          <p className="opacity-80">
+                            This announcement will be shown {newAnnouncement.type === 'global' ? 'everywhere in the app' : 
+                                                            newAnnouncement.type === 'page' ? `on the ${newAnnouncement.targetPage} page` : 
+                                                            `to players of: ${(newAnnouncement.targetGameIds || []).join(', ') || 'No games selected'}`}.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-8 border-t border-zinc-200 dark:border-zinc-800">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                   Active & Recent Announcements ({announcements.length})
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {announcements.map(ann => (
+                    <div key={ann.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 flex items-start gap-4 shadow-sm group">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${ann.color} text-white`}>
+                        <Megaphone size={20} />
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                            ann.type === 'global' ? 'bg-purple-100 text-purple-600' :
+                            ann.type === 'page' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
+                          }`}>
+                            {ann.type}
+                          </span>
+                          {!ann.active && <span className="text-[10px] font-black uppercase bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded">Inactive</span>}
+                        </div>
+                        <p className="font-bold text-sm mb-2 line-clamp-2">{ann.text}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-zinc-400">
+                            {ann.expiresAt ? `Expires: ${new Date(ann.expiresAt).toLocaleDateString()}` : 'Never Expires'}
+                          </span>
+                          <button 
+                            onClick={() => handleDeleteAnnouncement(ann.id)}
+                            className="p-2 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {announcements.length === 0 && (
+                    <div className="col-span-full py-12 text-center text-zinc-500 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
+                      No active announcements found.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

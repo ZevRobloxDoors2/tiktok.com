@@ -222,3 +222,16 @@ export type WatchParty = {
   createdAt: number;
   updatedAt: number;
 };
+
+export type Announcement = {
+  id: string;
+  text: string;
+  type: 'global' | 'page' | 'game';
+  targetPage?: string;
+  targetGameIds?: string[];
+  color: string;
+  size: 'sm' | 'md' | 'lg';
+  createdAt: number;
+  expiresAt?: number;
+  active: boolean;
+};
