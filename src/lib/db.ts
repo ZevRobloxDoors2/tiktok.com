@@ -88,7 +88,14 @@ export const saveUsers = (users: User[]) => saveCollection('users', users);
 export const updateUser = async (userId: string, data: Partial<User>) => {
   try {
     const docRef = doc(db, 'users', userId);
-    await updateDoc(docRef, data);
+    const updateData: any = { ...data };
+    // Remove undefined values to avoid Firestore crash
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        updateData[key] = null;
+      }
+    });
+    await updateDoc(docRef, updateData);
   } catch (err) {
     console.error("Error updating user:", userId, err);
     throw err;
@@ -96,7 +103,7 @@ export const updateUser = async (userId: string, data: Partial<User>) => {
 };
 
 export const updateUserGame = async (userId: string, gameTitle: string | null) => {
-  return updateUser(userId, { currentGame: gameTitle || undefined });
+  return updateUser(userId, { currentGame: gameTitle });
 };
 
 export const getVideos = () => fetchCollection<Video>('videos');

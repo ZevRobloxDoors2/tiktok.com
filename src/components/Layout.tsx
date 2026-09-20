@@ -155,6 +155,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [currentUser?.id]);
 
   useEffect(() => {
+    // Inject ytgame SDK mock for game compatibility (fixes Bowmasters and others)
+    (window as any).ytgame = {
+      system: {
+        getLanguage: () => 'en',
+        isAudioEnabled: () => true,
+        onPause: (cb: any) => {},
+        onResume: (cb: any) => {}
+      },
+      game: {
+        firstClick: () => {},
+        gameReady: () => {},
+        loadFinished: () => {}
+      }
+    };
+
     const handleMessage = async (event: MessageEvent) => {
       // Basic validation for type
       if (!event.data || typeof event.data !== 'object') return;
