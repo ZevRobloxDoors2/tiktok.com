@@ -78,7 +78,7 @@ export function Home() {
         catch { return []; }
       })();
       const unseenUgvs = allDbVideos.filter(video => {
-        if (video.isYouTube || video.isRemoved || seenFeedIds.current.has(video.id) || localViewed.includes(video.id)) return false;
+        if (video.isYouTube || video.isRemoved || seenFeedIds.current.has(video.id) || (localViewed || []).includes(video.id)) return false;
 
         // Post Visibility & Friendship check
         const isAuthor = currentUser?.id === video.userId;
@@ -537,9 +537,9 @@ export const VideoItem: React.FC<{
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isActive, setIsActive] = useState(false);
-  const [isLiked, setIsLiked] = useState(video.likes?.includes(currentUser?.id || '') || false);
-  const [likesCount, setLikesCount] = useState(video.likes?.length || 0);
-  const [isFavorited, setIsFavorited] = useState(currentUser?.favorites?.includes(video.id) || false);
+  const [isLiked, setIsLiked] = useState((video.likes || []).includes(currentUser?.id || '') || false);
+  const [likesCount, setLikesCount] = useState((video.likes || []).length);
+  const [isFavorited, setIsFavorited] = useState((currentUser?.favorites || []).includes(video.id) || false);
   const [views, setViews] = useState(video.views || 0);
   const [hasViewed, setHasViewed] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -720,11 +720,11 @@ export const VideoItem: React.FC<{
     if (idx !== -1) {
       const currentLikes = dbVideos[idx].likes || [];
       if (newStatus) {
-        if (!currentLikes.includes(currentUser.id)) {
+        if (!(currentLikes || []).includes(currentUser.id)) {
           dbVideos[idx].likes = [...currentLikes, currentUser.id];
         }
       } else {
-        dbVideos[idx].likes = currentLikes.filter(id => id !== currentUser.id);
+        dbVideos[idx].likes = (currentLikes || []).filter(id => id !== currentUser.id);
       }
       await saveVideos(dbVideos);
     }

@@ -18,6 +18,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     isGameActive, 
     setIsGameActive,
     activeGameTitle,
+    activeGameUrl,
     miniPlayerActive
   } = useAppStore();
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -156,24 +157,43 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    // Inject ytgame SDK mock ONLY for Bowmasters to prevent interference with other games
-    if (isGameActive && activeGameTitle === 'Bowmasters') {
-      (window as any).ytgame = {
+    // Inject ytgame SDK mock for YouTube Playables to prevent crashes
+    const isYTGame = isGameActive && (
+      activeGameTitle?.includes('Bowmasters') || 
+      activeGameTitle?.includes('Frvr') || 
+      activeGameTitle?.includes('FRVR') ||
+      activeGameTitle?.includes('2048') ||
+      activeGameTitle?.includes('Cookie') ||
+      activeGameTitle?.includes('Geometry') ||
+      activeGameUrl?.includes('Frvr')
+    );
+
+    if (isYTGame) {
+      const mock = {
         system: {
           getLanguage: () => 'en',
           isAudioEnabled: () => true,
-          onPause: (cb: any) => {},
-          onResume: (cb: any) => {}
+          onPause: (cb: any) => {
+            console.log('ytgame.system.onPause registered');
+            if (typeof cb === 'function') (window as any)._ytPauseCb = cb;
+          },
+          onResume: (cb: any) => {
+            console.log('ytgame.system.onResume registered');
+            if (typeof cb === 'function') (window as any)._ytResumeCb = cb;
+          },
+          loadData: () => Promise.resolve({}),
+          saveData: () => Promise.resolve()
         },
         game: {
           firstClick: () => {},
           gameReady: () => {},
           loadFinished: () => {}
+        },
+        engagement: {
+          sendEvent: () => {}
         }
       };
-    } else {
-      // Clean up for other games
-      delete (window as any).ytgame;
+      (window as any).ytgame = mock;
     }
 
     const handleMessage = async (event: MessageEvent) => {

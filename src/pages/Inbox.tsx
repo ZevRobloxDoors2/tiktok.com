@@ -67,9 +67,9 @@ export function Inbox() {
       const dmMsgs = allMsgs.filter(m => !m.groupId && (m.fromUserId === currentUser.id || m.toUserId === currentUser.id));
       
       // Filter group messages
-      const userGroups = allGroups.filter(g => g.members.includes(currentUser.id));
+      const userGroups = allGroups.filter(g => (g.members || []).includes(currentUser.id));
       const groupIds = userGroups.map(g => g.id);
-      const groupMsgs = allMsgs.filter(m => m.groupId && groupIds.includes(m.groupId));
+      const groupMsgs = allMsgs.filter(m => m.groupId && (groupIds || []).includes(m.groupId));
       
       const convosMap = new Map<string, { user?: User, group?: GroupChat, lastMessage: Message }>();
       
@@ -110,8 +110,8 @@ export function Inbox() {
       // Filter friends for group creation (following each other)
       const friends = allUsers.filter(u => 
         u.id !== currentUser.id && 
-        currentUser.following?.includes(u.id) && 
-        u.following?.includes(currentUser.id)
+        (currentUser.following || []).includes(u.id) && 
+        (u.following || []).includes(currentUser.id)
       );
       
       setNotifications(userNotifs);

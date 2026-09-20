@@ -57,11 +57,23 @@
                 },
                 firstClick: () => {},
                 gameReady: () => {},
-                firstFrameReady: () => {}
+                firstFrameReady: () => {},
+                loadFinished: () => {}
             },
             health: { logError: () => {} },
-            engagement: { score: () => {} },
-            system: { isPaused: () => false }
+            engagement: { score: () => {}, sendEvent: () => {} },
+            system: { 
+                isPaused: () => false,
+                getLanguage: () => 'en',
+                isAudioEnabled: () => true,
+                onPause: (cb) => { if (typeof cb === 'function') window._ytPauseCb = cb; },
+                onResume: (cb) => { if (typeof cb === 'function') window._ytResumeCb = cb; }
+            }
+        };
+
+        // Stub ads to prevent MIME errors
+        window.adsbygoogle = {
+            push: function(args) { console.log("Ad stubbed", args); }
         };
     </script>
 

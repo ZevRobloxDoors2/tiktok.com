@@ -93,7 +93,7 @@ export function Chat() {
       const updatedAllMsgs = allMsgs.map(m => {
         const isCurrentChat = groupId ? m.groupId === groupId : (m.fromUserId === otherUser?.id && m.toUserId === currentUser.id);
         if (isCurrentChat && m.fromUserId !== currentUser.id) {
-          if (!m.seenBy?.includes(currentUser.id)) {
+          if (!(m.seenBy || []).includes(currentUser.id)) {
             msgsToUpdate = true;
             return { 
               ...m, 
@@ -205,7 +205,7 @@ export function Chat() {
     
     if (!isSystem) {
       const notifications = await getNotifications();
-      const targetUserIds = group ? group.members.filter(id => id !== currentUser.id) : [otherUser!.id];
+      const targetUserIds = group ? (group.members || []).filter(id => id !== currentUser.id) : [otherUser!.id];
       
       const newNotifs = targetUserIds.map(id => ({
         id: `notif_${Date.now()}_${id}`,
@@ -356,7 +356,7 @@ export function Chat() {
               </div>
               <div>
                 <h2 className="font-bold leading-tight">{group.name}</h2>
-                <p className="text-xs text-zinc-500">{group.members.length} members</p>
+                <p className="text-xs text-zinc-500">{(group.members || []).length} members</p>
               </div>
             </div>
           ) : (
@@ -417,7 +417,7 @@ export function Chat() {
                   </div>
                   <div>
                     <p className="text-sm font-black uppercase tracking-tight">Active Watch Party</p>
-                    <p className="text-[10px] font-bold opacity-80">{party.participants.length} watching now</p>
+                    <p className="text-[10px] font-bold opacity-80">{(party.participants || []).length} watching now</p>
                   </div>
                 </div>
                 <button 
@@ -583,7 +583,7 @@ export function Chat() {
             <div className="flex flex-col items-center mb-6">
               <img src={group.avatarUrl} alt="" className="w-24 h-24 rounded-full mb-3 object-cover shadow-xl ring-4 ring-white dark:ring-zinc-900" />
               <h3 className="text-xl font-bold">{group.name}</h3>
-              <p className="text-sm text-zinc-500">Group · {group.members.length} members</p>
+              <p className="text-sm text-zinc-500">Group · {(group.members || []).length} members</p>
             </div>
             
             <div className="space-y-1 mb-8">
@@ -599,7 +599,8 @@ export function Chat() {
                 )}
               </div>
               
-              {group.members.map(mid => {
+              {/* Members List */}
+              {(group.members || []).map(mid => {
                 const u = allUsers.find(x => x.id === mid);
                 if (!u) return null;
                 const isOwner = group.ownerId === mid;

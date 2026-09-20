@@ -141,7 +141,7 @@ export const incrementVideoView = async (id: string, viewerId: string | null) =>
     if (snap.exists()) {
       const video = snap.data() as Video;
       const viewedBy = video.viewedBy || [];
-      if (viewerId && viewedBy.includes(viewerId)) return;
+      if (viewerId && (viewedBy || []).includes(viewerId)) return;
       
       await updateDoc(docRef, {
         views: (video.views || 0) + 1,
@@ -225,7 +225,7 @@ export const toggleGroupAdmin = async (groupId: string, userId: string) => {
     const snap = await getDoc(docRef);
     if (!snap.exists()) return;
     const group = snap.data() as GroupChat;
-    const isAdmin = group.admins.includes(userId);
+    const isAdmin = (group.admins || []).includes(userId);
     await updateDoc(docRef, {
       admins: isAdmin ? group.admins.filter(id => id !== userId) : arrayUnion(userId)
     });
@@ -241,7 +241,7 @@ export const joinVoiceChannel = async (groupId: string, userId: string) => {
     if (!snap.exists()) return;
     const group = snap.data() as GroupChat;
     const voiceChannel = group.voiceChannel || { active: true, participants: [] };
-    if (!voiceChannel.participants.includes(userId)) {
+    if (!(voiceChannel.participants || []).includes(userId)) {
       voiceChannel.participants.push(userId);
       await updateDoc(docRef, { voiceChannel: { ...voiceChannel, active: true } });
     }

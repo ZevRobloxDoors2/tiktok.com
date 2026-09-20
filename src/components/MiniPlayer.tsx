@@ -163,8 +163,6 @@ export function MiniPlayer() {
                       controls: 0,
                       modestbranding: 1,
                       rel: 0,
-                      origin: window.location.origin, // Fix postMessage origin issue
-                      widget_referrer: window.location.origin
                     },
                   }}
                   onReady={(e) => {
