@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getNotifications, getMessages, getUsers, getGroupChats, saveGroupChats } from '../lib/db';
 import { Notification, Message, User, GroupChat } from '../types';
-import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check, LifeBuoy, Phone } from 'lucide-react';
+import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check, LifeBuoy, Phone, Activity, Server, Database, Sparkles, Youtube, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { addReport } from '../lib/db';
+import { checkSystemHealth, SystemStatus } from '../lib/diagnostics';
 
 export function Inbox() {
   const { 
@@ -21,6 +22,11 @@ export function Inbox() {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportReason, setSupportReason] = useState('');
   const [supportSubmitted, setSupportSubmitted] = useState(false);
+
+  // Diagnostics state
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<SystemStatus | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   
   // Group creation state
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -173,13 +179,28 @@ export function Inbox() {
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">Inbox</h1>
-          <button 
-            onClick={() => setShowSupportModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors text-xs font-bold"
-          >
-            <LifeBuoy size={14} className="text-pink-600" />
-            Support
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={async () => {
+                setShowDiagnostics(true);
+                setIsCheckingHealth(true);
+                const status = await checkSystemHealth();
+                setDiagnosticsStatus(status);
+                setIsCheckingHealth(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors text-[10px] font-black uppercase tracking-wider text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            >
+              <Activity size={12} className="text-emerald-500" />
+              System Status
+            </button>
+            <button 
+              onClick={() => setShowSupportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors text-xs font-bold"
+            >
+              <LifeBuoy size={14} className="text-pink-600" />
+              Support
+            </button>
+          </div>
         </div>
         {activeTab === 'messages' && (
           <button 
@@ -466,6 +487,124 @@ export function Inbox() {
           </div>
         </div>
       )}
+
+      {/* Diagnostics Modal */}
+      {showDiagnostics && (
+        <div className="absolute inset-0 z-[60] bg-white dark:bg-zinc-950 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <Activity size={20} className="text-emerald-500" />
+              <h2 className="font-bold">System Diagnostics</h2>
+            </div>
+            <button onClick={() => setShowDiagnostics(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-full">
+              <X size={24} />
+            </button>
+          </div>
+          
+          <div className="p-8 flex-1 overflow-y-auto">
+            <div className="max-w-md mx-auto space-y-6">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Server size={32} className="text-emerald-500" />
+                </div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Backend Connectivity</h3>
+                <p className="text-sm text-zinc-500 mt-1">Verifying cloud infrastructure and API services.</p>
+              </div>
+
+              {isCheckingHealth ? (
+                <div className="flex flex-col items-center py-12">
+                  <Activity size={40} className="text-emerald-500 animate-pulse mb-4" />
+                  <p className="text-sm font-bold text-zinc-400">Running health checks...</p>
+                </div>
+              ) : diagnosticsStatus ? (
+                <div className="space-y-3">
+                  <HealthItem 
+                    icon={<Server size={18} />} 
+                    label="Core Backend" 
+                    status={diagnosticsStatus.backend} 
+                    desc="Node.js Server & /api routes"
+                  />
+                  <HealthItem 
+                    icon={<Database size={18} />} 
+                    label="Firebase Infrastructure" 
+                    status={diagnosticsStatus.firebase} 
+                    desc="Cloud Firestore & Auth"
+                  />
+                  <HealthItem 
+                    icon={<Sparkles size={18} />} 
+                    label="AI Services (Gemini)" 
+                    status={diagnosticsStatus.aiChat && diagnosticsStatus.aiSearch} 
+                    desc="Chat & Smart Search"
+                  />
+                  <HealthItem 
+                    icon={<Youtube size={18} />} 
+                    label="Media Proxy (YouTube)" 
+                    status={diagnosticsStatus.youtube} 
+                    desc="Video Feed Services"
+                  />
+
+                  <div className="mt-8 p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Latency</span>
+                      <span className="text-xs font-mono font-bold text-emerald-500">{diagnosticsStatus.latency}ms</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-500 transition-all duration-1000" 
+                        style={{ width: `${Math.max(5, 100 - (diagnosticsStatus.latency / 10))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex items-start gap-3 p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
+                    <ShieldAlert size={20} className="shrink-0" />
+                    <p className="text-xs leading-relaxed">
+                      <strong>Note:</strong> All backend features are fully active in this environment. If you export this app to a static host (like GitHub Pages), these checks will fail.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              <button 
+                onClick={async () => {
+                  setIsCheckingHealth(true);
+                  const status = await checkSystemHealth();
+                  setDiagnosticsStatus(status);
+                  setIsCheckingHealth(false);
+                }}
+                className="w-full py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-2xl transition-all active:scale-95 mt-4"
+              >
+                Refresh Check
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HealthItem({ icon, label, status, desc }: { icon: React.ReactNode, label: string, status: boolean, desc: string }) {
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${status ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center justify-between">
+          <h4 className="font-bold text-sm">{label}</h4>
+          {status ? (
+            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-emerald-500">
+              <Check size={12} strokeWidth={4} /> Operational
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-red-500">
+              <X size={12} strokeWidth={4} /> Offline
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] text-zinc-500 font-medium">{desc}</p>
+      </div>
     </div>
   );
 }

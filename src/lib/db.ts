@@ -1,7 +1,7 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 export { db };
-import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData } from '../types';
+import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -549,5 +549,63 @@ export const saveGameData = async (userId: string, gameId: string, data: string)
   } catch (err) {
     console.error("Error saving game data:", err);
     handleFirestoreError(err, OperationType.WRITE, `game_data/${userId}_${gameId}`);
+  }
+};
+
+export const createWatchParty = async (hostId: string, currentVideoId: string): Promise<string> => {
+  try {
+    const partyId = Math.random().toString(36).substr(2, 9);
+    const partyRef = doc(db, 'watch_parties', partyId);
+    const partyData: WatchParty = {
+      id: partyId,
+      hostId,
+      currentVideoId,
+      participants: [hostId],
+      status: 'playing',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    await setDoc(partyRef, partyData);
+    return partyId;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, 'watch_parties');
+    return '';
+  }
+};
+
+export const updateWatchPartyState = async (partyId: string, updates: Partial<WatchParty>) => {
+  try {
+    const partyRef = doc(db, 'watch_parties', partyId);
+    await updateDoc(partyRef, {
+      ...updates,
+      updatedAt: Date.now()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `watch_parties/${partyId}`);
+  }
+};
+
+export const subscribeToWatchParty = (partyId: string, callback: (party: WatchParty | null) => void) => {
+  const partyRef = doc(db, 'watch_parties', partyId);
+  return onSnapshot(partyRef, (snap) => {
+    if (snap.exists()) {
+      callback(snap.data() as WatchParty);
+    } else {
+      callback(null);
+    }
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, `watch_parties/${partyId}`);
+  });
+};
+
+export const joinWatchParty = async (partyId: string, userId: string) => {
+  try {
+    const partyRef = doc(db, 'watch_parties', partyId);
+    await updateDoc(partyRef, {
+      participants: arrayUnion(userId),
+      updatedAt: Date.now()
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `watch_parties/${partyId}`);
   }
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X, HelpCircle, Bell, Gamepad2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Home, Compass, PlusSquare, MessageSquare, User, Moon, Sun, LogIn, ShieldAlert, X, HelpCircle, Bell, Gamepad2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
@@ -37,7 +37,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     fromUserAvatar?: string;
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [showDeploymentWarning, setShowDeploymentWarning] = useState(false);
   const knownMessageIds = useRef<Set<string>>(new Set());
   const location = useLocation();
   const navigate = useNavigate();
@@ -73,14 +72,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    if (window.location.hostname.includes('github.io')) {
-      setShowDeploymentWarning(true);
-    }
-  }, []);
-
-  // Check announcements - when offline user arrives/comes online, this delivers their pending announcement notification immediately
-  useEffect(() => {
     if (!currentUser) {
+      // Guest online arrival check
       // Guest online arrival check
       const checkGuestAnnouncements = async () => {
         try {
@@ -169,13 +162,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       
       if (type === 'SAVE_GAME_DATA' && currentUser) {
         await saveGameData(currentUser.id, gameId, data);
-      } else if (type === 'LOAD_GAME_DATA' && currentUser) {
-        const savedData = await getGameData(currentUser.id, gameId);
+      } else if (type === 'LOAD_GAME_DATA') {
+        const savedData = currentUser ? await getGameData(currentUser.id, gameId) : {};
         event.source?.postMessage({
           type: 'LOAD_GAME_DATA_RESPONSE',
           requestId,
-          data: savedData
-        }, { targetOrigin: event.origin } as any);
+          data: savedData || {}
+        }, { targetOrigin: '*' } as any);
       }
     };
 
@@ -228,25 +221,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 overflow-hidden transition-colors">
-      <AnimatePresence>
-        {showDeploymentWarning && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-[3000] w-[90%] max-w-md bg-amber-500 text-white p-3 rounded-xl shadow-xl flex items-center gap-3 border border-amber-400"
-          >
-            <AlertCircle size={20} className="shrink-0" />
-            <div className="flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-0.5">Static Hosting Detected</p>
-              <p className="text-xs font-bold leading-tight">Backend features (AI search, YouTube proxy) are disabled on GitHub Pages.</p>
-            </div>
-            <button onClick={() => setShowDeploymentWarning(false)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-              <X size={16} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* Sidebar - Desktop */}
       {!isIntro && (
         <motion.div 

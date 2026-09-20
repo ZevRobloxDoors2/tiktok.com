@@ -3,13 +3,13 @@ import {
   getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, 
   ensureVideoInDB, getMessages, saveMessages, getNotifications, 
   saveNotifications, subscribeToVideo, deleteVideoFromDB, getAppSettings, subscribeToAppSettings,
-  updateUser 
+  updateUser, createWatchParty, joinWatchParty, subscribeToWatchParty, updateWatchPartyState
 } from '../lib/db';
-import { Video, User } from '../types';
+import { Video, User, WatchParty } from '../types';
 import { useAppStore } from '../store';
 import { 
   Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, 
-  User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock, AlertCircle, Maximize2 
+  User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock, AlertCircle, Maximize2, Tv
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,6 +26,13 @@ export function Home() {
   const { currentUser, introPhase, setIntroPhase, isLoading, setShowAuthModal } = useAppStore();
   const [videos, setVideos] = useState<(Video & { user: User; feedId: string })[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Watch Party State
+  const [activePartyId, setActivePartyId] = useState<string | null>(new URLSearchParams(window.location.search).get('partyId'));
+  const [partyData, setPartyData] = useState<WatchParty | null>(null);
+  const [isPartyHost, setIsPartyHost] = useState(false);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -194,6 +201,76 @@ export function Home() {
     }
   };
 
+  // Watch Party Effects
+  useEffect(() => {
+    if (!activePartyId) return;
+
+    const unsub = subscribeToWatchParty(activePartyId, (party) => {
+      if (!party) {
+        setActivePartyId(null);
+        setPartyData(null);
+        setIsPartyHost(false);
+        return;
+      }
+      setPartyData(party);
+      setIsPartyHost(party.hostId === currentUser?.id);
+
+      // If not host and video changed, scroll to it
+      if (party.hostId !== currentUser?.id) {
+        const videoIndex = videos.findIndex(v => v.id === party.currentVideoId);
+        if (videoIndex !== -1 && videoIndex !== currentVideoIndex) {
+          const container = containerRef.current;
+          if (container) {
+            container.scrollTo({ 
+              top: videoIndex * container.clientHeight, 
+              behavior: 'smooth' 
+            });
+            setCurrentVideoIndex(videoIndex);
+          }
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [activePartyId, videos, currentUser?.id]);
+
+  // Sync state if host
+  useEffect(() => {
+    if (activePartyId && isPartyHost && videos[currentVideoIndex]) {
+      updateWatchPartyState(activePartyId, {
+        currentVideoId: videos[currentVideoIndex].id
+      });
+    }
+  }, [currentVideoIndex, isPartyHost, activePartyId, videos]);
+
+  const handleStartWatchParty = async () => {
+    if (!currentUser) {
+      setShowAuthModal(true);
+      return;
+    }
+    const currentVideo = videos[currentVideoIndex];
+    if (!currentVideo) return;
+    
+    const partyId = await createWatchParty(currentUser.id, currentVideo.id);
+    if (partyId) {
+      setActivePartyId(partyId);
+      setIsPartyHost(true);
+      // Update URL without refreshing
+      const url = new URL(window.location.href);
+      url.searchParams.set('partyId', partyId);
+      window.history.pushState({}, '', url);
+    }
+  };
+
+  const handleJoinParty = async (partyId: string) => {
+    if (!currentUser) {
+      setShowAuthModal(true);
+      return;
+    }
+    await joinWatchParty(partyId, currentUser.id);
+    setActivePartyId(partyId);
+  };
+
   useEffect(() => {
     if (isLoading) return;
     seenFeedIds.current.clear();
@@ -246,6 +323,12 @@ export function Home() {
     
     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 160) {
       fetchBatch();
+    }
+
+    // Update current index for watch party sync
+    const newIndex = Math.round(container.scrollTop / container.clientHeight);
+    if (newIndex !== currentVideoIndex) {
+      setCurrentVideoIndex(newIndex);
     }
   };
 
@@ -398,6 +481,50 @@ export function Home() {
             onDelete={() => handlePostDeleted(video.id)}
           />
         ))}
+
+        {/* Watch Party Controls */}
+        <div className="absolute top-20 right-4 z-[60] flex flex-col gap-3">
+          {!activePartyId ? (
+            <button 
+              onClick={handleStartWatchParty}
+              className="p-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white hover:bg-pink-600 transition-all flex items-center gap-2 group"
+              title="Start Watch Party"
+            >
+              <Tv size={20} className="group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-black uppercase tracking-widest hidden group-hover:block">Start Party</span>
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2 items-end">
+              <div className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                Party Active
+              </div>
+              <div className="flex -space-x-2">
+                {partyData?.participants.slice(0, 3).map((uid, i) => (
+                  <div key={uid} className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center text-[10px] text-white font-bold overflow-hidden">
+                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`} alt="P" />
+                  </div>
+                ))}
+                {(partyData?.participants.length || 0) > 3 && (
+                  <div className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center text-[10px] text-white font-bold">
+                    +{(partyData?.participants.length || 0) - 3}
+                  </div>
+                )}
+              </div>
+              <button 
+                onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('partyId');
+                  window.history.pushState({}, '', url);
+                  setActivePartyId(null);
+                }}
+                className="text-[10px] font-bold text-white/50 hover:text-white"
+              >
+                Leave Party
+              </button>
+            </div>
+          )}
+        </div>
         {hasMore ? (
           <div ref={endRef} className="h-20 snap-start flex items-center justify-center bg-black shrink-0">
             <Loader2 size={32} className="animate-spin text-zinc-500" />

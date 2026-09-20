@@ -59,6 +59,21 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["id", "userId", "gameId", "data", "updatedAt"]
+    },
+    "WatchParty": {
+      "title": "Watch Party",
+      "description": "A real-time session for synchronized video watching.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostId": { "type": "string" },
+        "currentVideoId": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["playing", "paused"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "hostId", "currentVideoId", "participants", "status", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -77,6 +92,10 @@
     "game_data/{gameDataId}": {
       "schema": "GameData",
       "description": "Persistent game progress for users."
+    },
+    "watch_parties/{partyId}": {
+      "schema": "WatchParty",
+      "description": "Synchronized video watching sessions."
     }
   }
 }

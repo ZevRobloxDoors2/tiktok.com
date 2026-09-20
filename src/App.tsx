@@ -36,7 +36,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     <>
       {children}
       <InterestsModal />
-      <MiniPlayer />
       <GlobalStoryViewer />
       <CallOverlay />
     </>

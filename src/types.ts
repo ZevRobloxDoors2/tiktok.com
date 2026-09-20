@@ -209,3 +209,13 @@ export type GameData = {
   data: string;
   updatedAt: number;
 };
+
+export type WatchParty = {
+  id: string;
+  hostId: string;
+  currentVideoId: string;
+  participants: string[];
+  status: 'playing' | 'paused';
+  createdAt: number;
+  updatedAt: number;
+};
