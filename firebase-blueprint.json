@@ -92,6 +92,23 @@
         "active": { "type": "boolean" }
       },
       "required": ["id", "text", "type", "color", "size", "createdAt", "active"]
+    },
+    "VerificationRequest": {
+      "title": "Verification Request",
+      "description": "A request for student verification badge.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "reason": { "type": "string" },
+        "schoolIdUrl": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "firstName", "lastName", "schoolIdUrl", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -118,6 +135,10 @@
     "announcements/{announcementId}": {
       "schema": "Announcement",
       "description": "System announcements and targeted banners."
+    },
+    "verification_requests/{requestId}": {
+      "schema": "VerificationRequest",
+      "description": "Student verification applications."
     }
   }
 }

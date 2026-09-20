@@ -137,5 +137,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isStaffOrAdmin();
     }
+
+    // Verification Requests
+    match /verification_requests/{requestId} {
+      allow read: if isStaffOrAdmin() || isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update: if isStaffOrAdmin();
+      allow delete: if isStaffOrAdmin();
+    }
   }
 }

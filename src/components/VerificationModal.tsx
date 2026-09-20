@@ -3,6 +3,7 @@ import { X, Camera, Image as ImageIcon, ShieldCheck, Upload, Trash2, CheckCircle
 import { motion, AnimatePresence } from 'motion/react';
 import { User, VerificationRequest } from '../types';
 import { submitVerificationRequest } from '../lib/db';
+import { compressImage } from '../lib/imageUtils';
 
 interface VerificationModalProps {
   user: User;
@@ -48,7 +49,7 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
     }
   }, [stream, showCamera]);
 
-  const snapPhoto = () => {
+  const snapPhoto = async () => {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
@@ -56,9 +57,10 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      if (showCamera === 'id') setSchoolIdPhoto(dataUrl);
-      else setSelfiePhoto(dataUrl);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const compressed = await compressImage(dataUrl, 800, 600, 0.7);
+      if (showCamera === 'id') setSchoolIdPhoto(compressed);
+      else setSelfiePhoto(compressed);
     }
     setShowCamera(null);
   };
@@ -67,10 +69,11 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         if (ev.target?.result) {
-          if (target === 'id') setSchoolIdPhoto(ev.target.result as string);
-          else setSelfiePhoto(ev.target.result as string);
+          const compressed = await compressImage(ev.target.result as string, 800, 600, 0.7);
+          if (target === 'id') setSchoolIdPhoto(compressed);
+          else setSelfiePhoto(compressed);
         }
       };
       reader.readAsDataURL(file);
