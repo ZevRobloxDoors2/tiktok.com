@@ -29,7 +29,11 @@ const AnnouncementBanner: React.FC = () => {
         if (a.type === 'global') return true;
         
         if (a.type === 'page' && a.targetPage) {
-          return location.pathname === a.targetPage;
+          const currentPath = location.pathname;
+          const targetPath = a.targetPage;
+          // Alias /games to /games-apps
+          if (targetPath === '/games' && currentPath === '/games-apps') return true;
+          return currentPath === targetPath;
         }
         
         if (a.type === 'game' && a.targetGameIds && activeGameTitle) {

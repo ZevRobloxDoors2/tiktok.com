@@ -17,6 +17,8 @@ export const getSuggestions = () => fetchCollection<AppSuggestion>('app_suggesti
 export const subscribeToSuggestions = (callback: (suggestions: AppSuggestion[]) => void) => {
   return onSnapshot(collection(db, 'app_suggestions'), (snapshot) => {
     callback(snapshot.docs.map(doc => doc.data() as AppSuggestion));
+  }, (err) => {
+    console.warn("Suggestions subscription permission denied or error:", err);
   });
 };
 
@@ -77,6 +79,8 @@ export const getVerificationRequests = () => fetchCollection<VerificationRequest
 export const subscribeToVerificationRequests = (callback: (requests: VerificationRequest[]) => void) => {
   return onSnapshot(collection(db, 'verification_requests'), (snapshot) => {
     callback(snapshot.docs.map(doc => doc.data() as VerificationRequest));
+  }, (err) => {
+    console.warn("Verification requests subscription permission denied or error:", err);
   });
 };
 

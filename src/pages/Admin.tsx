@@ -860,7 +860,7 @@ export function Admin() {
                             <option value="/home">Home / Feed</option>
                             <option value="/explore">Explore</option>
                             <option value="/inbox">Inbox</option>
-                            <option value="/games">Games & Apps</option>
+                            <option value="/games-apps">Games & Apps</option>
                             <option value="/profile">Profile</option>
                           </select>
                         </div>
@@ -991,7 +991,7 @@ export function Admin() {
                         />
                         <input
                           type="text"
-                          placeholder="Link (e.g. /games)"
+                          placeholder="Link (e.g. /games-apps)"
                           value={newAnnouncement.actionButtonLink}
                           onChange={e => setNewAnnouncement(prev => ({ ...prev, actionButtonLink: e.target.value }))}
                           className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none focus:border-pink-500"
@@ -1071,7 +1071,7 @@ export function Admin() {
                         </select>
                       </div>
 
-                      {(newAnnouncement.type === 'page' && newAnnouncement.targetPage === '/games') && (
+                      {(newAnnouncement.type === 'page' && newAnnouncement.targetPage === '/games-apps') && (
                         <div className="flex items-center gap-3 pt-6">
                           <button
                             onClick={() => setNewAnnouncement(prev => ({ ...prev, hideDuringGameplay: !prev.hideDuringGameplay }))}

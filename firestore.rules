@@ -16,7 +16,9 @@ service cloud.firestore {
         request.auth.token.role == 'owner' || 
         request.auth.token.role == 'staff' ||
         request.auth.token.admin == true ||
-        request.auth.token.email.lower() == 'zaellacruze1@gmail.com'
+        request.auth.token.email.lower() == 'zaellacruze1@gmail.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
       );
     }
 
@@ -141,6 +143,14 @@ service cloud.firestore {
     // Verification Requests
     match /verification_requests/{requestId} {
       allow read: if isStaffOrAdmin() || isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update: if isStaffOrAdmin();
+      allow delete: if isStaffOrAdmin();
+    }
+
+    // App Suggestions
+    match /app_suggestions/{suggestionId} {
+      allow read: if isStaffOrAdmin();
       allow create: if isAuthenticated();
       allow update: if isStaffOrAdmin();
       allow delete: if isStaffOrAdmin();
