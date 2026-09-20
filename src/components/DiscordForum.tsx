@@ -467,7 +467,7 @@ export function DiscordForum() {
 
     const reactions = { ...(target.reactions || {}) };
     const currentList = reactions[emoji] || [];
-    const hasReacted = currentList.includes(currentUser.id);
+    const hasReacted = (currentList || []).includes(currentUser.id);
 
     if (hasReacted) {
       reactions[emoji] = currentList.filter(uid => uid !== currentUser.id);
@@ -680,8 +680,8 @@ export function DiscordForum() {
                   {/* Reactions Bar */}
                   <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#35373c]/50">
                     {['👍', '❤️', '💡', '🔥', '🎉'].map(emoji => {
-                      const count = selectedPost.reactions?.[emoji]?.length || 0;
-                      const active = currentUser && selectedPost.reactions?.[emoji]?.includes(currentUser.id);
+                      const count = (selectedPost.reactions?.[emoji] || []).length;
+                      const active = currentUser && (selectedPost.reactions?.[emoji] || []).includes(currentUser.id);
                       return (
                         <button
                           key={emoji}

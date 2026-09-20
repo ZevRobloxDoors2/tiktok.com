@@ -14,7 +14,7 @@ export function InterestsModal() {
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  if (!currentUser || (currentUser.interests && currentUser.interests.length > 0)) {
+  if (!currentUser || (currentUser.interests || []).length > 0) {
     return null;
   }
 

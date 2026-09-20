@@ -66,13 +66,13 @@ export function Profile() {
     const user = users.find(u => u.handle === handle);
     if (user) {
       setProfileUser(user);
-      setIsFollowing(currentUser?.following.includes(user.id) || false);
+      setIsFollowing((currentUser?.following || []).includes(user.id) || false);
       
       const allVideos = await getVideos();
       const userVideos = allVideos.filter(v => v.userId === user.id && !v.isRemoved);
       const userRemovedVideos = allVideos.filter(v => v.userId === user.id && v.isRemoved);
-      const userLikedVideos = allVideos.filter(v => v.likes.includes(user.id) && !v.isRemoved);
-      const userFavoriteVideos = allVideos.filter(v => user.favorites?.includes(v.id) && !v.isRemoved);
+      const userLikedVideos = allVideos.filter(v => (v.likes || []).includes(user.id) && !v.isRemoved);
+      const userFavoriteVideos = allVideos.filter(v => (user.favorites || []).includes(v.id) && !v.isRemoved);
       
       const fixUrl = (v: Video) => ({
         ...v,
@@ -253,15 +253,15 @@ export function Profile() {
             
             <div className="flex items-center justify-center md:justify-start gap-6 mb-4">
               <div className="text-center">
-                <span className="font-bold block">{profileUser.following.length}</span>
+                <span className="font-bold block">{(profileUser.following || []).length}</span>
                 <span className="text-zinc-500 text-sm">Following</span>
               </div>
               <div className="text-center">
-                <span className="font-bold block">{profileUser.followers.length}</span>
+                <span className="font-bold block">{(profileUser.followers || []).length}</span>
                 <span className="text-zinc-500 text-sm">Followers</span>
               </div>
               <div className="text-center">
-                <span className="font-bold block">{videos.reduce((acc, v) => acc + (v.likes?.length || 0), 0)}</span>
+                <span className="font-bold block">{videos.reduce((acc, v) => acc + (v.likes || []).length, 0)}</span>
                 <span className="text-zinc-500 text-sm">Likes</span>
               </div>
             </div>

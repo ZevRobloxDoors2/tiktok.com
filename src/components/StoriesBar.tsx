@@ -54,7 +54,7 @@ export function StoriesBar() {
         if (user) {
           // Sort stories chronologically
           stories.sort((a, b) => a.timestamp - b.timestamp);
-          const hasUnseen = stories.some(s => !currentUser || !s.viewers?.includes(currentUser.id));
+          const hasUnseen = stories.some(s => !currentUser || !(s.viewers || []).includes(currentUser.id));
           groups.push({ user, stories, hasUnseen });
         }
       });
@@ -209,7 +209,7 @@ export function GlobalStoryViewer() {
         const user = allUsers.find(u => u.id === userId);
         if (user) {
           stories.sort((a, b) => a.timestamp - b.timestamp);
-          const hasUnseen = stories.some(s => !currentUser || !s.viewers?.includes(currentUser.id));
+          const hasUnseen = stories.some(s => !currentUser || !(s.viewers || []).includes(currentUser.id));
           groups.push({ user, stories, hasUnseen });
         }
       });
@@ -267,7 +267,7 @@ function StoryViewerModal({ groups, currentGroupIndex, initialStoryIndex, onClos
   // Mark story as viewed
   useEffect(() => {
     if (!currentStory || !currentUser) return;
-    if (!currentStory.viewers?.includes(currentUser.id)) {
+    if (!(currentStory.viewers || []).includes(currentUser.id)) {
       const updatedViewers = [...(currentStory.viewers || []), currentUser.id];
       currentStory.viewers = updatedViewers;
       getStories().then(allStories => {
@@ -528,7 +528,7 @@ function StoryViewerModal({ groups, currentGroupIndex, initialStoryIndex, onClos
                 className="flex items-center gap-1.5 text-zinc-300 hover:text-white font-semibold"
               >
                 <Eye size={16} />
-                <span>{currentStory.viewers?.length || 0} views</span>
+                <span>{(currentStory.viewers || []).length} views</span>
               </button>
               <span className="text-[10px] text-zinc-400">Expires in 24h</span>
             </div>
@@ -540,15 +540,15 @@ function StoryViewerModal({ groups, currentGroupIndex, initialStoryIndex, onClos
           <div className="absolute inset-x-0 bottom-0 max-h-60 bg-zinc-900/95 backdrop-blur-md rounded-t-2xl p-4 z-40 border-t border-zinc-700 overflow-y-auto hide-scrollbar">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
-                <Eye size={16} /> Viewers ({currentStory.viewers?.length || 0})
+                <Eye size={16} /> Viewers ({(currentStory.viewers || []).length})
               </h4>
               <button onClick={() => setShowViewers(false)} className="text-zinc-400 hover:text-white">
                 <X size={16} />
               </button>
             </div>
             <div className="space-y-2">
-              {currentStory.viewers && currentStory.viewers.length > 0 ? (
-                currentStory.viewers.map(viewerId => (
+              {currentStory.viewers && (currentStory.viewers || []).length > 0 ? (
+                (currentStory.viewers || []).map(viewerId => (
                   <div key={viewerId} className="flex items-center gap-2 text-xs text-zinc-200">
                     <div className="w-6 h-6 rounded-full bg-pink-600 text-white flex items-center justify-center font-bold text-[10px]">
                       {viewerId.charAt(0).toUpperCase()}
