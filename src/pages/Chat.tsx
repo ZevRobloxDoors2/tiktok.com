@@ -589,7 +589,7 @@ export function Chat() {
             <div className="space-y-1 mb-8">
               <div className="flex items-center justify-between mb-3 px-2">
                 <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Members</h4>
-                {(group.ownerId === currentUser.id || group.admins.includes(currentUser.id)) && (
+                {(group.ownerId === currentUser.id || (group.admins || []).includes(currentUser.id)) && (
                   <button 
                     onClick={() => setShowAddMember(true)}
                     className="flex items-center gap-1 text-pink-600 text-[10px] font-black uppercase tracking-widest"
@@ -603,8 +603,8 @@ export function Chat() {
                 const u = allUsers.find(x => x.id === mid);
                 if (!u) return null;
                 const isOwner = group.ownerId === mid;
-                const isAdmin = group.admins.includes(mid);
-                const canManage = (group.ownerId === currentUser.id || group.admins.includes(currentUser.id)) && mid !== currentUser.id && !isOwner;
+                const isAdmin = group.admins?.includes(mid);
+                const canManage = (group.ownerId === currentUser.id || (group.admins || []).includes(currentUser.id)) && mid !== currentUser.id && !isOwner;
 
                 return (
                   <div key={mid} className="flex items-center justify-between p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group/member">
@@ -672,8 +672,8 @@ export function Chat() {
             />
             <div className="max-h-[300px] overflow-y-auto space-y-2">
               {allUsers
-                .filter(u => u.id !== currentUser.id && !group?.members.includes(u.id))
-                .filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()) || u.handle.toLowerCase().includes(searchQuery.toLowerCase()))
+                .filter(u => u.id !== currentUser.id && !(group?.members || []).includes(u.id))
+                .filter(u => (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) || (u.handle || '').toLowerCase().includes(searchQuery.toLowerCase()))
                 .map(u => (
                   <button 
                     key={u.id}

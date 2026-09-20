@@ -80,6 +80,8 @@ export function GamesApps() {
     setIsGameActive, 
     activeGameUrl, 
     setActiveGameUrl,
+    activeGameTitle,
+    setActiveGameTitle,
     miniPlayerActive,
     setMiniPlayerActive,
     miniPlayerUrl,
@@ -108,6 +110,8 @@ export function GamesApps() {
       if (event.data.type === 'CINEMA_PLAYING') {
         setMiniPlayerTitle(event.data.title);
         setMiniPlayerUrl(event.data.url);
+      } else if (event.data.type === 'CINEMA_MINIMIZE') {
+        handleExit();
       }
     };
 
@@ -122,6 +126,7 @@ export function GamesApps() {
 
   const launchItem = async (url: string, title: string) => {
     setActiveGameUrl(url);
+    setActiveGameTitle(title);
     setMiniPlayerTitle(title);
     setIsGameActive(true);
     setMiniPlayerActive(false);
@@ -137,6 +142,7 @@ export function GamesApps() {
     }
     setIsGameActive(false);
     setActiveGameUrl('');
+    setActiveGameTitle(null);
     
     if (currentUser) {
       await updateUserGame(currentUser.id, null);

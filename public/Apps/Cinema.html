@@ -1750,23 +1750,14 @@
     function toggleMiniPlayer() {
       if (!currentItem) return;
       
-      const frame = document.getElementById('videoFrame');
-      const mini = document.getElementById('miniPlayer');
-      const miniContainer = document.getElementById('miniVideoContainer');
-      const miniTitleLabel = document.getElementById('miniTitle');
-      const modal = document.getElementById('modalOverlay');
-      
-      miniTitleLabel.textContent = currentItem.title || currentItem.name;
-      
-      // Move iframe to mini player
-      miniContainer.appendChild(frame);
-      mini.classList.add('show');
-      
-      // Hide modal but keep state
-      modal.classList.remove('show');
-      
-      // Initialize drag
-      makeDraggable(mini, document.getElementById('miniPlayerHeader'));
+      // Notify parent that we want to minimize
+      if (window.parent !== window) {
+        window.parent.postMessage({
+          type: 'CINEMA_MINIMIZE',
+          title: currentItem.title || currentItem.name,
+          url: currentServer ? currentServer.url : ''
+        }, '*');
+      }
     }
 
     function restoreFromMini() {

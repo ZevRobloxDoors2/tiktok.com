@@ -17,6 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setShowAuthModal, 
     isGameActive, 
     setIsGameActive,
+    activeGameTitle,
     miniPlayerActive
   } = useAppStore();
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -155,20 +156,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    // Inject ytgame SDK mock for game compatibility (fixes Bowmasters and others)
-    (window as any).ytgame = {
-      system: {
-        getLanguage: () => 'en',
-        isAudioEnabled: () => true,
-        onPause: (cb: any) => {},
-        onResume: (cb: any) => {}
-      },
-      game: {
-        firstClick: () => {},
-        gameReady: () => {},
-        loadFinished: () => {}
-      }
-    };
+    // Inject ytgame SDK mock ONLY for Bowmasters to prevent interference with other games
+    if (isGameActive && activeGameTitle === 'Bowmasters') {
+      (window as any).ytgame = {
+        system: {
+          getLanguage: () => 'en',
+          isAudioEnabled: () => true,
+          onPause: (cb: any) => {},
+          onResume: (cb: any) => {}
+        },
+        game: {
+          firstClick: () => {},
+          gameReady: () => {},
+          loadFinished: () => {}
+        }
+      };
+    } else {
+      // Clean up for other games
+      delete (window as any).ytgame;
+    }
 
     const handleMessage = async (event: MessageEvent) => {
       // Basic validation for type
@@ -189,7 +195,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isGameActive, activeGameTitle]);
 
   const handleSupportSubmit = async () => {
     if (!supportMessage.trim()) return;

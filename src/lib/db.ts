@@ -145,7 +145,7 @@ export const incrementVideoView = async (id: string, viewerId: string | null) =>
       
       await updateDoc(docRef, {
         views: (video.views || 0) + 1,
-        viewedBy: viewerId ? arrayUnion(viewerId) : viewedBy
+        viewedBy: viewerId ? arrayUnion(viewerId) : (video.viewedBy || [])
       });
     }
   } catch(err) {

@@ -18,6 +18,8 @@ type AppState = {
   setIsGameActive: (val: boolean) => void;
   activeGameUrl: string;
   setActiveGameUrl: (url: string) => void;
+  activeGameTitle: string | null;
+  setActiveGameTitle: (title: string | null) => void;
   miniPlayerActive: boolean;
   setMiniPlayerActive: (val: boolean) => void;
   miniPlayerUrl: string;
@@ -40,6 +42,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isGameActive, setIsGameActive] = useState(false);
   const [activeGameUrl, setActiveGameUrl] = useState('');
+  const [activeGameTitle, setActiveGameTitle] = useState<string | null>(null);
   const [miniPlayerActive, setMiniPlayerActive] = useState(false);
   const [miniPlayerUrl, setMiniPlayerUrl] = useState('');
   const [miniPlayerTitle, setMiniPlayerTitle] = useState('');
@@ -120,6 +123,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsGameActive,
       activeGameUrl,
       setActiveGameUrl,
+      activeGameTitle,
+      setActiveGameTitle,
       miniPlayerActive,
       setMiniPlayerActive,
       miniPlayerUrl,
