@@ -16,6 +16,7 @@ import {
   AlertTriangle, Send, ShieldCheck, Trophy, Phone, Video as VideoIcon, Eye, EyeOff, Key, User as UserIcon
 } from 'lucide-react';
 import { VideoItem } from './Home';
+import { HolographicBadge } from '../components/UIPolish';
 
 // Helper for cropping
 const getCroppedImg = async (imageSrc: string, pixelCrop: any): Promise<string> => {

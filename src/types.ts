@@ -226,6 +226,11 @@ export type AppNotification = {
   message?: string;
   read: boolean;
   timestamp: number;
+  isImportant?: boolean;
+  actionButton?: {
+    text: string;
+    action: string;
+  };
 };
 
 export type Call = {

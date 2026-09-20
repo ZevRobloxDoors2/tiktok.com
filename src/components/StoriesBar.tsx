@@ -551,7 +551,7 @@ function StoryViewerModal({ groups, currentGroupIndex, initialStoryIndex, onClos
                 (currentStory.viewers || []).map(viewerId => (
                   <div key={viewerId} className="flex items-center gap-2 text-xs text-zinc-200">
                     <div className="w-6 h-6 rounded-full bg-pink-600 text-white flex items-center justify-center font-bold text-[10px]">
-                      {viewerId.charAt(0).toUpperCase()}
+                      {viewerId?.toString().charAt(0).toUpperCase() || '?'}
                     </div>
                     <span>{viewerId === currentUser?.id ? 'You' : `User: ${viewerId}`}</span>
                   </div>

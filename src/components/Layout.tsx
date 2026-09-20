@@ -6,6 +6,8 @@ import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
 import { MiniPlayer } from './MiniPlayer';
 import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications, saveGameData, getGameData, subscribeToIncomingCalls } from '../lib/db';
+import { TradientInfoModal } from './TradientInfoModal';
+import { HolographicBadge } from './UIPolish';
 import * as Types from '../types';
 
 import AnnouncementBanner from './AnnouncementBanner';
@@ -45,7 +47,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     message: string;
     fromUserHandle: string;
     fromUserAvatar?: string;
+    isImportant?: boolean;
+    actionButton?: { text: string; action: string };
   } | null>(null);
+  const [showTradientInfo, setShowTradientInfo] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeIncomingCall, setActiveIncomingCall] = useState<Types.Call | null>(null);
   const knownMessageIds = useRef<Set<string>>(new Set());
@@ -149,7 +154,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             id: latest.id,
             message: latest.message || '',
             fromUserHandle: author?.handle || 'eyeshd',
-            fromUserAvatar: author?.avatarUrl
+            fromUserAvatar: author?.avatarUrl,
+            isImportant: latest.isImportant,
+            actionButton: latest.actionButton
           });
 
           if ('Notification' in window && Notification.permission === 'granted') {
@@ -308,9 +315,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {currentUser && !currentUser.isVerified && (
                 <button 
                   onClick={() => setShowVerificationModal(true)}
-                  className="ml-auto flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-1.5 py-0.5 rounded transition-colors"
+                  className="ml-auto flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-2.5 py-1 rounded-lg transition-all hover:scale-105 active:scale-95 shadow-sm border border-blue-500/20"
                 >
-                  <ShieldCheck size={10} /> Be Verified
+                  <ShieldCheck size={12} strokeWidth={3} /> Be Verified
                 </button>
               )}
             </div>
@@ -457,29 +464,52 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {rewardToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[1000] w-[94%] max-w-sm flex items-center gap-4 rounded-2xl bg-indigo-600 text-white p-4 shadow-[0_20px_50px_rgba(79,70,229,0.3)] animate-in slide-in-from-top-10 duration-500 border border-white/20">
-          <div className="relative shrink-0">
-             <img src={rewardToast.fromUserAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=owner'} alt="" className="w-12 h-12 rounded-full border-2 border-white/30" />
-             <div className="absolute -bottom-1 -right-1 bg-white text-indigo-600 rounded-full p-1 shadow-lg">
-                <ShieldCheck size={14} />
-             </div>
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[1000] w-[94%] max-w-sm flex flex-col gap-3 rounded-2xl ${rewardToast.isImportant ? 'bg-indigo-700' : 'bg-indigo-600'} text-white p-4 shadow-[0_20px_50px_rgba(79,70,229,0.3)] animate-in slide-in-from-top-10 duration-500 border border-white/20`}>
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+               <img src={rewardToast.fromUserAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=owner'} alt="" className="w-12 h-12 rounded-full border-2 border-white/30" />
+               <div className="absolute -bottom-1 -right-1 bg-white text-indigo-600 rounded-full p-1 shadow-lg">
+                  <ShieldCheck size={14} />
+               </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h4 className="font-bold text-sm truncate">Message from @{rewardToast.fromUserHandle}</h4>
+                {rewardToast.isImportant && (
+                  <span className="bg-red-500 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest animate-pulse">Important</span>
+                )}
+              </div>
+              <p className="text-[11px] leading-tight opacity-90 line-clamp-2">{rewardToast.message}</p>
+            </div>
+            <button 
+              onClick={async () => {
+                if (currentUser) await markNotificationAsRead(rewardToast.id);
+                setRewardToast(null);
+              }}
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors shrink-0"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-bold text-sm truncate">Message from @{rewardToast.fromUserHandle}</h4>
-            <p className="text-[11px] leading-tight opacity-90 line-clamp-2 mt-0.5">{rewardToast.message}</p>
-          </div>
-          <button 
-            onClick={async () => {
-              if (currentUser) await markNotificationAsRead(rewardToast.id);
-              setRewardToast(null);
-              navigate(currentUser ? `/profile/${currentUser.handle}` : '/');
-            }}
-            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <X size={18} />
-          </button>
+
+          {rewardToast.actionButton && (
+            <button
+              onClick={async () => {
+                if (rewardToast.actionButton?.action === 'show_tradient_info') {
+                  setShowTradientInfo(true);
+                }
+                if (currentUser) await markNotificationAsRead(rewardToast.id);
+                setRewardToast(null);
+              }}
+              className="w-full py-2.5 bg-white text-indigo-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-zinc-100 transition-colors shadow-lg"
+            >
+              {rewardToast.actionButton.text}
+            </button>
+          )}
         </div>
       )}
+
+      <TradientInfoModal isOpen={showTradientInfo} onClose={() => setShowTradientInfo(false)} />
       
       {/* Mobile Bottom Nav */}
       {!isIntro && (

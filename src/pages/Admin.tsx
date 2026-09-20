@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications, getAnnouncements, saveAnnouncement, deleteAnnouncement, subscribeToAnnouncements, subscribeToVerificationRequests, voteOnVerificationRequest, updateVerificationRequestStatus, updateUserVerificationStatus, subscribeToSuggestions, updateDoc, doc, db } from '../lib/db';
+import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications, getAnnouncements, saveAnnouncement, deleteAnnouncement, subscribeToAnnouncements, subscribeToVerificationRequests, voteOnVerificationRequest, updateVerificationRequestStatus, updateUserVerificationStatus, subscribeToSuggestions, getVerificationRequests, updateDoc, doc, db } from '../lib/db';
 import { User, Report, Appeal, AuditLog, Video, AppNotification, Announcement, VerificationRequest, AppSuggestion } from '../types';
 import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings, Megaphone, Plus, Calendar, Palette, Maximize, Target, Layout as LayoutIcon, Ghost, X, Lightbulb, UserCheck } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
@@ -43,6 +43,7 @@ export function Admin() {
   const [announcementDuration, setAnnouncementDuration] = useState('24h');
 
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<{ 
     useCache: boolean; 
     youtubeApiKeyIndex: number; 
@@ -205,6 +206,20 @@ export function Admin() {
 
     if (log.action === 'promote_staff' && user) user.role = 'staff';
     if (log.action === 'remove_staff' && user) user.role = 'user';
+    if (log.action === 'verify_user' && user) {
+      // Toggle logic for "redo" acting as revert if already done
+      if (user.isVerified) {
+        user.isVerified = false;
+        // Also find the verification request and set it back to pending
+        const requests = await getVerificationRequests();
+        const req = requests.find(r => r.userId === user.id && r.status === 'approved');
+        if (req) {
+          await updateVerificationRequestStatus(req.id, 'pending');
+        }
+      } else {
+        user.isVerified = true;
+      }
+    }
     if (log.action === 'ban_user' && user) {
       const type = log.details.includes('(hwid)') ? 'hwid' : log.details.includes('(temp)') ? 'temp' : 'perm';
       user.banStatus = { type, reason: `Redone by owner from audit log ${log.id}`, linkedAccount: type === 'hwid' ? user.handle : undefined };
@@ -289,6 +304,24 @@ export function Admin() {
             reporter.acceptedReportsCount = (reporter.acceptedReportsCount || 0) + 1;
             if (reporter.acceptedReportsCount === 3 && !(reporter.badges || []).includes('Tradient')) {
               reporter.badges = [...(reporter.badges || []), 'Tradient'];
+              // Send important notification for Tradient reward
+              const tradientNotif: AppNotification = {
+                id: `notif_tradient_${Date.now()}`,
+                userId: reporter.id,
+                type: 'tradient_reward',
+                fromUserId: currentUser!.id,
+                title: '🏆 Tradient Badge Earned!',
+                message: "Congratulations! Your reports have been consistently accurate. You've been rewarded with the exclusive Tradient Badge. Check it out!",
+                read: false,
+                timestamp: Date.now(),
+                isImportant: true,
+                actionButton: {
+                  text: 'Check it out',
+                  action: 'show_tradient_info'
+                }
+              };
+              const allNotifs = await getNotifications();
+              await saveNotifications([...allNotifs, tradientNotif]);
             }
             await saveUsers(allUsers);
             setUsers(allUsers);
@@ -664,6 +697,18 @@ export function Admin() {
                                   className="px-2 py-1 bg-blue-500/20 text-blue-600 dark:text-blue-400 font-semibold rounded text-xs hover:bg-blue-500/30"
                                 >
                                   Make Staff
+                                </button>
+                              )}
+                              {u.isVerified && isOwner && (
+                                <button
+                                  onClick={() => executeWithConfirm('Remove Verification Badge', async (reason) => {
+                                    await updateUserVerificationStatus(u.id, false);
+                                    await logAction('remove_verification', u.id, `Removed verification badge. Reason: ${reason}`);
+                                    await loadData();
+                                  })}
+                                  className="px-2 py-1 bg-red-500/20 text-red-600 dark:text-red-400 font-semibold rounded text-xs hover:bg-red-500/30 flex items-center gap-1"
+                                >
+                                  <XCircle size={12} /> Remove Verified
                                 </button>
                               )}
                             </>
@@ -1182,16 +1227,32 @@ export function Admin() {
 
                   return (
                     <div key={request.id} className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm flex flex-col md:flex-row">
-                      <div className="md:w-64 aspect-[3/4] bg-zinc-100 dark:bg-zinc-900 overflow-hidden relative">
-                        <img src={request.schoolIdUrl} className="w-full h-full object-cover" alt="School ID Proof" />
+                      <div className="md:w-64 aspect-[3/4] bg-zinc-100 dark:bg-zinc-900 overflow-hidden relative group">
+                        <img 
+                          src={request.schoolIdUrl} 
+                          className="w-full h-full object-cover cursor-zoom-in transition-transform group-hover:scale-110" 
+                          alt="School ID Proof" 
+                          onClick={() => setZoomedImage(request.schoolIdUrl)}
+                        />
                         <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest border border-white/20">
                           School ID
                         </div>
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                           <Maximize className="text-white" size={24} />
+                        </div>
                       </div>
                       {request.photoUrl && (
-                        <div className="md:w-32 aspect-[3/4] bg-zinc-200 dark:bg-zinc-800 border-l border-zinc-300 dark:border-zinc-700 overflow-hidden relative">
-                           <img src={request.photoUrl} className="w-full h-full object-cover" alt="Selfie" />
+                        <div className="md:w-32 aspect-[3/4] bg-zinc-200 dark:bg-zinc-800 border-l border-zinc-300 dark:border-zinc-700 overflow-hidden relative group">
+                           <img 
+                            src={request.photoUrl} 
+                            className="w-full h-full object-cover cursor-zoom-in transition-transform group-hover:scale-110" 
+                            alt="Selfie" 
+                            onClick={() => setZoomedImage(request.photoUrl!)}
+                           />
                            <div className="absolute bottom-1 left-1 bg-black/30 text-[8px] text-white px-1 rounded">Selfie</div>
+                           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                              <Maximize className="text-white" size={16} />
+                           </div>
                         </div>
                       )}
                       
@@ -1625,6 +1686,42 @@ export function Admin() {
           </div>
         </div>
       )}
+      {/* Image Zoom Modal */}
+      <AnimatePresence>
+        {zoomedImage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setZoomedImage(null)}
+            className="fixed inset-0 z-[2000] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-12 cursor-zoom-out"
+          >
+            <button 
+              onClick={() => setZoomedImage(null)}
+              className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"
+            >
+              <X size={32} />
+            </button>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-5xl w-full max-h-full flex items-center justify-center overflow-hidden rounded-2xl shadow-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                src={zoomedImage} 
+                alt="Zoomed" 
+                className="max-w-full max-h-[85vh] object-contain transition-transform hover:scale-150 cursor-move"
+                onDragStart={(e) => e.preventDefault()}
+              />
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] font-black text-white uppercase tracking-widest pointer-events-none">
+                Hover to Zoom • Click outside to close
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

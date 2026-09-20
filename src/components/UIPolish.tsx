@@ -3,23 +3,23 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, Crown, Heart } from 'lucide-react';
 
 // 1. Holographic Badge Component
-export const HolographicBadge: React.FC<{ type: 'verified' | 'staff' | 'owner' }> = ({ type }) => {
+export const HolographicBadge: React.FC<{ type?: 'verified' | 'staff' | 'owner' }> = ({ type = 'verified' }) => {
   return (
-    <motion.div
+    <motion.span
       className="relative group cursor-help inline-flex items-center"
       whileHover={{ scale: 1.1 }}
     >
-      <div className={`
+      <span className={`
         relative z-10 p-0.5 rounded-full flex items-center justify-center
         ${type === 'owner' ? 'bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 
           type === 'staff' ? 'bg-gradient-to-tr from-emerald-400 via-teal-200 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 
-          'bg-gradient-to-tr from-blue-400 via-cyan-200 to-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'}
+          'bg-[#00A2FF] shadow-[0_0_8px_rgba(0,162,255,0.4)]'}
       `}>
-        {type === 'owner' ? <Crown size={12} className="text-amber-950" /> : <ShieldCheck size={12} className="text-blue-950" />}
-      </div>
+        {type === 'owner' ? <Crown size={12} className="text-amber-950" /> : <ShieldCheck size={12} className={type === 'verified' ? "text-white" : "text-blue-950"} />}
+      </span>
       
       {/* Holographic Shimmer Effect */}
-      <motion.div
+      <motion.span
         animate={{
           backgroundPosition: ['0% 0%', '100% 100%'],
         }}
@@ -32,10 +32,10 @@ export const HolographicBadge: React.FC<{ type: 'verified' | 'staff' | 'owner' }
       />
       
       {/* Tooltip */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black/80 backdrop-blur-md border border-white/20 rounded text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-        {type.toUpperCase()}
-      </div>
-    </motion.div>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black/80 backdrop-blur-md border border-white/20 rounded text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+        {type?.toUpperCase()}
+      </span>
+    </motion.span>
   );
 };
 

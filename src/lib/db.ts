@@ -72,6 +72,8 @@ export const submitVerificationRequest = async (request: VerificationRequest) =>
   }
 };
 
+export const getVerificationRequests = () => fetchCollection<VerificationRequest>('verification_requests');
+
 export const subscribeToVerificationRequests = (callback: (requests: VerificationRequest[]) => void) => {
   return onSnapshot(collection(db, 'verification_requests'), (snapshot) => {
     callback(snapshot.docs.map(doc => doc.data() as VerificationRequest));
