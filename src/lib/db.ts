@@ -1,7 +1,7 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 export { db };
-import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement } from '../types';
+import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement } from '../types';
 
 export const getAnnouncements = () => fetchCollection<Announcement>('announcements');
 
@@ -123,6 +123,12 @@ const saveCollection = async <T extends { id: string }>(collName: string, items:
 };
 
 export const getUsers = () => fetchCollection<User>('users');
+
+export const getUser = async (id: string): Promise<User | null> => {
+  const docRef = doc(db, 'users', id);
+  const snap = await getDoc(docRef);
+  return snap.exists() ? snap.data() as User : null;
+};
 export const saveUsers = (users: User[]) => saveCollection('users', users);
 
 export const updateUser = async (userId: string, data: Partial<User>) => {
@@ -345,8 +351,8 @@ export const markMessagesFromUserAsRead = async (currentUserId: string, otherUse
   }
 };
 
-export const getNotifications = () => fetchCollection<Notification>('notifications');
-export const saveNotifications = (notifications: Notification[]) => saveCollection('notifications', notifications);
+export const getNotifications = () => fetchCollection<AppNotification>('notifications');
+export const saveNotifications = (notifications: AppNotification[]) => saveCollection('notifications', notifications);
 
 export const markNotificationAsRead = async (notificationId: string) => {
   try {
@@ -357,10 +363,10 @@ export const markNotificationAsRead = async (notificationId: string) => {
   }
 };
 
-export const subscribeToNotifications = (userId: string, callback: (notifications: Notification[]) => void) => {
+export const subscribeToNotifications = (userId: string, callback: (notifications: AppNotification[]) => void) => {
   return onSnapshot(collection(db, 'notifications'), (snapshot) => {
     const notifs = snapshot.docs
-      .map(doc => doc.data() as Notification)
+      .map(doc => doc.data() as AppNotification)
       .filter(n => n.userId === userId);
     callback(notifs);
   }, (err) => {
@@ -584,16 +590,6 @@ export const addIceCandidate = async (callId: string, side: 'caller' | 'receiver
   }
 };
 
-export const subscribeToCall = (callId: string, callback: (call: any) => void) => {
-  return onSnapshot(doc(db, 'calls', callId), (docSnap) => {
-    if (docSnap.exists()) {
-      callback(docSnap.data());
-    }
-  }, (err) => {
-    handleFirestoreError(err, OperationType.GET, `calls/${callId}`);
-  });
-};
-
 export const deleteCall = async (callId: string) => {
   try {
     const docRef = doc(db, 'calls', callId);
@@ -703,4 +699,86 @@ export const joinWatchParty = async (partyId: string, userId: string) => {
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `watch_parties/${partyId}`);
   }
+};
+
+// Call Management
+export const initiateCall = async (callerId: string, receiverId: string, type: 'voice' | 'video' = 'voice') => {
+  try {
+    const callId = Math.random().toString(36).substr(2, 9);
+    const callRef = doc(db, 'calls', callId);
+    const callData: Call = {
+      id: callId,
+      callerId,
+      receiverId,
+      type,
+      status: 'offering',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    await setDoc(callRef, callData);
+
+    // Create notification for receiver
+    const notifId = `notif_call_${callId}`;
+    const notif: AppNotification = {
+      id: notifId,
+      userId: receiverId,
+      fromUserId: callerId,
+      type: 'call',
+      callId,
+      title: 'Incoming Call',
+      message: `You have an incoming ${type} call`,
+      read: false,
+      timestamp: Date.now()
+    };
+    await saveNotifications([notif]);
+
+    return callId;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, 'calls');
+    return '';
+  }
+};
+
+export const updateCallStatus = async (callId: string, status: Call['status'], extra?: Partial<Call>) => {
+  try {
+    const callRef = doc(db, 'calls', callId);
+    await updateDoc(callRef, cleanObject({
+      ...extra,
+      status,
+      updatedAt: Date.now()
+    }));
+
+    // If answered or declined, mark call notification as read or delete it
+    if (status === 'answered' || status === 'declined') {
+      const notifId = `notif_call_${callId}`;
+      const notifRef = doc(db, 'notifications', notifId);
+      const snap = await getDoc(notifRef);
+      if (snap.exists()) {
+        await updateDoc(notifRef, { read: true });
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `calls/${callId}`);
+  }
+};
+
+export const subscribeToIncomingCalls = (userId: string, callback: (calls: Call[]) => void) => {
+  const callsRef = collection(db, 'calls');
+  return onSnapshot(callsRef, (snap) => {
+    const calls = snap.docs
+      .map(doc => doc.data() as Call)
+      .filter(c => c.receiverId === userId && c.status === 'offering');
+    callback(calls);
+  });
+};
+
+export const subscribeToCall = (callId: string, callback: (call: Call | null) => void) => {
+  const callRef = doc(db, 'calls', callId);
+  return onSnapshot(callRef, (snap) => {
+    if (snap.exists()) {
+      callback(snap.data() as Call);
+    } else {
+      callback(null);
+    }
+  });
 };

@@ -1,3 +1,4 @@
+// Touch
 export type User = {
   id: string;
   email: string;
@@ -191,17 +192,30 @@ export type UserStatus = {
   lastActive: number;
 };
 
-export type Notification = {
+export type AppNotification = {
   id: string;
   userId: string; // The user receiving the notification
-  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward' | 'support_resolved';
+  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward' | 'support_resolved' | 'call';
   fromUserId: string;
   videoId?: string;
   forumPostId?: string;
+  callId?: string;
   title?: string;
   message?: string;
   read: boolean;
   timestamp: number;
+};
+
+export type Call = {
+  id: string;
+  callerId: string;
+  receiverId: string;
+  type: 'voice' | 'video';
+  status: 'offering' | 'answered' | 'declined' | 'ended';
+  createdAt: number;
+  updatedAt: number;
+  offer?: any;
+  answer?: any;
 };
 
 export type GameData = {

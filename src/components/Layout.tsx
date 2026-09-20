@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
 import { MiniPlayer } from './MiniPlayer';
-import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications, saveGameData, getGameData } from '../lib/db';
+import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications, saveGameData, getGameData, subscribeToIncomingCalls } from '../lib/db';
+import * as Types from '../types';
 
 import AnnouncementBanner from './AnnouncementBanner';
+import { IncomingCallModal } from './IncomingCallModal';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { 
@@ -41,6 +43,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     fromUserAvatar?: string;
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [activeIncomingCall, setActiveIncomingCall] = useState<Types.Call | null>(null);
   const knownMessageIds = useRef<Set<string>>(new Set());
   const location = useLocation();
   const navigate = useNavigate();
@@ -155,7 +158,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => unsubscribe();
+    const unsubCalls = currentUser ? subscribeToIncomingCalls(currentUser.id, (calls) => {
+      if (calls.length > 0) {
+        setActiveIncomingCall(calls[0]);
+      } else {
+        setActiveIncomingCall(null);
+      }
+    }) : () => {};
+
+    return () => {
+      unsubscribe();
+      unsubCalls();
+    };
   }, [currentUser?.id]);
 
   useEffect(() => {
@@ -497,6 +511,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       
+      <AnimatePresence>
+        {activeIncomingCall && (
+          <IncomingCallModal 
+            call={activeIncomingCall} 
+            onClose={() => setActiveIncomingCall(null)} 
+          />
+        )}
+      </AnimatePresence>
+
       {/* Support Modal */}
       {showSupportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
