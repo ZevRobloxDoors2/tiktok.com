@@ -14,7 +14,6 @@ import AnnouncementBanner from './AnnouncementBanner';
 import { IncomingCallModal } from './IncomingCallModal';
 
 import { VerificationModal } from './VerificationModal';
-import { HolographicBadge } from './UIPolish';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { 

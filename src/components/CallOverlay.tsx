@@ -7,17 +7,77 @@ import {
   Phone, X, Check
 } from 'lucide-react';
 import { useAppStore } from '../store';
-import { createCall, updateCall, addIceCandidate, subscribeToCall, deleteCall, db } from '../lib/db';
+import { createCall, updateCall, addIceCandidate, subscribeToCall, deleteCall, getUsers, db } from '../lib/db';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
-const servers = {
+const servers: RTCConfiguration = {
   iceServers: [
-    {
-      urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
-    },
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
   ],
   iceCandidatePoolSize: 10,
 };
+
+// Web Audio API helper for real voice activity detection
+function setupAudioAnalyzer(stream: MediaStream, onSpeakingChange: (speaking: boolean) => void): () => void {
+  try {
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks || audioTracks.length === 0) return () => {};
+
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return () => {};
+
+    const audioCtx = new AudioContextClass();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.4;
+    source.connect(analyser);
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    let isSpeakingCurrent = false;
+    let animId: number;
+
+    const checkVolume = () => {
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+      }
+      const average = sum / bufferLength;
+      // Speech volume threshold (ranges 0-255)
+      const speaking = average > 14;
+      if (speaking !== isSpeakingCurrent) {
+        isSpeakingCurrent = speaking;
+        onSpeakingChange(speaking);
+      }
+      animId = requestAnimationFrame(checkVolume);
+    };
+    checkVolume();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      try {
+        source.disconnect();
+        analyser.disconnect();
+        audioCtx.close().catch(() => {});
+      } catch (e) {
+        // ignore cleanup errors
+      }
+    };
+  } catch (e) {
+    console.warn("Could not setup audio analyzer:", e);
+    return () => {};
+  }
+}
 
 export function CallOverlay() {
   const { isCalling, setIsCalling, callData, currentUser, setCallData } = useAppStore();
@@ -37,6 +97,24 @@ export function CallOverlay() {
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const callIdRef = useRef<string | null>(null);
 
+  const callUnsubRef = useRef<(() => void) | null>(null);
+  const isSettingRemoteDesc = useRef<boolean>(false);
+  const processedCandidates = useRef<Set<string>>(new Set());
+  const candidatesQueue = useRef<RTCIceCandidateInit[]>([]);
+  const cleanupTimerRef = useRef<any>(null);
+  const localAnalyzerCleanupRef = useRef<(() => void) | null>(null);
+  const remoteAnalyzerCleanupRef = useRef<(() => void) | null>(null);
+
+  // Helper to attach and play remote audio
+  const attachRemoteAudio = () => {
+    if (remoteAudioRef.current && remoteStream.current) {
+      remoteAudioRef.current.srcObject = remoteStream.current;
+      remoteAudioRef.current.play().catch(e => {
+        console.warn("Auto-play blocked or waiting for user interaction:", e);
+      });
+    }
+  };
+
   // Listen for incoming calls
   useEffect(() => {
     if (!currentUser) return;
@@ -51,27 +129,45 @@ export function CallOverlay() {
       snapshot.docChanges().forEach(async (change) => {
         if (change.type === 'added') {
           const data = change.doc.data();
-          if (!isCalling) {
-            import('../lib/db').then(({ getUsers }) => {
-              getUsers().then(users => {
-                const caller = users.find(u => u.id === data.callerId);
-                if (caller) {
-                  setCallData({ user: caller, type: 'voice' });
-                  setIsCalling(true);
-                  setCallStatus('ringing');
-                  callIdRef.current = data.id;
-                }
-              });
-            });
+          // Filter out stale calls older than 60 seconds
+          if (data.timestamp && Date.now() - data.timestamp > 60000) return;
+
+          if (!isCalling && callStatus === 'idle') {
+            try {
+              const users = await getUsers();
+              const caller = users.find(u => u.id === data.callerId);
+              if (caller) {
+                setCallData({ user: caller, type: data.type || 'voice' });
+                setIsCalling(true);
+                setCallStatus('ringing');
+                callIdRef.current = data.id;
+              }
+            } catch (err) {
+              console.error("Failed to load caller info:", err);
+            }
           }
         }
       });
+    }, (err) => {
+      console.warn("Incoming calls snapshot warning:", err);
     });
 
     return () => unsub();
-  }, [currentUser, isCalling, setCallData, setIsCalling]);
+  }, [currentUser?.id, isCalling, callStatus, setCallData, setIsCalling]);
 
-  // Handle Call Lifecycle
+  // If ringing, listen to see if the caller hangs up before we answer
+  useEffect(() => {
+    if (callStatus === 'ringing' && callIdRef.current) {
+      const unsub = subscribeToCall(callIdRef.current, (data) => {
+        if (!data || data.status === 'ended') {
+          handleEndCall(false);
+        }
+      });
+      return () => unsub();
+    }
+  }, [callStatus]);
+
+  // Handle Call Lifecycle for Caller
   useEffect(() => {
     if (!isCalling || !callData || !currentUser) return;
 
@@ -84,73 +180,147 @@ export function CallOverlay() {
     }
 
     async function startCall() {
-      const callId = [currentUser!.id, callData!.user.id].sort().join('_');
-      callIdRef.current = callId;
+      // Clear any pending old call deletion timer
+      if (cleanupTimerRef.current) {
+        clearTimeout(cleanupTimerRef.current);
+        cleanupTimerRef.current = null;
+      }
+      if (callUnsubRef.current) {
+        callUnsubRef.current();
+        callUnsubRef.current = null;
+      }
+
+      // Generate a unique session call ID to completely prevent collisions with previous calls
+      const sessionCallId = `call_${currentUser!.id}_${callData!.user.id}_${Date.now()}`;
+      callIdRef.current = sessionCallId;
+      processedCandidates.current.clear();
+      candidatesQueue.current = [];
+      isSettingRemoteDesc.current = false;
       
-      pc.current = new RTCPeerConnection(servers);
+      const newPc = new RTCPeerConnection(servers);
+      pc.current = newPc;
       remoteStream.current = new MediaStream();
 
       try {
-        localStream.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        localStream.current.getTracks().forEach((track) => {
-          pc.current?.addTrack(track, localStream.current!);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isCameraOn });
+        localStream.current = stream;
+        stream.getTracks().forEach((track) => {
+          newPc.addTrack(track, stream);
         });
+
+        // Setup real voice activity analyzer
+        localAnalyzerCleanupRef.current?.();
+        localAnalyzerCleanupRef.current = setupAudioAnalyzer(stream, setIsSpeaking);
       } catch (err) {
         console.error("Microphone error:", err);
       }
 
-      pc.current.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-          remoteStream.current?.addTrack(track);
-        });
-      };
+      newPc.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          remoteStream.current = event.streams[0];
+        } else if (event.track) {
+          if (!remoteStream.current) remoteStream.current = new MediaStream();
+          remoteStream.current.addTrack(event.track);
+        }
 
-      pc.current.onicecandidate = (event) => {
-        if (event.candidate) {
-          addIceCandidate(callId, 'caller', event.candidate.toJSON());
+        attachRemoteAudio();
+
+        if (remoteVideoRef.current && remoteStream.current) {
+          remoteVideoRef.current.srcObject = remoteStream.current;
+        }
+
+        if (remoteStream.current) {
+          remoteAnalyzerCleanupRef.current?.();
+          remoteAnalyzerCleanupRef.current = setupAudioAnalyzer(remoteStream.current, setRemoteIsSpeaking);
         }
       };
 
-      const offerDescription = await pc.current.createOffer();
-      await pc.current.setLocalDescription(offerDescription);
+      newPc.onicecandidate = (event) => {
+        if (event.candidate && callIdRef.current === sessionCallId) {
+          addIceCandidate(sessionCallId, 'caller', event.candidate.toJSON());
+        }
+      };
 
-      await createCall(callId, currentUser!.id, callData!.user.id, {
+      newPc.oniceconnectionstatechange = () => {
+        console.log("Caller ICE connection state:", newPc.iceConnectionState);
+        if (newPc.iceConnectionState === 'connected' || newPc.iceConnectionState === 'completed') {
+          attachRemoteAudio();
+        }
+      };
+
+      const offerDescription = await newPc.createOffer();
+      await newPc.setLocalDescription(offerDescription);
+
+      await createCall(sessionCallId, currentUser!.id, callData!.user.id, {
         type: offerDescription.type,
         sdp: offerDescription.sdp,
       });
 
-      const candidatesQueue: RTCIceCandidateInit[] = [];
+      // Subscribe to signaling updates
+      const unsub = subscribeToCall(sessionCallId, async (data) => {
+        if (!data || pc.current !== newPc) return;
 
-      subscribeToCall(callId, async (data) => {
-        if (!pc.current) return;
         if (data.status === 'ended') {
           handleEndCall(false);
           return;
         }
+
         if (data.status === 'active' && callStatus !== 'active') {
           setCallStatus('active');
         }
-        if (data.answer && !pc.current.currentRemoteDescription) {
-          await pc.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-          // Process queued candidates
-          while (candidatesQueue.length > 0) {
-            const cand = candidatesQueue.shift();
-            if (cand) await pc.current.addIceCandidate(new RTCIceCandidate(cand));
+
+        // Set remote answer description safely without race conditions
+        if (data.answer && newPc.signalingState === 'have-local-offer' && !isSettingRemoteDesc.current) {
+          isSettingRemoteDesc.current = true;
+          try {
+            await newPc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            setCallStatus('active');
+            attachRemoteAudio();
+
+            // Drain queued ICE candidates
+            while (candidatesQueue.current.length > 0) {
+              const cand = candidatesQueue.current.shift();
+              if (cand && newPc.remoteDescription) {
+                try {
+                  await newPc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch (e) {
+                  console.warn("Error adding queued receiver candidate:", e);
+                }
+              }
+            }
+          } catch (err) {
+            console.error("Error setting remote answer description:", err);
+          } finally {
+            isSettingRemoteDesc.current = false;
           }
         }
-        if (data.receiverCandidates) {
-          data.receiverCandidates.forEach(async (candidate: any) => {
-            if (pc.current?.currentRemoteDescription) {
-              await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+
+        // Process receiver ICE candidates with deduplication
+        if (Array.isArray(data.receiverCandidates)) {
+          for (const candidate of data.receiverCandidates) {
+            if (!candidate || !candidate.candidate) continue;
+            const key = `${candidate.candidate}_${candidate.sdpMid}_${candidate.sdpMLineIndex}`;
+            if (processedCandidates.current.has(key)) continue;
+            processedCandidates.current.add(key);
+
+            if (newPc.remoteDescription && newPc.remoteDescription.type) {
+              try {
+                await newPc.addIceCandidate(new RTCIceCandidate(candidate));
+              } catch (e) {
+                console.warn("Error adding receiver candidate:", e);
+              }
             } else {
-              candidatesQueue.push(candidate);
+              candidatesQueue.current.push(candidate);
             }
-          });
+          }
         }
       });
+
+      callUnsubRef.current = unsub;
     }
   }, [isCalling, callData, currentUser, callStatus]);
 
+  // Synchronize media video elements
   useEffect(() => {
     if (callStatus === 'active' || isCameraOn) {
       if (localStream.current && localVideoRef.current) {
@@ -158,98 +328,205 @@ export function CallOverlay() {
       }
       if (remoteStream.current) {
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream.current;
-        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream.current;
+        attachRemoteAudio();
       }
     }
   }, [callStatus, isCameraOn, isCalling]);
 
   const acceptCall = async () => {
-    if (!callIdRef.current || !currentUser) return;
-    setCallStatus('active');
+    const sessionCallId = callIdRef.current;
+    if (!sessionCallId || !currentUser) return;
+    
+    if (cleanupTimerRef.current) {
+      clearTimeout(cleanupTimerRef.current);
+      cleanupTimerRef.current = null;
+    }
+    if (callUnsubRef.current) {
+      callUnsubRef.current();
+      callUnsubRef.current = null;
+    }
 
-    pc.current = new RTCPeerConnection(servers);
+    setCallStatus('active');
+    processedCandidates.current.clear();
+    candidatesQueue.current = [];
+    isSettingRemoteDesc.current = false;
+
+    const newPc = new RTCPeerConnection(servers);
+    pc.current = newPc;
     remoteStream.current = new MediaStream();
 
     try {
-      localStream.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: isCameraOn });
-      localStream.current.getTracks().forEach((track) => {
-        pc.current?.addTrack(track, localStream.current!);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isCameraOn });
+      localStream.current = stream;
+      stream.getTracks().forEach((track) => {
+        newPc.addTrack(track, stream);
       });
+
+      // Setup real voice activity analyzer
+      localAnalyzerCleanupRef.current?.();
+      localAnalyzerCleanupRef.current = setupAudioAnalyzer(stream, setIsSpeaking);
     } catch (err) {
       console.error("Media error:", err);
     }
 
-    pc.current.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.current?.addTrack(track);
-      });
-    };
+    newPc.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        remoteStream.current = event.streams[0];
+      } else if (event.track) {
+        if (!remoteStream.current) remoteStream.current = new MediaStream();
+        remoteStream.current.addTrack(event.track);
+      }
 
-    pc.current.onicecandidate = (event) => {
-      if (event.candidate) {
-        addIceCandidate(callIdRef.current!, 'receiver', event.candidate.toJSON());
+      attachRemoteAudio();
+
+      if (remoteVideoRef.current && remoteStream.current) {
+        remoteVideoRef.current.srcObject = remoteStream.current;
+      }
+
+      if (remoteStream.current) {
+        remoteAnalyzerCleanupRef.current?.();
+        remoteAnalyzerCleanupRef.current = setupAudioAnalyzer(remoteStream.current, setRemoteIsSpeaking);
       }
     };
 
-    const candidatesQueue: RTCIceCandidateInit[] = [];
+    newPc.onicecandidate = (event) => {
+      if (event.candidate && callIdRef.current === sessionCallId) {
+        addIceCandidate(sessionCallId, 'receiver', event.candidate.toJSON());
+      }
+    };
 
-    subscribeToCall(callIdRef.current, async (data) => {
-      if (!pc.current) return;
+    newPc.oniceconnectionstatechange = () => {
+      console.log("Receiver ICE connection state:", newPc.iceConnectionState);
+      if (newPc.iceConnectionState === 'connected' || newPc.iceConnectionState === 'completed') {
+        attachRemoteAudio();
+      }
+    };
+
+    const unsub = subscribeToCall(sessionCallId, async (data) => {
+      if (!data || pc.current !== newPc) return;
+
       if (data.status === 'ended') {
         handleEndCall(false);
         return;
       }
-      if (data.offer && !pc.current.currentRemoteDescription) {
-        await pc.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pc.current.createAnswer();
-        await pc.current.setLocalDescription(answer);
-        await updateCall(callIdRef.current!, {
-          answer: { type: answer.type, sdp: answer.sdp },
-          status: 'active'
-        });
-        // Process queued candidates
-        while (candidatesQueue.length > 0) {
-          const cand = candidatesQueue.shift();
-          if (cand) await pc.current.addIceCandidate(new RTCIceCandidate(cand));
+
+      // Process offer only when in 'stable' state and not already processing
+      if (data.offer && newPc.signalingState === 'stable' && !isSettingRemoteDesc.current && !newPc.currentRemoteDescription) {
+        isSettingRemoteDesc.current = true;
+        try {
+          await newPc.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await newPc.createAnswer();
+          await newPc.setLocalDescription(answer);
+
+          await updateCall(sessionCallId, {
+            answer: { type: answer.type, sdp: answer.sdp },
+            status: 'active'
+          });
+
+          attachRemoteAudio();
+
+          // Process queued caller candidates
+          while (candidatesQueue.current.length > 0) {
+            const cand = candidatesQueue.current.shift();
+            if (cand && newPc.remoteDescription) {
+              try {
+                await newPc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (e) {
+                console.warn("Error adding queued caller candidate:", e);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error setting remote offer / creating answer:", err);
+        } finally {
+          isSettingRemoteDesc.current = false;
         }
       }
-      if (data.callerCandidates) {
-        data.callerCandidates.forEach(async (candidate: any) => {
-          if (pc.current?.currentRemoteDescription) {
-            await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+
+      // Process caller ICE candidates with deduplication
+      if (Array.isArray(data.callerCandidates)) {
+        for (const candidate of data.callerCandidates) {
+          if (!candidate || !candidate.candidate) continue;
+          const key = `${candidate.candidate}_${candidate.sdpMid}_${candidate.sdpMLineIndex}`;
+          if (processedCandidates.current.has(key)) continue;
+          processedCandidates.current.add(key);
+
+          if (newPc.remoteDescription && newPc.remoteDescription.type) {
+            try {
+              await newPc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (e) {
+              console.warn("Error adding caller candidate:", e);
+            }
           } else {
-            candidatesQueue.push(candidate);
+            candidatesQueue.current.push(candidate);
           }
-        });
+        }
       }
     });
+
+    callUnsubRef.current = unsub;
   };
 
   const handleEndCall = async (shouldUpdateDb = true) => {
     const currentId = callIdRef.current;
+    
+    // Stop listening to signaling updates
+    if (callUnsubRef.current) {
+      callUnsubRef.current();
+      callUnsubRef.current = null;
+    }
+
+    // Stop audio analyzers
+    localAnalyzerCleanupRef.current?.();
+    localAnalyzerCleanupRef.current = null;
+    remoteAnalyzerCleanupRef.current?.();
+    remoteAnalyzerCleanupRef.current = null;
+
     if (shouldUpdateDb && currentId) {
       try {
         await updateCall(currentId, { status: 'ended' });
-        setTimeout(() => {
+        cleanupTimerRef.current = setTimeout(() => {
           try {
             deleteCall(currentId);
           } catch (e) {
             console.warn("Could not delete call doc:", e);
           }
-        }, 2000);
+        }, 3000);
       } catch (err) {
         console.error("Failed to update call status in DB:", err);
       }
     }
     
-    localStream.current?.getTracks().forEach(t => t.stop());
-    pc.current?.close();
-    pc.current = null;
+    // Stop and release all tracks
+    if (localStream.current) {
+      localStream.current.getTracks().forEach(t => t.stop());
+      localStream.current = null;
+    }
+    if (remoteStream.current) {
+      remoteStream.current.getTracks().forEach(t => t.stop());
+      remoteStream.current = null;
+    }
+
+    if (pc.current) {
+      pc.current.ontrack = null;
+      pc.current.onicecandidate = null;
+      pc.current.oniceconnectionstatechange = null;
+      pc.current.close();
+      pc.current = null;
+    }
+
+    isSettingRemoteDesc.current = false;
+    processedCandidates.current.clear();
+    candidatesQueue.current = [];
+
     setIsCalling(false);
     setCallStatus('idle');
+    setCallData(null);
     callIdRef.current = null;
     setIsCameraOn(false);
     setIsScreenSharing(false);
+    setIsSpeaking(false);
+    setRemoteIsSpeaking(false);
   };
 
   const toggleCamera = async () => {
@@ -259,11 +536,19 @@ export function CallOverlay() {
         const videoTrack = stream.getVideoTracks()[0];
         if (localStream.current) {
           localStream.current.addTrack(videoTrack);
-          if (pc.current) {
-            const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
-            if (sender) sender.replaceTrack(videoTrack);
-            else pc.current.addTrack(videoTrack, localStream.current);
+        } else {
+          localStream.current = stream;
+        }
+        if (pc.current) {
+          const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(videoTrack);
+          } else {
+            pc.current.addTrack(videoTrack, localStream.current);
           }
+        }
+        if (localVideoRef.current && localStream.current) {
+          localVideoRef.current.srcObject = localStream.current;
         }
         setIsCameraOn(true);
       } catch (err) {
@@ -274,6 +559,10 @@ export function CallOverlay() {
       if (videoTrack) {
         videoTrack.stop();
         localStream.current?.removeTrack(videoTrack);
+        if (pc.current) {
+          const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) sender.replaceTrack(null);
+        }
         setIsCameraOn(false);
       }
     }
@@ -284,11 +573,20 @@ export function CallOverlay() {
       try {
         const stream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true });
         const screenTrack = stream.getVideoTracks()[0];
-        screenTrack.onended = () => setIsScreenSharing(false);
+        screenTrack.onended = () => {
+          setIsScreenSharing(false);
+          if (pc.current) {
+            const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
+            if (sender) sender.replaceTrack(null);
+          }
+        };
         if (pc.current) {
           const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) sender.replaceTrack(screenTrack);
-          else pc.current.addTrack(screenTrack, stream);
+          if (sender) {
+            sender.replaceTrack(screenTrack);
+          } else if (localStream.current) {
+            pc.current.addTrack(screenTrack, localStream.current);
+          }
         }
         setIsScreenSharing(true);
       } catch (err) {
@@ -296,6 +594,10 @@ export function CallOverlay() {
       }
     } else {
       setIsScreenSharing(false);
+      if (pc.current) {
+        const sender = pc.current.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) sender.replaceTrack(null);
+      }
       if (isCameraOn) toggleCamera();
     }
   };
@@ -305,13 +607,10 @@ export function CallOverlay() {
   }, [isMuted]);
 
   useEffect(() => {
-    if (callStatus !== 'active') return;
-    const interval = setInterval(() => {
-      setIsSpeaking(Math.random() > 0.7);
-      setRemoteIsSpeaking(Math.random() > 0.8);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [callStatus]);
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = isDeafened;
+    }
+  }, [isDeafened]);
 
   if (!isCalling || !callData) return null;
 
@@ -323,7 +622,7 @@ export function CallOverlay() {
         exit={{ opacity: 0, y: 100 }}
         className="fixed inset-0 z-[3000] bg-[#1E1F22] flex flex-col overflow-hidden font-sans"
       >
-        <audio ref={remoteAudioRef} autoPlay />
+        <audio ref={remoteAudioRef} autoPlay playsInline />
         
         <div className="h-12 border-b border-black/20 flex items-center justify-between px-4 bg-[#313338]">
           <div className="flex items-center gap-2">

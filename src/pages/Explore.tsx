@@ -45,7 +45,10 @@ export function Explore() {
       const matchedLocalVideos = allVideos.filter(v => {
         if (v.isRemoved) return false;
         const u = allUsers.find(user => user.id === v.userId);
-        return v.description.toLowerCase().includes(q) || v.tags.some(t => t.toLowerCase().includes(q)) || (u && u.username.toLowerCase().includes(q));
+        const descMatch = (v.description || '').toLowerCase().includes(q);
+        const tagMatch = Array.isArray(v.tags) && v.tags.some(t => t && t.toLowerCase().includes(q));
+        const userMatch = (u?.username || '').toLowerCase().includes(q);
+        return descMatch || tagMatch || userMatch;
       }).map(v => ({...v, user: allUsers.find(u => u.id === v.userId)}));
 
       // Find YouTube shorts

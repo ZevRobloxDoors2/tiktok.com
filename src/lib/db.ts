@@ -95,7 +95,7 @@ export const voteOnVerificationRequest = async (requestId: string, adminId: stri
   }
 };
 
-export const updateVerificationRequestStatus = async (requestId: string, status: 'approved' | 'rejected') => {
+export const updateVerificationRequestStatus = async (requestId: string, status: 'approved' | 'rejected' | 'pending') => {
   try {
     const ref = doc(db, 'verification_requests', requestId);
     await updateDoc(ref, { status });
