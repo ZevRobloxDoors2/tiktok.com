@@ -38,7 +38,7 @@ const AnnouncementBanner: React.FC = () => {
     return () => unsub();
   }, [location.pathname, activeGameTitle]);
 
-  const activeAnnouncements = announcements.filter(a => !dismissed.includes(a.id));
+  const activeAnnouncements = announcements;
 
   if (activeAnnouncements.length === 0) return null;
 
@@ -66,12 +66,7 @@ const AnnouncementBanner: React.FC = () => {
               {a.text}
             </div>
 
-            <button 
-              onClick={() => setDismissed(prev => [...prev, a.id])}
-              className="flex-shrink-0 p-2 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <X size={18} />
-            </button>
+            <div className="flex-shrink-0 w-8" /> 
             
             {/* Subtle glow effect for large announcements */}
             {a.size === 'lg' && (

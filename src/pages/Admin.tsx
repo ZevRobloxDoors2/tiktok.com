@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications, getAnnouncements, saveAnnouncement, deleteAnnouncement } from '../lib/db';
-import { User, Report, Appeal, AuditLog, Video, Notification, Announcement } from '../types';
+import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications, getAnnouncements, saveAnnouncement, deleteAnnouncement, subscribeToAnnouncements } from '../lib/db';
+import { User, Report, Appeal, AuditLog, Video, AppNotification, Announcement } from '../types';
 import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings, Megaphone, Plus, Calendar, Palette, Maximize, Target, Layout as LayoutIcon, Ghost } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -81,35 +81,44 @@ export function Admin() {
   const handleCreateAnnouncement = async () => {
     if (!newAnnouncement.text) return;
     
-    const durationMs = announcementDuration === '1h' ? 60 * 60 * 1000 :
-                       announcementDuration === '24h' ? 24 * 60 * 60 * 1000 :
-                       announcementDuration === '7d' ? 7 * 24 * 60 * 60 * 1000 :
-                       announcementDuration === '30d' ? 30 * 24 * 60 * 60 * 1000 : 0;
-    
-    const announcement: Announcement = {
-      id: `ann_${Date.now()}`,
-      text: newAnnouncement.text!,
-      type: newAnnouncement.type as any,
-      targetPage: newAnnouncement.targetPage,
-      targetGameIds: newAnnouncement.targetGameIds,
-      color: newAnnouncement.color!,
-      size: newAnnouncement.size as any,
-      createdAt: Date.now(),
-      expiresAt: durationMs > 0 ? Date.now() + durationMs : undefined,
-      active: true
-    };
+    setConfirmModal(prev => ({ ...prev, loading: true }));
+    try {
+      const durationMs = announcementDuration === '1h' ? 60 * 60 * 1000 :
+                         announcementDuration === '24h' ? 24 * 60 * 60 * 1000 :
+                         announcementDuration === '7d' ? 7 * 24 * 60 * 60 * 1000 :
+                         announcementDuration === '30d' ? 30 * 24 * 60 * 60 * 1000 : 0;
+      
+      const announcement: Announcement = {
+        id: `ann_${Date.now()}`,
+        text: newAnnouncement.text!,
+        type: newAnnouncement.type as any,
+        targetPage: newAnnouncement.targetPage,
+        targetGameIds: newAnnouncement.targetGameIds,
+        color: newAnnouncement.color!,
+        size: newAnnouncement.size as any,
+        createdAt: Date.now(),
+        expiresAt: durationMs > 0 ? Date.now() + durationMs : undefined,
+        active: true
+      };
 
-    await saveAnnouncement(announcement);
-    setAnnouncements(prev => [announcement, ...prev]);
-    setNewAnnouncement({
-      text: '',
-      type: 'global',
-      color: 'bg-pink-600',
-      size: 'md',
-      active: true,
-      targetGameIds: []
-    });
-    await logAction('create_announcement', announcement.id, `Created ${announcement.type} announcement: ${announcement.text.substring(0, 30)}...`);
+      await saveAnnouncement(announcement);
+      // Local update is redundant if subscription is active but good for responsiveness
+      setAnnouncements(prev => [announcement, ...prev]);
+      setNewAnnouncement({
+        text: '',
+        type: 'global',
+        color: 'bg-pink-600',
+        size: 'md',
+        active: true,
+        targetGameIds: []
+      });
+      await logAction('create_announcement', announcement.id, `Created ${announcement.type} announcement: ${announcement.text.substring(0, 30)}...`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create announcement. Please check permissions (Try logging in with Google).");
+    } finally {
+      setConfirmModal(prev => ({ ...prev, loading: false }));
+    }
   };
 
   const handleDeleteAnnouncement = async (id: string) => {
@@ -119,7 +128,11 @@ export function Admin() {
   };
 
   useEffect(() => {
-    if (isMod) loadData();
+    if (isMod) {
+      loadData();
+      const unsub = subscribeToAnnouncements(setAnnouncements);
+      return () => unsub();
+    }
   }, [isMod]);
 
   if (!isMod) {

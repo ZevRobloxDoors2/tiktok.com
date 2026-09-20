@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import { getNotifications, getMessages, getUsers, getGroupChats, saveGroupChats } from '../lib/db';
-import { Notification, Message, User, GroupChat } from '../types';
+import { AppNotification, Message, User, GroupChat } from '../types';
 import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Search, Check, LifeBuoy, Phone, Activity, Server, Database, Sparkles, Youtube, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { addReport } from '../lib/db';

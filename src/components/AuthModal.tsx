@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { getUsers, saveUsers, updateUser } from '../lib/db';
 import { User } from '../types';
-import { signInWithGoogle } from '../lib/firebase';
+import { signInWithGoogle, signInAsGuest } from '../lib/firebase';
 import { Loader2 } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
 
@@ -69,6 +69,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     
     try {
       if (email === 'zaellacruze1@gmail.com' && password === 'nohorse') {
+        await signInAsGuest();
         const user = await syncUserToDb(email, 'Zaella Cruze', null);
         setCurrentUser(user);
         onClose();

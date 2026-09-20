@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Video, Notification } from './types';
+import { User, Video, AppNotification } from './types';
 import { getUsers, getVideos, initDb } from './lib/db';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from './lib/firebase';

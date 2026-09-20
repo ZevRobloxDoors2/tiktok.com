@@ -1,7 +1,7 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 export { db };
-import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement } from '../types';
+import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement, Call } from '../types';
 
 export const getAnnouncements = () => fetchCollection<Announcement>('announcements');
 
@@ -378,7 +378,7 @@ export const announceForumPostToEveryone = async (post: FAQPost, author: User) =
   try {
     const allUsers = await getUsers();
     const existingNotifs = await getNotifications();
-    const newNotifs: Notification[] = allUsers.map(user => ({
+    const newNotifs: AppNotification[] = allUsers.map(user => ({
       id: `notif_forum_${post.id}_${user.id}`,
       userId: user.id,
       type: 'forum_announcement',
@@ -426,7 +426,7 @@ export const resolveReport = async (reportId: string, adminId: string, adminUser
     // Create notification for reporter
     const notifId = `notif_resolved_${reportId}`;
     const notifRef = doc(db, 'notifications', notifId);
-    const notification: Notification = {
+    const notification: AppNotification = {
       id: notifId,
       userId: report.reporterId,
       type: 'support_resolved',

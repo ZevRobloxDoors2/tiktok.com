@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, browserPopupRedirectResolver } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // Safe base64-encoded key to prevent GitHub secret scanning and ensure Firebase never receives an empty string
@@ -59,13 +59,22 @@ export { auth, db };
 
 // Use the popup redirect resolver to support iframe authentication
 export const signInWithGoogle = async () => {
-
   const provider = new GoogleAuthProvider();
   try {
     const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     return result.user;
   } catch (error) {
     console.error("Error signing in with Google", error);
+    throw error;
+  }
+};
+
+export const signInAsGuest = async () => {
+  try {
+    const result = await signInAnonymously(auth);
+    return result.user;
+  } catch (error) {
+    console.error("Error signing in anonymously", error);
     throw error;
   }
 };

@@ -211,11 +211,13 @@ export type Call = {
   callerId: string;
   receiverId: string;
   type: 'voice' | 'video';
-  status: 'offering' | 'answered' | 'declined' | 'ended';
+  status: 'offering' | 'answered' | 'declined' | 'ended' | 'active';
   createdAt: number;
   updatedAt: number;
   offer?: any;
   answer?: any;
+  callerCandidates?: any[];
+  receiverCandidates?: any[];
 };
 
 export type GameData = {
