@@ -11,6 +11,8 @@ import * as Types from '../types';
 import AnnouncementBanner from './AnnouncementBanner';
 import { IncomingCallModal } from './IncomingCallModal';
 
+import { VerificationModal } from './VerificationModal';
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const { 
     currentUser, 
@@ -26,6 +28,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     miniPlayerActive
   } = useAppStore();
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
   const [supportType, setSupportType] = useState<'support' | 'bug' | null>(null);
   const [supportSent, setSupportSent] = useState(false);
@@ -301,6 +304,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2 mb-1.5">
               <span className="bg-pink-600 text-white px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">BETA v0.9</span>
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              {currentUser && !currentUser.isVerified && (
+                <button 
+                  onClick={() => setShowVerificationModal(true)}
+                  className="ml-auto flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-1.5 py-0.5 rounded transition-colors"
+                >
+                  <ShieldCheck size={10} /> Request Verification
+                </button>
+              )}
             </div>
             Bugs might appear. If so, please contact <button onClick={() => setShowSupportModal(true)} className="text-blue-500 dark:text-blue-400 hover:underline font-bold inline">support</button>
           </div>
@@ -511,6 +522,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       
+      {showVerificationModal && currentUser && (
+        <VerificationModal 
+          user={currentUser} 
+          onClose={() => setShowVerificationModal(false)} 
+        />
+      )}
+
       <AnimatePresence>
         {activeIncomingCall && (
           <IncomingCallModal 

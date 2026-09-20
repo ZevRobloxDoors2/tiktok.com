@@ -2,7 +2,10 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
-import { getUsers, getVideos, saveUsers, deleteVideoFromDB, getAppeals, saveAppeals, updateUser } from '../lib/db';
+import { 
+  getUsers, getVideos, saveUsers, deleteVideoFromDB, getAppeals, saveAppeals, 
+  updateUser, submitVerificationRequest 
+} from '../lib/db';
 import { User, Video, Appeal } from '../types';
 import { useAppStore } from '../store';
 import { isFriend } from '../lib/utils';
@@ -201,8 +204,18 @@ export function Profile() {
           
           <div className="flex-1 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-2 mb-1 flex-wrap">
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-bold flex items-center gap-1.5">
                 {profileUser.username}
+                {profileUser.isVerified && (
+                  <motion.div 
+                    animate={{ rotateY: [0, 180, 360], filter: ["hue-rotate(0deg)", "hue-rotate(360deg)"] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    className="text-blue-500 drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]"
+                    title="Verified Student"
+                  >
+                    <ShieldCheck size={20} fill="currentColor" fillOpacity={0.2} />
+                  </motion.div>
+                )}
               </h1>
               {areFriends && !isOwnProfile && (
                 <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold flex items-center gap-1">
@@ -557,6 +570,8 @@ export function Profile() {
   );
 }
 
+import { VerificationModal } from '../components/VerificationModal';
+
 function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }) {
   const { setCurrentUser } = useAppStore();
   const [modalTab, setModalTab] = useState<'profile' | 'account'>('profile');
@@ -568,6 +583,10 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
   const [password, setPassword] = useState(user.password || '');
   const [showPassword, setShowPassword] = useState(false);
   const [showActivityStatus, setShowActivityStatus] = useState(user.showActivityStatus !== false);
+  const [isGhostMode, setIsGhostMode] = useState(user.isGhostMode || false);
+
+  // Verification State
+  const [showVerifModal, setShowVerifModal] = useState(false);
   
   // Cropping State
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
@@ -587,7 +606,8 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
         isPrivate,
         avatarUrl,
         password,
-        showActivityStatus
+        showActivityStatus,
+        isGhostMode
       };
       
       await updateUser(user.id, updateData);
@@ -748,6 +768,45 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
                   <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${showActivityStatus ? 'translate-x-6' : 'translate-x-0'}`} />
                 </button>
               </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold flex items-center gap-2">
+                    <EyeOff size={16} className="text-zinc-500" /> Ghost Mode
+                  </p>
+                  <p className="text-sm text-zinc-500">Hide your online status completely.</p>
+                </div>
+                <button 
+                  onClick={() => setIsGhostMode(!isGhostMode)}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${isGhostMode ? 'bg-zinc-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                >
+                  <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${isGhostMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <h4 className="font-bold text-sm mb-4">Account Verification</h4>
+                {!user.isVerified ? (
+                  <button 
+                    onClick={() => setShowVerifModal(true)}
+                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform shadow-lg shadow-blue-500/20"
+                  >
+                    <ShieldCheck size={18} /> Request Verified Badge
+                  </button>
+                ) : (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex items-center gap-3">
+                    <ShieldCheck className="text-blue-600" />
+                    <div>
+                      <p className="font-bold text-blue-600 text-sm">Account Verified</p>
+                      <p className="text-[10px] text-blue-500 uppercase font-black">Holographic badge active</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {showVerifModal && (
+                <VerificationModal user={user} onClose={() => setShowVerifModal(false)} />
+              )}
 
               <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
                 <h4 className="font-bold text-sm mb-2 flex items-center gap-2 text-zinc-600 dark:text-zinc-400">

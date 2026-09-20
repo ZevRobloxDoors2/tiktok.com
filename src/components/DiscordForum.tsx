@@ -143,6 +143,17 @@ export function DiscordForum() {
       // Seed initial helpful FAQs
       const initialPosts: FAQPost[] = [
         {
+          id: 'announcement_v2',
+          authorId: currentUser?.id || 'system_staff',
+          title: '📢 Major Update: Verification 2.0 & Media Editor Enhancements!',
+          categoryId: 'announcements',
+          pinned: true,
+          timestamp: Date.now(),
+          content: `We've just rolled out some huge updates to CentralTok!\n\n**1. Verified Student Badges**\nYou can now apply for a Verified Badge! This holographic badge will appear on your profile, in messages, and in the user lists. Verification requires your School ID and is manually reviewed by our moderation team.\n\n**2. Professional Media Editor**\nUnleash your creativity! Our new media editor allows you to:\n- 🎵 **Add Music**: Choose from a library of trending tracks.\n- ✍️ **Text Overlays**: Add multiple text layers with custom fonts and colors.\n- 🎭 **Animations**: Animate your text with 'Pop', 'Float', 'Glitch', or 'Typing' effects.\n- 🌈 **Enhanced Filters**: New visual filters to make your content pop!\n\n**3. Verification Update**\nNote that verification now REQUIRES your School ID (showing your name and picture). This ensures our community remains safe and authentic.\n\nStay creative, CentralTokians!`,
+          replies: [],
+          reactions: { '🔥': [currentUser?.id || 'system'], '🚀': [currentUser?.id || 'system'], '✅': [currentUser?.id || 'system'] }
+        },
+        {
           id: 'faq_1',
           authorId: currentUser?.id || 'system_staff',
           title: '👥 How do Friends and Post Privacy (Friends / Only You / Everyone) work?',

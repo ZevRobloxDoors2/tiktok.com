@@ -17,6 +17,8 @@ export type User = {
   currentGame?: string;
   showActivityStatus?: boolean;
   password?: string;
+  isGhostMode?: boolean;
+  isVerified?: boolean;
   acceptedReportsCount?: number;
   banStatus?: {
     type: 'temp' | 'perm' | 'hwid';
@@ -78,6 +80,16 @@ export type Video = {
   views: number;
   viewedBy?: string[]; // User IDs or anonymous session IDs
   filter: string;
+  musicId?: string;
+  textOverlays?: {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    animation: string;
+    fontSize: number;
+    color: string;
+  }[];
   isYouTube?: boolean;
   youtubeId?: string;
   feedId?: string;
@@ -96,6 +108,16 @@ export type Story = {
   expiresAt: number; // 24h expiration
   viewers?: string[]; // User IDs who viewed
   filter?: string;
+  musicId?: string;
+  textOverlays?: {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    animation: string;
+    fontSize: number;
+    color: string;
+  }[];
 };
 
 export type FAQCategory = {
@@ -195,7 +217,7 @@ export type UserStatus = {
 export type AppNotification = {
   id: string;
   userId: string; // The user receiving the notification
-  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward' | 'support_resolved' | 'call';
+  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward' | 'support_resolved' | 'call' | 'verification_update';
   fromUserId: string;
   videoId?: string;
   forumPostId?: string;
@@ -250,4 +272,36 @@ export type Announcement = {
   createdAt: number;
   expiresAt?: number;
   active: boolean;
+  hideDuringGameplay?: boolean;
+  displayDuration?: number; // in seconds, 0 for permanent
+  allowDismiss?: boolean;
+  isPoll?: boolean;
+  pollOptions?: string[];
+  pollVotes?: Record<string, number>; // User ID -> Option Index
+  scheduledAt?: number;
+  actionButtonText?: string;
+  actionButtonLink?: string;
+};
+
+export type VerificationRequest = {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  photoUrl?: string;
+  schoolIdUrl: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  votes: Record<string, 'approve' | 'reject'>; // Admin ID -> Vote
+  createdAt: number;
+};
+
+export type AppSuggestion = {
+  id: string;
+  userId: string;
+  name: string;
+  type: 'game' | 'app';
+  description: string;
+  status: 'pending' | 'reviewed' | 'implemented';
+  createdAt: number;
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Play, User as UserIcon, Compass, Sparkles } from 'lucide-react';
+import { Search, X, Play, User as UserIcon, Compass, Sparkles, ShieldCheck } from 'lucide-react';
 import { getVideos, getUsers } from '../lib/db';
 import { Video, User } from '../types';
 import { VideoItem } from './Home';
@@ -168,7 +168,10 @@ export function Explore() {
                       <div key={user.id} onClick={() => navigate(`/profile/${user.handle}`)} className="flex items-center gap-4 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors">
                         <img src={user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.handle}`} alt={user.handle} className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800" />
                         <div>
-                          <p className="font-bold">{user.username}</p>
+                          <p className="font-bold flex items-center gap-1">
+                            {user.username}
+                            {user.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                          </p>
                           <p className="text-sm text-zinc-500">@{user.handle}</p>
                         </div>
                       </div>

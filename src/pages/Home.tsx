@@ -22,6 +22,13 @@ import YouTube, { YouTubeEvent, YouTubeProps } from 'react-youtube';
 import { getReports, saveReports } from '../lib/db';
 import { normalizeYoutubeShorts } from '../lib/feed';
 
+const SONGS = [
+  { id: '1', name: 'Summer Vibes', artist: 'Lofi Girl', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+  { id: '2', name: 'Drift Phonk', artist: 'KORDHELL', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+  { id: '3', name: 'Chill Beats', artist: 'NCS', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { id: '4', name: 'Glitch Mode', artist: 'Hacker Core', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' }
+];
+
 export function Home() {
   const { currentUser, introPhase, setIntroPhase, isLoading, setShowAuthModal } = useAppStore();
   const [videos, setVideos] = useState<(Video & { user: User; feedId: string })[]>([]);
@@ -67,6 +74,18 @@ export function Home() {
     advanceRequested.current = false;
     
     try {
+      const currentCount = videos.length;
+      let targetType: 'ugv' | 'youtube' = 'youtube';
+
+      // Mixed Logic: YT Shorts (0) -> YT (1) -> VIDEO (2) -> YT (3) -> VIDEO (4) -> Random (5+)
+      if (currentCount === 0 || currentCount === 1 || currentCount === 3) {
+        targetType = 'youtube';
+      } else if (currentCount === 2 || currentCount === 4) {
+        targetType = 'ugv';
+      } else {
+        targetType = Math.random() > 0.5 ? 'ugv' : 'youtube';
+      }
+
       const allDbVideos = await getVideos();
       const allUsers = await getUsers();
       const localViewed = (() => {
@@ -96,7 +115,15 @@ export function Home() {
         user: allUsers.find(u => u.id === v.userId) || ({} as User)
       }));
 
-      let nextVideo: Video & { user: User } | undefined = unseenUgvs[Math.floor(Math.random() * unseenUgvs.length)];
+      // If we target UGV but have none, fallback to YouTube
+      if (targetType === 'ugv' && unseenUgvs.length === 0) {
+        targetType = 'youtube';
+      }
+
+      let nextVideo: Video & { user: User } | undefined = targetType === 'ugv' 
+        ? unseenUgvs[Math.floor(Math.random() * unseenUgvs.length)]
+        : undefined;
+
       let nextYtPageToken = ytPageToken;
 
       if (!nextVideo) {
@@ -553,12 +580,37 @@ export const VideoItem: React.FC<{
   const [shareUsers, setShareUsers] = useState<User[]>([]);
   const [sharedTo, setSharedTo] = useState<string | null>(null);
   const [likePos, setLikePos] = useState<{ x: number, y: number } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastTapRef = useRef<number>(0);
   const shouldPlayYoutube = useRef(false);
 
   const areFriends = isFriend(currentUser, video.user);
   const canDelete = !video.isYouTube && (currentUser?.id === video.userId || currentUser?.role === 'owner' || currentUser?.role === 'staff');
   const isImageMedia = video.mediaType === 'image';
+
+  // Find track if any
+  const track = video.musicId ? SONGS.find(s => s.id === video.musicId) : null;
+
+  useEffect(() => {
+    if (track && isActive && isPlaying) {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(track.url);
+        audioRef.current.loop = true;
+      }
+      audioRef.current.play().catch(() => {});
+    } else if (audioRef.current) {
+      audioRef.current.pause();
+    }
+  }, [isActive, isPlaying, track]);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const handleDeletePost = async () => {
     if (!window.confirm("Are you sure you want to delete this post? This action cannot be undone.")) return;
@@ -928,6 +980,39 @@ export const VideoItem: React.FC<{
                 <Loader2 size={32} className="text-pink-600 animate-spin" />
               </div>
             )}
+
+            {/* Text Overlays */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              {video.textOverlays?.map((overlay) => (
+                <motion.div
+                  key={overlay.id}
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ 
+                    opacity: 1, 
+                    scale: 1,
+                    y: overlay.animation === 'float' ? [0, -10, 0] : 0,
+                    x: overlay.animation === 'glitch' ? [0, -2, 2, -2, 2, 0] : 0
+                  }}
+                  transition={{ 
+                    duration: overlay.animation === 'float' ? 2 : 0.3,
+                    repeat: overlay.animation === 'float' || overlay.animation === 'glitch' ? Infinity : 0,
+                    ease: "easeInOut"
+                  }}
+                  className="absolute"
+                  style={{ 
+                    left: `${overlay.x}%`, 
+                    top: `${overlay.y}%`, 
+                    color: overlay.color,
+                    fontSize: `${overlay.fontSize}px`,
+                    fontWeight: '900',
+                    textShadow: '0 2px 10px rgba(0,0,0,0.5)',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  {overlay.text}
+                </motion.div>
+              ))}
+            </div>
             
             {/* Play Overlay */}
             {!isPlaying && !isImageMedia && (
@@ -1070,9 +1155,9 @@ export const VideoItem: React.FC<{
             </p>
             
             <div className="flex items-center gap-4 text-xs font-bold">
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 group/music cursor-pointer pointer-events-auto">
-                <Music size={14} className="animate-[spin_4s_linear_infinite] text-pink-400" />
-                <span className="max-w-[120px] overflow-hidden whitespace-nowrap overflow-ellipsis">Original Audio</span>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 group/music cursor-pointer pointer-events-auto max-w-[200px]">
+                <Music size={14} className="animate-[spin_4s_linear_infinite] text-pink-400 shrink-0" />
+                <span className="truncate">{track ? `${track.name} - ${track.artist}` : 'Original Audio'}</span>
               </div>
               <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-full border border-white/5">
                 <Eye size={16} className="text-zinc-400" />

@@ -5,15 +5,31 @@ import { saveVideos, getVideos, getStories, saveStories } from '../lib/db';
 import { Video, Story } from '../types';
 import { 
   Upload as UploadIcon, X, Video as VideoIcon, Camera, Image as ImageIcon, 
-  Users, Lock, Globe, Zap, CircleDot, Disc
+  Users, Lock, Globe, Zap, CircleDot, Disc, Music, Type, Plus, Minus, Move
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const FILTERS = [
   { name: 'Normal', class: '' },
   { name: 'Grayscale', class: 'grayscale' },
   { name: 'Sepia', class: 'sepia' },
   { name: 'Vivid', class: 'saturate-150 contrast-110' },
-  { name: 'Cool', class: 'hue-rotate-90' }
+  { name: 'Cool', class: 'hue-rotate-90' },
+  { name: 'Warm', class: 'sepia-[0.3] saturate-125' }
+];
+
+const SONGS = [
+  { id: '1', name: 'Summer Vibes', artist: 'Lofi Girl', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+  { id: '2', name: 'Drift Phonk', artist: 'KORDHELL', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+  { id: '3', name: 'Chill Beats', artist: 'NCS', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { id: '4', name: 'Glitch Mode', artist: 'Hacker Core', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' }
+];
+
+const ANIMATIONS = [
+  { name: 'Pop', value: 'pop' },
+  { name: 'Float', value: 'float' },
+  { name: 'Glitch', value: 'glitch' },
+  { name: 'Typing', value: 'typing' }
 ];
 
 export function Upload() {
@@ -30,6 +46,13 @@ export function Upload() {
   const [isUploading, setIsUploading] = useState(false);
   const [filter, setFilter] = useState('');
   
+  // Editor States
+  const [selectedMusic, setSelectedMusic] = useState<typeof SONGS[0] | null>(null);
+  const [textOverlays, setTextOverlays] = useState<{ id: string, text: string, x: number, y: number, animation: string, fontSize: number, color: string }[]>([]);
+  const [activeTextId, setActiveTextId] = useState<string | null>(null);
+  const [showMusicPicker, setShowMusicPicker] = useState(false);
+  const [showTextControls, setShowTextControls] = useState(false);
+  
   // Recording states
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -39,6 +62,29 @@ export function Upload() {
   const chunksRef = useRef<Blob[]>([]);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const addTextOverlay = () => {
+    const newText = {
+      id: `text_${Date.now()}`,
+      text: 'Double tap to edit',
+      x: 50,
+      y: 50,
+      animation: 'pop',
+      fontSize: 24,
+      color: '#ffffff'
+    };
+    setTextOverlays([...textOverlays, newText]);
+    setActiveTextId(newText.id);
+  };
+
+  const updateText = (id: string, updates: Partial<typeof textOverlays[0]>) => {
+    setTextOverlays(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  };
+
+  const deleteText = (id: string) => {
+    setTextOverlays(prev => prev.filter(t => t.id !== id));
+    if (activeTextId === id) setActiveTextId(null);
+  };
 
   if (!currentUser) {
     return <div className="p-8 text-center">Please log in to create posts and stories.</div>;
@@ -197,7 +243,9 @@ export function Upload() {
           timestamp: Date.now(),
           expiresAt: Date.now() + 24 * 60 * 60 * 1000,
           visibility: visibility,
-          viewers: []
+          viewers: [],
+          musicId: selectedMusic?.id,
+          textOverlays: textOverlays
         };
         await saveStories([newStory, ...stories]);
         navigate('/');
@@ -215,7 +263,9 @@ export function Upload() {
           views: 0,
           filter: filter,
           mediaType: mediaType,
-          visibility: visibility
+          visibility: visibility,
+          musicId: selectedMusic?.id,
+          textOverlays: textOverlays
         };
         
         const videos = await getVideos();
@@ -372,8 +422,99 @@ export function Upload() {
                 ) : (
                   <video src={previewUrl!} className={`w-full h-full object-contain ${filter}`} controls autoPlay loop />
                 )}
+
+                {/* Overlays Container */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <AnimatePresence>
+                    {textOverlays.map((overlay) => (
+                      <motion.div
+                        key={overlay.id}
+                        drag
+                        dragMomentum={false}
+                        onDragEnd={(_, info) => {
+                          const rect = (info as any).target.offsetParent.getBoundingClientRect();
+                          const x = (info.point.x / rect.width) * 100;
+                          const y = (info.point.y / rect.height) * 100;
+                          updateText(overlay.id, { x, y });
+                        }}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ 
+                          opacity: 1, 
+                          scale: 1,
+                          y: overlay.animation === 'float' ? [0, -10, 0] : 0,
+                          x: overlay.animation === 'glitch' ? [0, -2, 2, -2, 2, 0] : 0
+                        }}
+                        transition={{ 
+                          duration: overlay.animation === 'float' ? 2 : 0.3,
+                          repeat: overlay.animation === 'float' || overlay.animation === 'glitch' ? Infinity : 0,
+                          ease: "easeInOut"
+                        }}
+                        className="absolute pointer-events-auto cursor-move select-none"
+                        style={{ 
+                          left: `${overlay.x}%`, 
+                          top: `${overlay.y}%`, 
+                          color: overlay.color,
+                          fontSize: `${overlay.fontSize}px`,
+                          fontWeight: '900',
+                          textShadow: '0 2px 10px rgba(0,0,0,0.5)',
+                          transform: 'translate(-50%, -50%)',
+                          zIndex: activeTextId === overlay.id ? 20 : 10
+                        }}
+                        onDoubleClick={() => {
+                          const newText = prompt("Edit text:", overlay.text);
+                          if (newText !== null) updateText(overlay.id, { text: newText });
+                        }}
+                        onClick={() => setActiveTextId(overlay.id)}
+                      >
+                        {overlay.text}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
+                  {selectedMusic && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="absolute bottom-4 left-4 right-4 z-20 pointer-events-auto"
+                    >
+                      <div className="bg-black/60 backdrop-blur-md border border-white/20 p-2 rounded-xl flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-indigo-600 rounded-lg flex items-center justify-center animate-spin-slow">
+                          <Music size={20} className="text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-black uppercase text-white/50 tracking-widest leading-none mb-1">Playing Track</p>
+                          <p className="text-xs font-bold text-white truncate">{selectedMusic.name}</p>
+                        </div>
+                        <button 
+                          onClick={() => setSelectedMusic(null)}
+                          className="p-2 hover:bg-white/10 rounded-full text-white/70"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
+                <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 pointer-events-auto">
+                   <button 
+                    onClick={() => setShowMusicPicker(!showMusicPicker)}
+                    className={`p-3 rounded-full backdrop-blur-md transition-all flex items-center gap-2 ${selectedMusic ? 'bg-indigo-600 text-white' : 'bg-black/50 text-white hover:bg-black/70'}`}
+                    title="Add Music"
+                  >
+                    <Music size={20} />
+                  </button>
+                  <button 
+                    onClick={addTextOverlay}
+                    className="p-3 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-md transition-all flex items-center gap-2"
+                    title="Add Text"
+                  >
+                    <Type size={20} />
+                  </button>
+                </div>
+
                 <button 
-                  onClick={() => { setFile(null); setPreviewUrl(null); }}
+                  onClick={() => { setFile(null); setPreviewUrl(null); setSelectedMusic(null); setTextOverlays([]); }}
                   className="absolute top-4 right-4 bg-black/50 hover:bg-black/80 p-2 rounded-full backdrop-blur-sm transition-colors text-white z-10"
                   title="Remove media"
                 >
@@ -381,6 +522,96 @@ export function Upload() {
                 </button>
               </div>
             )}
+
+            {/* Music Picker Modal */}
+            <AnimatePresence>
+              {showMusicPicker && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="absolute inset-0 z-30 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-6 overflow-y-auto"
+                >
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-2xl font-black uppercase tracking-tighter">Music Library</h3>
+                    <button onClick={() => setShowMusicPicker(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {SONGS.map(song => (
+                      <button 
+                        key={song.id}
+                        onClick={() => { setSelectedMusic(song); setShowMusicPicker(false); }}
+                        className={`p-4 rounded-2xl border text-left flex items-center gap-4 transition-all ${selectedMusic?.id === song.id ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-800 hover:border-indigo-500'}`}
+                      >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedMusic?.id === song.id ? 'bg-white/20' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
+                          <Music size={20} className={selectedMusic?.id === song.id ? 'text-white' : 'text-indigo-600'} />
+                        </div>
+                        <div>
+                          <p className="font-bold">{song.name}</p>
+                          <p className={`text-[10px] font-black uppercase tracking-widest ${selectedMusic?.id === song.id ? 'text-white/70' : 'text-zinc-500'}`}>{song.artist}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Text Properties Editor */}
+            <AnimatePresence>
+              {activeTextId && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="mt-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl"
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="font-black text-[10px] uppercase tracking-widest text-zinc-400">Text Properties</h4>
+                    <button onClick={() => setActiveTextId(null)} className="text-zinc-400 hover:text-zinc-900"><X size={14} /></button>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-zinc-400 mb-2">Animation Style</p>
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {ANIMATIONS.map(anim => (
+                          <button 
+                            key={anim.value}
+                            onClick={() => updateText(activeTextId, { animation: anim.value })}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${textOverlays.find(t => t.id === activeTextId)?.animation === anim.value ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800'}`}
+                          >
+                            {anim.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-zinc-400 mb-2">Size</p>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => updateText(activeTextId, { fontSize: Math.max(12, (textOverlays.find(t => t.id === activeTextId)?.fontSize || 24) - 2) })} className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg"><Minus size={14}/></button>
+                          <span className="font-bold text-sm">{textOverlays.find(t => t.id === activeTextId)?.fontSize}px</span>
+                          <button onClick={() => updateText(activeTextId, { fontSize: Math.min(64, (textOverlays.find(t => t.id === activeTextId)?.fontSize || 24) + 2) })} className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg"><Plus size={14}/></button>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-zinc-400 mb-2">Actions</p>
+                        <button 
+                          onClick={() => deleteText(activeTextId)}
+                          className="w-full py-2 bg-red-50 dark:bg-red-900/10 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-100 transition-colors"
+                        >
+                          Remove Text
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Filters Row */}
             {(mode === 'record' || mode === 'screen' || file) && (

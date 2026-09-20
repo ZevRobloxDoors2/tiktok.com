@@ -1,7 +1,24 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
-export { db };
-import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement, Call } from '../types';
+export { db, doc, updateDoc };
+import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement, Call, VerificationRequest, AppSuggestion } from '../types';
+
+export const submitSuggestion = async (suggestion: AppSuggestion) => {
+  try {
+    const docRef = doc(db, 'app_suggestions', suggestion.id);
+    await setDoc(docRef, suggestion);
+  } catch (err) {
+    console.error("Error submitting suggestion:", err);
+  }
+};
+
+export const getSuggestions = () => fetchCollection<AppSuggestion>('app_suggestions');
+
+export const subscribeToSuggestions = (callback: (suggestions: AppSuggestion[]) => void) => {
+  return onSnapshot(collection(db, 'app_suggestions'), (snapshot) => {
+    callback(snapshot.docs.map(doc => doc.data() as AppSuggestion));
+  });
+};
 
 export const getAnnouncements = () => fetchCollection<Announcement>('announcements');
 
@@ -31,6 +48,71 @@ export const deleteAnnouncement = async (id: string) => {
     await deleteDoc(docRef);
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `announcements/${id}`);
+  }
+};
+
+export const voteInPoll = async (announcementId: string, userId: string, optionIndex: number) => {
+  try {
+    const ref = doc(db, 'announcements', announcementId);
+    await updateDoc(ref, {
+      [`pollVotes.${userId}`]: optionIndex
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `announcements/${announcementId}`);
+  }
+};
+
+export const submitVerificationRequest = async (request: VerificationRequest) => {
+  try {
+    const cleanedData = cleanObject(request);
+    const docRef = doc(db, 'verification_requests', request.id);
+    await setDoc(docRef, cleanedData);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `verification_requests/${request.id}`);
+  }
+};
+
+export const subscribeToVerificationRequests = (callback: (requests: VerificationRequest[]) => void) => {
+  return onSnapshot(collection(db, 'verification_requests'), (snapshot) => {
+    callback(snapshot.docs.map(doc => doc.data() as VerificationRequest));
+  });
+};
+
+export const voteOnVerificationRequest = async (requestId: string, adminId: string, vote: 'approve' | 'reject') => {
+  try {
+    const ref = doc(db, 'verification_requests', requestId);
+    await updateDoc(ref, {
+      [`votes.${adminId}`]: vote
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `verification_requests/${requestId}`);
+  }
+};
+
+export const updateVerificationRequestStatus = async (requestId: string, status: 'approved' | 'rejected') => {
+  try {
+    const ref = doc(db, 'verification_requests', requestId);
+    await updateDoc(ref, { status });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `verification_requests/${requestId}`);
+  }
+};
+
+export const updateUserVerificationStatus = async (userId: string, isVerified: boolean) => {
+  try {
+    const ref = doc(db, 'users', userId);
+    await updateDoc(ref, { isVerified });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `users/${userId}`);
+  }
+};
+
+export const updateUserGhostMode = async (userId: string, isGhostMode: boolean) => {
+  try {
+    const ref = doc(db, 'users', userId);
+    await updateDoc(ref, { isGhostMode });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `users/${userId}`);
   }
 };
 

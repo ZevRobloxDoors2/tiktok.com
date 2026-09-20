@@ -363,7 +363,10 @@ export function Chat() {
             <Link to={`/profile/${otherUser!.handle}`} className="flex items-center gap-3">
               <img src={otherUser!.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
               <div>
-                <h2 className="font-bold leading-tight">{otherUser!.username}</h2>
+                <h2 className="font-bold leading-tight flex items-center gap-1">
+                  {otherUser!.username}
+                  {otherUser!.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                </h2>
                 <p className="text-xs text-zinc-500">@{otherUser!.handle}</p>
               </div>
             </Link>
@@ -456,7 +459,10 @@ export function Chat() {
             return (
               <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                 {group && !isMe && sender && (
-                  <span className="text-[10px] font-bold text-zinc-500 ml-10 mb-1">{sender.username}</span>
+                  <span className="text-[10px] font-bold text-zinc-500 ml-10 mb-1 flex items-center gap-1">
+                    {sender.username}
+                    {sender.isVerified && <ShieldCheck size={10} className="text-blue-500" />}
+                  </span>
                 )}
                 <div className={`flex items-end gap-2 max-w-[85%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                   {!isMe && (

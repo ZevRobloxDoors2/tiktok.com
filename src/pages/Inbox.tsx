@@ -315,7 +315,10 @@ export function Inbox() {
                   <Link to={link} key={c.user!.id} className="p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
                     <img src={c.user!.avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover" />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold truncate">{c.user!.username}</h3>
+                      <h3 className="font-bold truncate flex items-center gap-1">
+                        {c.user!.username}
+                        {c.user!.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                      </h3>
                       <p className="text-sm text-zinc-500 truncate flex items-center gap-1">
                         {c.lastMessage.fromUserId === currentUser.id ? 'You: ' : ''}
                         {c.lastMessage.content || (c.lastMessage.imageUrl ? '📷 Photo' : c.lastMessage.videoUrl ? '🎥 Video' : c.lastMessage.audioUrl ? '🎤 Voice' : '')}
@@ -429,7 +432,10 @@ export function Inbox() {
                 <div className="flex items-center gap-3">
                   <img src={friend.avatarUrl} alt="" className="w-12 h-12 rounded-full" />
                   <div>
-                    <p className="font-bold">{friend.username}</p>
+                    <p className="font-bold flex items-center gap-1">
+                      {friend.username}
+                      {friend.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                    </p>
                     <p className="text-xs text-zinc-500">@{friend.handle}</p>
                   </div>
                 </div>

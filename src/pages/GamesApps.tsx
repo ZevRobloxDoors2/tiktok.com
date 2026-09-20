@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gamepad2, Rocket, Stars, Sparkles, AlertCircle, Play, Info, Square, LayoutGrid, Users } from 'lucide-react';
-import { subscribeToAppSettings, getUsers, updateUserGame } from '../lib/db';
+import { Gamepad2, Rocket, Stars, Sparkles, AlertCircle, Play, Info, Square, LayoutGrid, Users, Lightbulb, X, Send } from 'lucide-react';
+import { subscribeToAppSettings, getUsers, updateUserGame, submitSuggestion } from '../lib/db';
 import { useAppStore } from '../store';
-import { User } from '../types';
+import { User, AppSuggestion } from '../types';
 import { GAMES, APPS, GameItem } from '../data/games';
 
 export function GamesApps() {
@@ -26,6 +26,9 @@ export function GamesApps() {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'games' | 'apps'>('games');
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [suggestionData, setSuggestionData] = useState({ name: '', type: 'game' as 'game' | 'app', description: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeToAppSettings((settings) => {
@@ -86,6 +89,30 @@ export function GamesApps() {
     return allUsers.filter(u => u.currentGame === gameTitle && u.showActivityStatus !== false && u.id !== currentUser?.id);
   };
 
+  const handleSuggest = async () => {
+    if (!currentUser || !suggestionData.name || !suggestionData.description) return;
+    setIsSubmitting(true);
+    try {
+      const suggestion: AppSuggestion = {
+        id: `sugg_${Date.now()}`,
+        userId: currentUser.id,
+        name: suggestionData.name,
+        type: suggestionData.type,
+        description: suggestionData.description,
+        status: 'pending',
+        createdAt: Date.now()
+      };
+      await submitSuggestion(suggestion);
+      setShowSuggestModal(false);
+      setSuggestionData({ name: '', type: 'game', description: '' });
+      alert("Thanks! Your suggestion has been sent to the admins.");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (isCrashed) {
     return (
       <div className="h-full w-full bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
@@ -127,8 +154,9 @@ export function GamesApps() {
   const currentList = activeTab === 'games' ? GAMES : APPS;
 
   return (
-    <div id="games-page" className="w-full h-full bg-zinc-50 dark:bg-zinc-950 p-6 transition-colors overflow-y-auto relative">
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+    <>
+      <div id="games-page" className="w-full h-full bg-zinc-50 dark:bg-zinc-950 p-6 transition-colors overflow-y-auto relative">
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <motion.div 
           animate={{ y: [-10, 10, -10], rotate: [0, 10, 0] }}
           transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
@@ -154,20 +182,29 @@ export function GamesApps() {
             <p className="text-zinc-500 dark:text-zinc-400 font-bold">Discover exclusive games and tools built for you.</p>
           </div>
 
-          <div className="flex bg-zinc-200/50 dark:bg-zinc-900/50 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-xl">
+          <div className="flex items-center gap-4">
+            <div className="flex bg-zinc-200/50 dark:bg-zinc-900/50 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-xl">
+              <button 
+                onClick={() => setActiveTab('games')}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-sm uppercase tracking-widest transition-all ${activeTab === 'games' ? 'bg-white dark:bg-zinc-800 text-pink-600 shadow-xl' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+              >
+                <Gamepad2 size={18} />
+                Games
+              </button>
+              <button 
+                onClick={() => setActiveTab('apps')}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-sm uppercase tracking-widest transition-all ${activeTab === 'apps' ? 'bg-white dark:bg-zinc-800 text-indigo-600 shadow-xl' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+              >
+                <LayoutGrid size={18} />
+                Apps
+              </button>
+            </div>
+
             <button 
-              onClick={() => setActiveTab('games')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-sm uppercase tracking-widest transition-all ${activeTab === 'games' ? 'bg-white dark:bg-zinc-800 text-pink-600 shadow-xl' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+              onClick={() => setShowSuggestModal(true)}
+              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-transform shadow-lg shadow-orange-500/20"
             >
-              <Gamepad2 size={18} />
-              Games
-            </button>
-            <button 
-              onClick={() => setActiveTab('apps')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-sm uppercase tracking-widest transition-all ${activeTab === 'apps' ? 'bg-white dark:bg-zinc-800 text-indigo-600 shadow-xl' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-            >
-              <LayoutGrid size={18} />
-              Apps
+              <Lightbulb size={14} /> Suggest New
             </button>
           </div>
         </div>
@@ -258,6 +295,78 @@ export function GamesApps() {
           })}
         </div>
       </div>
-    </div>
+      </div>
+
+      <AnimatePresence>
+        {showSuggestModal && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2 text-zinc-900 dark:text-white">
+                  <Lightbulb className="text-amber-500" /> Suggest Game/App
+                </h3>
+                <button onClick={() => setShowSuggestModal(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full dark:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-zinc-400 mb-2">What is it?</label>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                    <button 
+                      onClick={() => setSuggestionData(prev => ({ ...prev, type: 'game' }))}
+                      className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${suggestionData.type === 'game' ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600' : 'text-zinc-500'}`}
+                    >
+                      Game
+                    </button>
+                    <button 
+                      onClick={() => setSuggestionData(prev => ({ ...prev, type: 'app' }))}
+                      className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${suggestionData.type === 'app' ? 'bg-white dark:bg-zinc-700 shadow-sm text-emerald-600' : 'text-zinc-500'}`}
+                    >
+                      App
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-zinc-400 mb-1">Name of the {suggestionData.type}</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. Minecraft, Discord..."
+                    value={suggestionData.name}
+                    onChange={e => setSuggestionData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 outline-none focus:border-amber-500 font-bold dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-zinc-400 mb-1">Brief Description</label>
+                  <textarea 
+                    placeholder="Tell us why we should add this..."
+                    value={suggestionData.description}
+                    onChange={e => setSuggestionData(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 outline-none focus:border-amber-500 h-32 resize-none dark:text-white"
+                  />
+                </div>
+
+                <button 
+                  disabled={!suggestionData.name || !suggestionData.description || isSubmitting}
+                  onClick={handleSuggest}
+                  className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? 'Sending...' : <><Send size={16} /> Submit Suggestion</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications, getAnnouncements, saveAnnouncement, deleteAnnouncement, subscribeToAnnouncements } from '../lib/db';
-import { User, Report, Appeal, AuditLog, Video, AppNotification, Announcement } from '../types';
-import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings, Megaphone, Plus, Calendar, Palette, Maximize, Target, Layout as LayoutIcon, Ghost } from 'lucide-react';
+import { getUsers, getReports, saveReports, getAppeals, saveAppeals, getAuditLogs, saveAuditLogs, saveUsers, getVideos, saveVideos, getAppSettings, saveAppSettings, saveNotifications, getNotifications, getAnnouncements, saveAnnouncement, deleteAnnouncement, subscribeToAnnouncements, subscribeToVerificationRequests, voteOnVerificationRequest, updateVerificationRequestStatus, updateUserVerificationStatus, subscribeToSuggestions, updateDoc, doc, db } from '../lib/db';
+import { User, Report, Appeal, AuditLog, Video, AppNotification, Announcement, VerificationRequest, AppSuggestion } from '../types';
+import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings, Megaphone, Plus, Calendar, Palette, Maximize, Target, Layout as LayoutIcon, Ghost, X, Lightbulb, UserCheck } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { GAMES, APPS } from '../data/games';
 
 export function Admin() {
   const { currentUser } = useAppStore();
-  const [activeTab, setActiveTab] = useState<'reports' | 'users' | 'appeals' | 'logs' | 'announcements' | 'settings'>('reports');
+  const [activeTab, setActiveTab] = useState<'reports' | 'users' | 'appeals' | 'logs' | 'announcements' | 'verification' | 'suggestions' | 'settings'>('reports');
   
   const [reports, setReports] = useState<Report[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -17,6 +17,8 @@ export function Admin() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
+  const [suggestions, setSuggestions] = useState<AppSuggestion[]>([]);
   
   // Announcement Form State
   const [newAnnouncement, setNewAnnouncement] = useState<Partial<Announcement>>({
@@ -27,7 +29,17 @@ export function Admin() {
     active: true,
     targetGameIds: [],
     targetPage: '',
+    hideDuringGameplay: false,
+    displayDuration: 0,
+    allowDismiss: true,
+    isPoll: false,
+    pollOptions: ['', ''],
+    scheduledAt: 0,
+    actionButtonText: '',
+    actionButtonLink: '',
   });
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
   const [announcementDuration, setAnnouncementDuration] = useState('24h');
 
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
@@ -88,6 +100,11 @@ export function Admin() {
                          announcementDuration === '7d' ? 7 * 24 * 60 * 60 * 1000 :
                          announcementDuration === '30d' ? 30 * 24 * 60 * 60 * 1000 : 0;
       
+      let scheduledAt = 0;
+      if (scheduledDate && scheduledTime) {
+        scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`).getTime();
+      }
+
       const announcement: Announcement = {
         id: `ann_${Date.now()}`,
         text: newAnnouncement.text!,
@@ -98,7 +115,16 @@ export function Admin() {
         size: newAnnouncement.size as any,
         createdAt: Date.now(),
         expiresAt: durationMs > 0 ? Date.now() + durationMs : undefined,
-        active: true
+        active: true,
+        hideDuringGameplay: newAnnouncement.hideDuringGameplay,
+        displayDuration: newAnnouncement.displayDuration,
+        allowDismiss: newAnnouncement.allowDismiss,
+        isPoll: newAnnouncement.isPoll,
+        pollOptions: newAnnouncement.isPoll ? newAnnouncement.pollOptions?.filter(o => o.trim() !== '') : undefined,
+        pollVotes: {},
+        scheduledAt: scheduledAt || undefined,
+        actionButtonText: newAnnouncement.actionButtonText,
+        actionButtonLink: newAnnouncement.actionButtonLink,
       };
 
       await saveAnnouncement(announcement);
@@ -110,8 +136,17 @@ export function Admin() {
         color: 'bg-pink-600',
         size: 'md',
         active: true,
-        targetGameIds: []
+        targetGameIds: [],
+        hideDuringGameplay: false,
+        displayDuration: 0,
+        allowDismiss: true,
+        isPoll: false,
+        pollOptions: ['', ''],
+        actionButtonText: '',
+        actionButtonLink: '',
       });
+      setScheduledDate('');
+      setScheduledTime('');
       await logAction('create_announcement', announcement.id, `Created ${announcement.type} announcement: ${announcement.text.substring(0, 30)}...`);
     } catch (err) {
       console.error(err);
@@ -130,8 +165,14 @@ export function Admin() {
   useEffect(() => {
     if (isMod) {
       loadData();
-      const unsub = subscribeToAnnouncements(setAnnouncements);
-      return () => unsub();
+      const unsubAnn = subscribeToAnnouncements(setAnnouncements);
+      const unsubVerif = subscribeToVerificationRequests(setVerificationRequests);
+      const unsubSugg = subscribeToSuggestions(setSuggestions);
+      return () => {
+        unsubAnn();
+        unsubVerif();
+        unsubSugg();
+      };
     }
   }, [isMod]);
 
@@ -468,8 +509,8 @@ export function Admin() {
         </div>
 
         <div className="flex gap-2 mb-6 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto pb-2">
-          {['reports', 'users', 'appeals', 'logs', 'announcements', 'settings'].map(tab => (
-            ((tab !== 'logs' && tab !== 'announcements' && tab !== 'settings') || isOwner) && (
+          {['reports', 'users', 'appeals', 'logs', 'announcements', 'verification', 'suggestions', 'settings'].map(tab => (
+            ((tab !== 'logs' && tab !== 'announcements' && tab !== 'verification' && tab !== 'suggestions' && tab !== 'settings') || isOwner) && (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -864,6 +905,150 @@ export function Admin() {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2 flex items-center gap-1">
+                          <Calendar size={14} /> Scheduled Date
+                        </label>
+                        <input
+                          type="date"
+                          value={scheduledDate}
+                          onChange={e => setScheduledDate(e.target.value)}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-2 flex items-center gap-1">
+                          <Calendar size={14} /> Scheduled Time
+                        </label>
+                        <input
+                          type="time"
+                          value={scheduledTime}
+                          onChange={e => setScheduledTime(e.target.value)}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-sm flex items-center gap-2">
+                          <Target size={16} className="text-pink-600" /> Action Button
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          placeholder="Button Text (e.g. Play Now)"
+                          value={newAnnouncement.actionButtonText}
+                          onChange={e => setNewAnnouncement(prev => ({ ...prev, actionButtonText: e.target.value }))}
+                          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none focus:border-pink-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Link (e.g. /games)"
+                          value={newAnnouncement.actionButtonLink}
+                          onChange={e => setNewAnnouncement(prev => ({ ...prev, actionButtonLink: e.target.value }))}
+                          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none focus:border-pink-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-sm flex items-center gap-2">
+                          <Users size={16} className="text-blue-600" /> Interaction Poll
+                        </label>
+                        <button
+                          onClick={() => setNewAnnouncement(prev => ({ ...prev, isPoll: !prev.isPoll }))}
+                          className={`w-12 h-6 rounded-full transition-all relative ${newAnnouncement.isPoll ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${newAnnouncement.isPoll ? 'left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+                      
+                      {newAnnouncement.isPoll && (
+                        <div className="space-y-2">
+                          {newAnnouncement.pollOptions?.map((option, idx) => (
+                            <div key={idx} className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder={`Option ${idx + 1}`}
+                                value={option}
+                                onChange={e => {
+                                  const newOptions = [...(newAnnouncement.pollOptions || [])];
+                                  newOptions[idx] = e.target.value;
+                                  setNewAnnouncement(prev => ({ ...prev, pollOptions: newOptions }));
+                                }}
+                                className="flex-grow bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                              />
+                              {idx > 1 && (
+                                <button
+                                  onClick={() => {
+                                    const newOptions = newAnnouncement.pollOptions?.filter((_, i) => i !== idx);
+                                    setNewAnnouncement(prev => ({ ...prev, pollOptions: newOptions }));
+                                  }}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          {(newAnnouncement.pollOptions?.length || 0) < 4 && (
+                            <button
+                              onClick={() => setNewAnnouncement(prev => ({ ...prev, pollOptions: [...(prev.pollOptions || []), ''] }))}
+                              className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline"
+                            >
+                              <Plus size={12} /> Add Option
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2 flex items-center gap-1">
+                          Timer (Disappears in)
+                        </label>
+                        <select
+                          value={newAnnouncement.displayDuration}
+                          onChange={e => setNewAnnouncement(prev => ({ ...prev, displayDuration: parseInt(e.target.value) }))}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
+                        >
+                          <option value="0">Permanent</option>
+                          <option value="5">5 Seconds</option>
+                          <option value="10">10 Seconds</option>
+                          <option value="15">15 Seconds</option>
+                          <option value="30">30 Seconds</option>
+                          <option value="60">1 Minute</option>
+                        </select>
+                      </div>
+
+                      {(newAnnouncement.type === 'page' && newAnnouncement.targetPage === '/games') && (
+                        <div className="flex items-center gap-3 pt-6">
+                          <button
+                            onClick={() => setNewAnnouncement(prev => ({ ...prev, hideDuringGameplay: !prev.hideDuringGameplay }))}
+                            className={`w-12 h-6 rounded-full transition-all relative ${newAnnouncement.hideDuringGameplay ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                          >
+                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${newAnnouncement.hideDuringGameplay ? 'left-7' : 'left-1'}`} />
+                          </button>
+                          <label className="text-xs font-semibold">Hide during gameplay</label>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 pt-6">
+                        <button
+                          onClick={() => setNewAnnouncement(prev => ({ ...prev, allowDismiss: !prev.allowDismiss }))}
+                          className={`w-12 h-6 rounded-full transition-all relative ${newAnnouncement.allowDismiss ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${newAnnouncement.allowDismiss ? 'left-7' : 'left-1'}`} />
+                        </button>
+                        <label className="text-xs font-semibold">Allow users to close (X)</label>
+                      </div>
+                    </div>
+
                     <button
                       onClick={handleCreateAnnouncement}
                       className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl shadow-lg shadow-pink-600/20 transition-all flex items-center justify-center gap-2"
@@ -905,6 +1090,9 @@ export function Admin() {
                             This announcement will be shown {newAnnouncement.type === 'global' ? 'everywhere in the app' : 
                                                             newAnnouncement.type === 'page' ? `on the ${newAnnouncement.targetPage} page` : 
                                                             `to players of: ${(newAnnouncement.targetGameIds || []).join(', ') || 'No games selected'}`}.
+                            {newAnnouncement.hideDuringGameplay && <span className="block font-bold text-pink-600 mt-1">Will hide automatically when a game starts.</span>}
+                            {newAnnouncement.displayDuration! > 0 && <span className="block text-[10px] opacity-70 mt-1">Disappears {newAnnouncement.displayDuration}s after appearing.</span>}
+                            {!newAnnouncement.allowDismiss && <span className="block font-bold text-red-500 mt-1">Users cannot manually close this!</span>}
                           </p>
                         </div>
                       </div>
@@ -935,9 +1123,24 @@ export function Admin() {
                         </div>
                         <p className="font-bold text-sm mb-2 line-clamp-2">{ann.text}</p>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-zinc-400">
-                            {ann.expiresAt ? `Expires: ${new Date(ann.expiresAt).toLocaleDateString()}` : 'Never Expires'}
-                          </span>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            <span className="text-[10px] text-zinc-400">
+                              {ann.expiresAt ? `Expires: ${new Date(ann.expiresAt).toLocaleDateString()}` : 'Never Expires'}
+                            </span>
+                            {ann.displayDuration ? (
+                              <span className="text-[10px] text-zinc-500 font-bold bg-zinc-100 dark:bg-zinc-800 px-1.5 rounded">
+                                Timer: {ann.displayDuration}s
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-green-500 font-bold">Permanent</span>
+                            )}
+                            {ann.hideDuringGameplay && (
+                              <span className="text-[10px] text-pink-500 font-bold">Hides in Game</span>
+                            )}
+                            {ann.allowDismiss === false && (
+                              <span className="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-950/30 px-1.5 rounded">Mandatory</span>
+                            )}
+                          </div>
                           <button 
                             onClick={() => handleDeleteAnnouncement(ann.id)}
                             className="p-2 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
@@ -955,6 +1158,202 @@ export function Admin() {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'verification' && isOwner && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">Verification Requests</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Review students requesting the holographic verification badge.</p>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 px-3 py-1 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
+                  {verificationRequests.filter(r => r.status === 'pending').length} Pending
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                {verificationRequests.filter(r => r.status === 'pending').map((request) => {
+                  const user = users.find(u => u.id === request.userId);
+                  const approves = Object.values(request.votes || {}).filter(v => v === 'approve').length;
+                  const rejects = Object.values(request.votes || {}).filter(v => v === 'reject').length;
+                  const myVote = currentUser ? request.votes?.[currentUser.id] : null;
+
+                  return (
+                    <div key={request.id} className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm flex flex-col md:flex-row">
+                      <div className="md:w-64 aspect-[3/4] bg-zinc-100 dark:bg-zinc-900 overflow-hidden relative">
+                        <img src={request.schoolIdUrl} className="w-full h-full object-cover" alt="School ID Proof" />
+                        <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest border border-white/20">
+                          School ID
+                        </div>
+                      </div>
+                      {request.photoUrl && (
+                        <div className="md:w-32 aspect-[3/4] bg-zinc-200 dark:bg-zinc-800 border-l border-zinc-300 dark:border-zinc-700 overflow-hidden relative">
+                           <img src={request.photoUrl} className="w-full h-full object-cover" alt="Selfie" />
+                           <div className="absolute bottom-1 left-1 bg-black/30 text-[8px] text-white px-1 rounded">Selfie</div>
+                        </div>
+                      )}
+                      
+                      <div className="flex-1 p-6 flex flex-col">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h3 className="text-lg font-black">{request.firstName} {request.lastName}</h3>
+                            <p className="text-sm text-zinc-500">@{user?.handle || 'Unknown'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] text-zinc-400 font-bold uppercase">{new Date(request.createdAt).toLocaleDateString()}</p>
+                            <div className="flex gap-1 mt-1 justify-end">
+                              <span className="text-[10px] font-black text-green-600 bg-green-50 dark:bg-green-900/30 px-1.5 py-0.5 rounded">
+                                Approve: {approves}
+                              </span>
+                              <span className="text-[10px] font-black text-red-600 bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 rounded">
+                                Reject: {rejects}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 space-y-4">
+                          <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 shadow-inner">
+                            <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">Reason for Verification</p>
+                            <p className="text-sm italic text-zinc-700 dark:text-zinc-300">"{request.reason}"</p>
+                          </div>
+                          
+                          <p className="text-[10px] text-zinc-500 italic">
+                            * Remember: Only verify if they are actually known around the school. Approval requires multiple mod votes.
+                          </p>
+                        </div>
+
+                        <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap gap-3">
+                          <button
+                            onClick={() => voteOnVerificationRequest(request.id, currentUser!.id, 'approve')}
+                            disabled={myVote === 'approve'}
+                            className={`flex-1 min-w-[120px] py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                              myVote === 'approve' 
+                                ? 'bg-green-100 text-green-600 border-2 border-green-200 cursor-default' 
+                                : 'bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/20'
+                            }`}
+                          >
+                            <CheckCircle size={18} />
+                            {myVote === 'approve' ? 'Voted Approve' : 'Vote Approve'}
+                          </button>
+                          
+                          <button
+                            onClick={() => voteOnVerificationRequest(request.id, currentUser!.id, 'reject')}
+                            disabled={myVote === 'reject'}
+                            className={`flex-1 min-w-[120px] py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                              myVote === 'reject' 
+                                ? 'bg-red-100 text-red-600 border-2 border-red-200 cursor-default' 
+                                : 'bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/20'
+                            }`}
+                          >
+                            <XCircle size={18} />
+                            {myVote === 'reject' ? 'Voted Reject' : 'Vote Reject'}
+                          </button>
+
+                          {(approves >= 1) && (
+                            <button
+                              onClick={async () => {
+                                await updateVerificationRequestStatus(request.id, 'approved');
+                                await updateUserVerificationStatus(request.userId, true);
+                                await logAction('verify_user', request.userId, `Verified user ${request.firstName} ${request.lastName} after vote.`);
+                              }}
+                              className="w-full mt-2 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            >
+                              Finalize Approval & Verify
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {verificationRequests.filter(r => r.status === 'pending').length === 0 && (
+                  <div className="py-20 text-center text-zinc-500 bg-zinc-50 dark:bg-zinc-950 rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
+                    <CheckCircle size={48} className="mx-auto mb-4 opacity-20" />
+                    <p className="font-bold">Inbox Clear</p>
+                    <p className="text-xs">No pending verification requests at this time.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'suggestions' && isOwner && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">App Suggestions</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Review student ideas for new games or apps.</p>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 px-3 py-1 rounded-full text-xs font-bold border border-amber-100 dark:border-amber-800">
+                  {suggestions.filter(s => s.status === 'pending').length} New
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {suggestions.sort((a, b) => b.createdAt - a.createdAt).map((suggestion) => {
+                  const user = users.find(u => u.id === suggestion.userId);
+                  return (
+                    <div key={suggestion.id} className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative overflow-hidden group">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-3 rounded-xl ${suggestion.type === 'game' ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                            {suggestion.type === 'game' ? <Gamepad2 size={20} /> : <LayoutIcon size={20} />}
+                          </div>
+                          <div>
+                            <h3 className="font-black text-lg">{suggestion.name}</h3>
+                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1">
+                              By {user?.handle || 'Unknown'} • {new Date(suggestion.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
+                          suggestion.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                          suggestion.status === 'reviewed' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
+                        }`}>
+                          {suggestion.status}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-6 italic">
+                        "{suggestion.description}"
+                      </p>
+
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={async () => {
+                            await updateDoc(doc(db, 'app_suggestions', suggestion.id), { status: 'reviewed' });
+                            await logAction('review_suggestion', suggestion.id, `Reviewed suggestion: ${suggestion.name}`);
+                          }}
+                          className="flex-1 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-xs font-bold hover:bg-zinc-300 transition-colors"
+                        >
+                          Mark Reviewed
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            await updateDoc(doc(db, 'app_suggestions', suggestion.id), { status: 'implemented' });
+                            await logAction('implement_suggestion', suggestion.id, `Implemented suggestion: ${suggestion.name}`);
+                          }}
+                          className="flex-1 py-2 rounded-lg bg-green-600 text-white text-xs font-bold hover:bg-green-700 transition-colors"
+                        >
+                          Implemented
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {suggestions.length === 0 && (
+                <div className="py-20 text-center text-zinc-500">
+                  <Lightbulb size={48} className="mx-auto mb-4 opacity-20" />
+                  <p className="font-bold">No Suggestions Yet</p>
+                  <p className="text-xs">Students haven't suggested any apps or games yet.</p>
+                </div>
+              )}
             </div>
           )}
 
