@@ -206,16 +206,7 @@ export function Profile() {
             <div className="flex items-center justify-center md:justify-start gap-2 mb-1 flex-wrap">
               <h1 className="text-2xl font-bold flex items-center gap-1.5">
                 {profileUser.username}
-                {profileUser.isVerified && (
-                  <motion.div 
-                    animate={{ rotateY: [0, 180, 360], filter: ["hue-rotate(0deg)", "hue-rotate(360deg)"] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                    className="text-blue-500 drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]"
-                    title="Verified Student"
-                  >
-                    <ShieldCheck size={20} fill="currentColor" fillOpacity={0.2} />
-                  </motion.div>
-                )}
+                {profileUser.isVerified && <HolographicBadge />}
               </h1>
               {areFriends && !isOwnProfile && (
                 <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold flex items-center gap-1">
@@ -791,7 +782,7 @@ function EditProfileModal({ user, onClose }: { user: User, onClose: () => void }
                     onClick={() => setShowVerifModal(true)}
                     className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform shadow-lg shadow-blue-500/20"
                   >
-                    <ShieldCheck size={18} /> Request Verified Badge
+                    <ShieldCheck size={18} /> Be Verified
                   </button>
                 ) : (
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex items-center gap-3">

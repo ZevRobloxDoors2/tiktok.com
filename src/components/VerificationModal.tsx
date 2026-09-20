@@ -30,7 +30,6 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(s => {
           setStream(s);
-          if (videoRef.current) videoRef.current.srcObject = s;
         })
         .catch(err => {
           console.error("Camera error:", err);
@@ -42,6 +41,12 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
       setStream(null);
     }
   }, [showCamera]);
+
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, showCamera]);
 
   const snapPhoto = () => {
     if (!videoRef.current) return;

@@ -12,6 +12,7 @@ import AnnouncementBanner from './AnnouncementBanner';
 import { IncomingCallModal } from './IncomingCallModal';
 
 import { VerificationModal } from './VerificationModal';
+import { HolographicBadge } from './UIPolish';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { 
@@ -309,7 +310,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   onClick={() => setShowVerificationModal(true)}
                   className="ml-auto flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-1.5 py-0.5 rounded transition-colors"
                 >
-                  <ShieldCheck size={10} /> Request Verification
+                  <ShieldCheck size={10} /> Be Verified
                 </button>
               )}
             </div>
@@ -373,7 +374,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3 px-2 py-2">
               <img src={currentUser.avatarUrl} alt={currentUser.username} className="w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-800" />
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{currentUser.username}</p>
+                <p className="font-semibold text-sm truncate flex items-center gap-1">
+                  {currentUser.username}
+                  {currentUser.isVerified && <HolographicBadge />}
+                </p>
                 <p className="text-xs text-zinc-500 truncate">@{currentUser.handle}</p>
               </div>
             </div>

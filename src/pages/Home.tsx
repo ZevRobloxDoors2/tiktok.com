@@ -77,13 +77,11 @@ export function Home() {
       const currentCount = videos.length;
       let targetType: 'ugv' | 'youtube' = 'youtube';
 
-      // Mixed Logic: YT Shorts (0) -> YT (1) -> VIDEO (2) -> YT (3) -> VIDEO (4) -> Random (5+)
-      if (currentCount === 0 || currentCount === 1 || currentCount === 3) {
+      // Interleaved Logic: YT (0) -> VIDEO (1) -> YT (2) -> VIDEO (3) -> YT (4) -> VIDEO (5) -> Random (6+)
+      if (currentCount % 2 === 0) {
         targetType = 'youtube';
-      } else if (currentCount === 2 || currentCount === 4) {
-        targetType = 'ugv';
       } else {
-        targetType = Math.random() > 0.5 ? 'ugv' : 'youtube';
+        targetType = 'ugv';
       }
 
       const allDbVideos = await getVideos();
@@ -1204,6 +1202,7 @@ export const VideoItem: React.FC<{
           videoContext={{
             title: video.description || 'Short Video',
             creator: video.user?.username || video.user?.handle || 'creator',
+            isVerified: video.user?.isVerified,
             tags: video.tags || [],
             url: video.videoUrl,
             isYouTube: video.isYouTube,

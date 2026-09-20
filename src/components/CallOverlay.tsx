@@ -103,8 +103,6 @@ export function CallOverlay() {
         event.streams[0].getTracks().forEach((track) => {
           remoteStream.current?.addTrack(track);
         });
-        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream.current;
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream.current;
       };
 
       pc.current.onicecandidate = (event) => {
@@ -153,6 +151,18 @@ export function CallOverlay() {
     }
   }, [isCalling, callData, currentUser, callStatus]);
 
+  useEffect(() => {
+    if (callStatus === 'active' || isCameraOn) {
+      if (localStream.current && localVideoRef.current) {
+        localVideoRef.current.srcObject = localStream.current;
+      }
+      if (remoteStream.current) {
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream.current;
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream.current;
+      }
+    }
+  }, [callStatus, isCameraOn, isCalling]);
+
   const acceptCall = async () => {
     if (!callIdRef.current || !currentUser) return;
     setCallStatus('active');
@@ -165,7 +175,6 @@ export function CallOverlay() {
       localStream.current.getTracks().forEach((track) => {
         pc.current?.addTrack(track, localStream.current!);
       });
-      if (localVideoRef.current && isCameraOn) localVideoRef.current.srcObject = localStream.current;
     } catch (err) {
       console.error("Media error:", err);
     }
@@ -174,8 +183,6 @@ export function CallOverlay() {
       event.streams[0].getTracks().forEach((track) => {
         remoteStream.current?.addTrack(track);
       });
-      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream.current;
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream.current;
     };
 
     pc.current.onicecandidate = (event) => {
@@ -257,7 +264,6 @@ export function CallOverlay() {
             if (sender) sender.replaceTrack(videoTrack);
             else pc.current.addTrack(videoTrack, localStream.current);
           }
-          if (localVideoRef.current) localVideoRef.current.srcObject = localStream.current;
         }
         setIsCameraOn(true);
       } catch (err) {

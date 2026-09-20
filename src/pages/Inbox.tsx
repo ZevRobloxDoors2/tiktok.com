@@ -6,6 +6,7 @@ import { Heart, MessageCircle, UserPlus, Bell, ShieldCheck, Users, Plus, X, Sear
 import { Link } from 'react-router-dom';
 import { addReport } from '../lib/db';
 import { checkSystemHealth, SystemStatus } from '../lib/diagnostics';
+import { HolographicBadge } from '../components/UIPolish';
 
 export function Inbox() {
   const { 
@@ -317,7 +318,7 @@ export function Inbox() {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold truncate flex items-center gap-1">
                         {c.user!.username}
-                        {c.user!.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                        {c.user!.isVerified && <HolographicBadge />}
                       </h3>
                       <p className="text-sm text-zinc-500 truncate flex items-center gap-1">
                         {c.lastMessage.fromUserId === currentUser.id ? 'You: ' : ''}
@@ -434,7 +435,7 @@ export function Inbox() {
                   <div>
                     <p className="font-bold flex items-center gap-1">
                       {friend.username}
-                      {friend.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                      {friend.isVerified && <HolographicBadge />}
                     </p>
                     <p className="text-xs text-zinc-500">@{friend.handle}</p>
                   </div>

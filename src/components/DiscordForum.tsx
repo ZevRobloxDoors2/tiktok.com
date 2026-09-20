@@ -143,13 +143,13 @@ export function DiscordForum() {
       // Seed initial helpful FAQs
       const initialPosts: FAQPost[] = [
         {
-          id: 'announcement_v2',
+          id: 'announcement_v0.9_final',
           authorId: currentUser?.id || 'system_staff',
-          title: '📢 Major Update: Verification 2.0 & Media Editor Enhancements!',
+          title: '🚀 CentralTok V0.9 BETA: Be Verified & New Creative Tools!',
           categoryId: 'announcements',
           pinned: true,
           timestamp: Date.now(),
-          content: `We've just rolled out some huge updates to CentralTok!\n\n**1. Verified Student Badges**\nYou can now apply for a Verified Badge! This holographic badge will appear on your profile, in messages, and in the user lists. Verification requires your School ID and is manually reviewed by our moderation team.\n\n**2. Professional Media Editor**\nUnleash your creativity! Our new media editor allows you to:\n- 🎵 **Add Music**: Choose from a library of trending tracks.\n- ✍️ **Text Overlays**: Add multiple text layers with custom fonts and colors.\n- 🎭 **Animations**: Animate your text with 'Pop', 'Float', 'Glitch', or 'Typing' effects.\n- 🌈 **Enhanced Filters**: New visual filters to make your content pop!\n\n**3. Verification Update**\nNote that verification now REQUIRES your School ID (showing your name and picture). This ensures our community remains safe and authentic.\n\nStay creative, CentralTokians!`,
+          content: `Welcome to the V0.9 BETA update! We've added several highly requested features:\n\n**✨ Be Verified**\nYou can now find the "Be Verified" option directly in the **BETA V0.9 Modal** in your sidebar. Verification now requires:\n- First & Last Name\n- **School ID Photo** (showing your name and student picture)\n- Selfie (Optional)\n\nOnce verified, you'll sport the new **Holographic Badge** across the entire app, including your profile, messages, and the people tab!\n\n**🎵 New Video Editor Features**\nExpress yourself with our enhanced upload tools:\n- **Music Library**: Add songs directly to your videos.\n- **Animated Text**: Add text layers with high-energy animations like 'Float', 'Glitch', and 'Pop'.\n- **Live Camera Fixes**: We've resolved issues with live camera previews for a smoother recording experience.\n\n**🎮 New Games & Apps**\nCheck out the "Suggest Game/App" feature on the Games page to let us know what we should add next!\n\nStay tuned for more updates as we approach V1.0!`,
           replies: [],
           reactions: { '🔥': [currentUser?.id || 'system'], '🚀': [currentUser?.id || 'system'], '✅': [currentUser?.id || 'system'] }
         },

@@ -4,6 +4,7 @@ import { Search, X, Play, User as UserIcon, Compass, Sparkles, ShieldCheck } fro
 import { getVideos, getUsers } from '../lib/db';
 import { Video, User } from '../types';
 import { VideoItem } from './Home';
+import { HolographicBadge } from '../components/UIPolish';
 
 export function Explore() {
   const [query, setQuery] = useState('');
@@ -170,7 +171,7 @@ export function Explore() {
                         <div>
                           <p className="font-bold flex items-center gap-1">
                             {user.username}
-                            {user.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                            {user.isVerified && <HolographicBadge />}
                           </p>
                           <p className="text-sm text-zinc-500">@{user.handle}</p>
                         </div>

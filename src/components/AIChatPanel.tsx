@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, Bot, Loader2, Sparkles, Film, CheckCircle2, RefreshCw, MessageSquare } from 'lucide-react';
+import { HolographicBadge } from './UIPolish';
 
 export interface VideoContext {
   title: string;
   creator: string;
+  isVerified?: boolean;
   tags: string[];
   url?: string;
   isYouTube?: boolean;
@@ -224,8 +226,10 @@ Provide a brief, friendly 2-sentence summary of what happened in the video, and 
                   {videoContext.mediaType === 'image' ? 'Photo' : 'Video'}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-400 truncate max-w-[260px]">
-                Watching @{videoContext.creator}: {videoContext.title || 'Video'}
+              <p className="text-[11px] text-zinc-400 truncate max-w-[260px] flex items-center gap-1">
+                Watching @{videoContext.creator}
+                {videoContext.isVerified && <HolographicBadge />}
+                : {videoContext.title || 'Video'}
               </p>
             </div>
           </div>

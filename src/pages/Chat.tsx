@@ -13,6 +13,7 @@ import {
   Mic, Square, Trash2, CheckCheck, Users, Info, Tv,
   ShieldCheck, UserPlus, UserMinus, Shield
 } from 'lucide-react';
+import { HolographicBadge } from '../components/UIPolish';
 
 export function Chat() {
   const { handle, groupId } = useParams<{ handle?: string, groupId?: string }>();
@@ -51,17 +52,20 @@ export function Chat() {
       const users = await getUsers();
       setAllUsers(users);
       
-      if (groupId) {
+      const currentHandle = handle;
+      const currentGroupId = groupId;
+      
+      if (currentGroupId) {
         const groups = await getGroupChats();
-        const g = groups.find(x => x.id === groupId);
+        const g = groups.find(x => x.id === currentGroupId);
         if (!g) {
           navigate('/messages');
           return;
         }
         setGroup(g);
         setOtherUser(null);
-      } else {
-        const user = users.find(u => u.handle === handle);
+      } else if (currentHandle) {
+        const user = users.find(u => u.handle === currentHandle);
         if (!user) {
           navigate('/messages');
           return;
@@ -301,17 +305,39 @@ export function Chat() {
     }
   };
 
-  const startCamera = async () => {
-    setShowCamera(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch(err) { alert("Camera access denied."); setShowCamera(false); }
-  };
+  useEffect(() => {
+    if (showCamera && videoRef.current && (videoRef.current.srcObject as MediaStream)?.id !== (videoRef.current.srcObject as any)?._streamId) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            (videoRef.current as any)._streamId = stream.id;
+          }
+        })
+        .catch(err => {
+          console.error("Camera error:", err);
+          alert("Could not access camera.");
+          setShowCamera(false);
+        });
+    }
+    
+    return () => {
+      if (!showCamera && videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+        (videoRef.current as any)._streamId = null;
+      }
+    };
+  }, [showCamera]);
 
   const stopCamera = () => {
-    const stream = videoRef.current?.srcObject as MediaStream;
-    stream?.getTracks().forEach(t => t.stop());
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
+      (videoRef.current as any)._streamId = null;
+    }
     setShowCamera(false);
   };
 
@@ -365,7 +391,7 @@ export function Chat() {
               <div>
                 <h2 className="font-bold leading-tight flex items-center gap-1">
                   {otherUser!.username}
-                  {otherUser!.isVerified && <ShieldCheck size={14} className="text-blue-500 fill-blue-500/20" />}
+                  {otherUser!.isVerified && <HolographicBadge />}
                 </h2>
                 <p className="text-xs text-zinc-500">@{otherUser!.handle}</p>
               </div>
@@ -461,7 +487,7 @@ export function Chat() {
                 {group && !isMe && sender && (
                   <span className="text-[10px] font-bold text-zinc-500 ml-10 mb-1 flex items-center gap-1">
                     {sender.username}
-                    {sender.isVerified && <ShieldCheck size={10} className="text-blue-500" />}
+                    {sender.isVerified && <HolographicBadge />}
                   </span>
                 )}
                 <div className={`flex items-end gap-2 max-w-[85%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -538,7 +564,7 @@ export function Chat() {
           <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">
             <Paperclip size={20} />
           </button>
-          <button type="button" onClick={startCamera} className="p-2.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors mr-1">
+          <button type="button" onClick={() => setShowCamera(true)} className="p-2.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors mr-1">
             <Camera size={20} />
           </button>
           

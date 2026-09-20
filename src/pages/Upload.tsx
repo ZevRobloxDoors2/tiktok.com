@@ -96,7 +96,6 @@ export function Upload() {
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(s => {
           setStream(s);
-          if (cameraRef.current) cameraRef.current.srcObject = s;
         })
         .catch(err => {
           console.warn('Camera error:', err);
@@ -107,7 +106,6 @@ export function Upload() {
       navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
         .then(s => {
           setStream(s);
-          if (cameraRef.current) cameraRef.current.srcObject = s;
           
           s.getVideoTracks()[0].onended = () => {
             s.getTracks().forEach(track => track.stop());
@@ -126,6 +124,12 @@ export function Upload() {
       if (timerRef.current) clearInterval(timerRef.current);
     }
   }, [mode, stream]);
+
+  useEffect(() => {
+    if (stream && cameraRef.current) {
+      cameraRef.current.srcObject = stream;
+    }
+  }, [stream, mode]);
 
   const startRecording = () => {
     if (!stream) return;

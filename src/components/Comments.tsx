@@ -3,6 +3,7 @@ import { useAppStore } from '../store';
 import { Video, Comment, User } from '../types';
 import { addCommentToVideo, getUsers, ensureVideoInDB } from '../lib/db';
 import { X, Send } from 'lucide-react';
+import { HolographicBadge } from './UIPolish';
 
 export function Comments({ video, onClose }: { video: Video, onClose: () => void }) {
   const { currentUser } = useAppStore();
@@ -63,7 +64,10 @@ export function Comments({ video, onClose }: { video: Video, onClose: () => void
                 <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold">{user?.username.charAt(0) || '?'}</div>
               )}
               <div className="flex-1">
-                <p className="text-xs text-zinc-500 font-semibold">{user?.username}</p>
+                <p className="text-xs text-zinc-500 font-semibold flex items-center gap-1">
+                  {user?.username}
+                  {user?.isVerified && <HolographicBadge />}
+                </p>
                 <p className="text-sm mt-0.5">{c.text}</p>
                 <div className="flex gap-4 mt-1 items-center">
                   <span className="text-xs text-zinc-500">{formatTime(c.timestamp)}</span>
@@ -82,7 +86,10 @@ export function Comments({ video, onClose }: { video: Video, onClose: () => void
                             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold text-xs">{rUser?.username.charAt(0) || '?'}</div>
                           )}
                           <div>
-                            <p className="text-xs text-zinc-500 font-semibold">{rUser?.username}</p>
+                            <p className="text-xs text-zinc-500 font-semibold flex items-center gap-1">
+                              {rUser?.username}
+                              {rUser?.isVerified && <HolographicBadge />}
+                            </p>
                             <p className="text-sm mt-0.5">{r.text}</p>
                             <div className="flex gap-4 mt-1 items-center">
                               <span className="text-xs text-zinc-500">{formatTime(r.timestamp)}</span>
