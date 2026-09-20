@@ -16,9 +16,7 @@ service cloud.firestore {
         request.auth.token.role == 'owner' || 
         request.auth.token.role == 'staff' ||
         request.auth.token.admin == true ||
-        request.auth.token.email.lower() == 'zaellacruze1@gmail.com' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
+        request.auth.token.email.lower() == 'zaellacruze1@gmail.com'
       );
     }
 
@@ -64,25 +62,24 @@ service cloud.firestore {
 
     // Reports collection
     match /reports/{reportId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read: if isStaffOrAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isStaffOrAdmin();
     }
 
     // Appeals collection
     match /appeals/{appealId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read: if isStaffOrAdmin() || isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update: if isStaffOrAdmin();
+      allow delete: if isStaffOrAdmin();
     }
 
     // Audit logs collection
-    match /auditLogs/{logId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
+    match /audit_logs/{logId} {
+      allow read: if isStaffOrAdmin();
+      allow create: if isStaffOrAdmin();
+      allow update: if isStaffOrAdmin();
       allow delete: if isStaffOrAdmin();
     }
 

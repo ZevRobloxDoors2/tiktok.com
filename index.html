@@ -12,6 +12,46 @@
     <meta name="twitter:card" content="summary_large_image" />
     <script type="module" crossorigin src="./dist/assets/index-BVlZUxd8.js"></script>
     <link rel="stylesheet" crossorigin href="./dist/assets/index-EcogrfdA.css" />
+    <script>
+      // YouTube Playables SDK Mock - Enhanced for FRVR and others
+      const noop = () => {};
+      const noopPromise = () => Promise.resolve({});
+      
+      window.ytgame = {
+        system: {
+          getLanguage: () => 'en',
+          isAudioEnabled: () => true,
+          onPause: (cb) => {
+            console.log('ytgame.system.onPause registered');
+            if (typeof cb === 'function') window._ytPauseCb = cb;
+            return { unsubscribe: noop };
+          },
+          onResume: (cb) => {
+            console.log('ytgame.system.onResume registered');
+            if (typeof cb === 'function') window._ytResumeCb = cb;
+            return { unsubscribe: noop };
+          },
+          loadData: noopPromise,
+          saveData: noopPromise,
+          sendScore: noop,
+          setGameReady: noop,
+          getSDKVersion: () => '1.0.0',
+        },
+        game: {
+          firstClick: noop,
+          gameReady: noop,
+          loadFinished: noop
+        },
+        engagement: {
+          sendEvent: noop
+        }
+      };
+      
+      // Also expose on parent for iframe access
+      if (window.parent && window.parent !== window) {
+        window.parent.ytgame = window.ytgame;
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -184,45 +184,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    // Inject ytgame SDK mock for YouTube Playables to prevent crashes
-    const isYTGame = isGameActive && (
-      activeGameTitle?.includes('Bowmasters') || 
-      activeGameTitle?.includes('Frvr') || 
-      activeGameTitle?.includes('FRVR') ||
-      activeGameTitle?.includes('2048') ||
-      activeGameTitle?.includes('Cookie') ||
-      activeGameTitle?.includes('Geometry') ||
-      activeGameUrl?.includes('Frvr')
-    );
-
-    if (isYTGame) {
-      const mock = {
-        system: {
-          getLanguage: () => 'en',
-          isAudioEnabled: () => true,
-          onPause: (cb: any) => {
-            console.log('ytgame.system.onPause registered');
-            if (typeof cb === 'function') (window as any)._ytPauseCb = cb;
-          },
-          onResume: (cb: any) => {
-            console.log('ytgame.system.onResume registered');
-            if (typeof cb === 'function') (window as any)._ytResumeCb = cb;
-          },
-          loadData: () => Promise.resolve({}),
-          saveData: () => Promise.resolve()
-        },
-        game: {
-          firstClick: () => {},
-          gameReady: () => {},
-          loadFinished: () => {}
-        },
-        engagement: {
-          sendEvent: () => {}
-        }
-      };
-      (window as any).ytgame = mock;
-    }
-
     const handleMessage = async (event: MessageEvent) => {
       // Basic validation for type
       if (!event.data || typeof event.data !== 'object') return;
@@ -242,7 +203,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [currentUser?.id, isGameActive, activeGameTitle]);
+  }, [currentUser?.id]);
 
   const handleSupportSubmit = async () => {
     if (!supportMessage.trim()) return;
