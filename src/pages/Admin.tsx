@@ -5,6 +5,7 @@ import { User, Report, Appeal, AuditLog, Video, Notification, Announcement } fro
 import { ShieldAlert, AlertTriangle, Users, FileText, CheckCircle, XCircle, Trash2, Ban, Search, Filter, RotateCcw, Loader2, Power, Gamepad2, Settings, Megaphone, Plus, Calendar, Palette, Maximize, Target, Layout as LayoutIcon, Ghost } from 'lucide-react';
 import { getDeviceId } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { GAMES, APPS } from '../data/games';
 
 export function Admin() {
   const { currentUser } = useAppStore();
@@ -24,7 +25,8 @@ export function Admin() {
     color: 'bg-pink-600',
     size: 'md',
     active: true,
-    targetGameIds: []
+    targetGameIds: [],
+    targetPage: '',
   });
   const [announcementDuration, setAnnouncementDuration] = useState('24h');
 
@@ -767,29 +769,32 @@ export function Admin() {
 
                       {newAnnouncement.type === 'game' && (
                         <div className="col-span-2">
-                          <label className="block text-sm font-semibold mb-2">Target Games (IDs or Titles)</label>
-                          <div className="flex flex-wrap gap-2">
-                            {['Bowmasters', 'Drift Boss', 'Basketball FRVR', 'Doodle Jump', 'Geometry Dash'].map(game => (
-                              <button
-                                key={game}
-                                onClick={() => {
-                                  const ids = newAnnouncement.targetGameIds || [];
-                                  if (ids.includes(game)) {
-                                    setNewAnnouncement(prev => ({ ...prev, targetGameIds: ids.filter(id => id !== game) }));
-                                  } else {
-                                    setNewAnnouncement(prev => ({ ...prev, targetGameIds: [...ids, game] }));
-                                  }
-                                }}
-                                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                                  (newAnnouncement.targetGameIds || []).includes(game)
-                                    ? 'bg-pink-600 text-white'
-                                    : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-300'
-                                }`}
-                              >
-                                {game}
-                              </button>
-                            ))}
+                          <label className="block text-sm font-semibold mb-2">Target Games & Apps</label>
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 max-h-[200px] overflow-y-auto">
+                            <div className="flex flex-wrap gap-2">
+                              {[...GAMES, ...APPS].map(item => (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    const ids = newAnnouncement.targetGameIds || [];
+                                    if (ids.includes(item.title)) {
+                                      setNewAnnouncement(prev => ({ ...prev, targetGameIds: ids.filter(id => id !== item.title) }));
+                                    } else {
+                                      setNewAnnouncement(prev => ({ ...prev, targetGameIds: [...ids, item.title] }));
+                                    }
+                                  }}
+                                  className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${
+                                    (newAnnouncement.targetGameIds || []).includes(item.title)
+                                      ? 'bg-pink-600 text-white'
+                                      : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-300'
+                                  }`}
+                                >
+                                  {item.title}
+                                </button>
+                              ))}
+                            </div>
                           </div>
+                          <p className="text-[10px] text-zinc-500 mt-2 italic">Click titles to toggle selection. Announcements will show when these games are active.</p>
                         </div>
                       )}
                     </div>

@@ -5,10 +5,21 @@ import { User, Video, Message, Notification, Report, Appeal, AuditLog, Comment, 
 
 export const getAnnouncements = () => fetchCollection<Announcement>('announcements');
 
+const cleanObject = (obj: any) => {
+  const newObj = { ...obj };
+  Object.keys(newObj).forEach(key => {
+    if (newObj[key] === undefined) {
+      delete newObj[key];
+    }
+  });
+  return newObj;
+};
+
 export const saveAnnouncement = async (announcement: Announcement) => {
   try {
+    const cleanedData = cleanObject(announcement);
     const docRef = doc(db, 'announcements', announcement.id);
-    await setDoc(docRef, announcement);
+    await setDoc(docRef, cleanedData);
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `announcements/${announcement.id}`);
   }
