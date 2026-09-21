@@ -261,12 +261,13 @@ export function Inbox() {
                   <div className="relative">
                     <img src={n.fromUser.avatarUrl} alt="" className="w-12 h-12 rounded-full" />
                     <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-zinc-950 flex items-center justify-center text-white
-                      ${n.type === 'like' ? 'bg-pink-600' : n.type === 'follow' ? 'bg-blue-500' : n.type === 'forum_announcement' ? 'bg-[#5865F2]' : n.type === 'tradient_reward' ? 'bg-indigo-600' : 'bg-green-500'}`}>
+                      ${n.type === 'like' ? 'bg-pink-600' : n.type === 'follow' ? 'bg-blue-500' : n.type === 'forum_announcement' ? 'bg-[#5865F2]' : n.type === 'tradient_reward' ? 'bg-indigo-600' : n.type === 'moderation' ? 'bg-amber-600' : 'bg-green-500'}`}>
                       {n.type === 'like' && <Heart size={12} className="fill-current" />}
                       {n.type === 'follow' && <UserPlus size={12} />}
                       {n.type === 'mention' && <span className="text-[10px] font-bold">@</span>}
                       {n.type === 'forum_announcement' && <span className="text-[10px]">📢</span>}
                       {n.type === 'tradient_reward' && <ShieldCheck size={12} />}
+                      {n.type === 'moderation' && <ShieldAlert size={12} />}
                     </div>
                   </div>
                   <div className="flex-1">
@@ -286,6 +287,11 @@ export function Inbox() {
                       ) : n.type === 'support_resolved' ? (
                         <>
                           <span className="font-bold text-green-600 dark:text-green-400">✅ Support Resolved:</span>{' '}
+                          <span className="text-zinc-800 dark:text-zinc-200">{n.message}</span>
+                        </>
+                      ) : n.type === 'moderation' ? (
+                        <>
+                          <span className="font-bold text-amber-600 dark:text-amber-400">⚠️ Moderator Action:</span>{' '}
                           <span className="text-zinc-800 dark:text-zinc-200">{n.message}</span>
                         </>
                       ) : (

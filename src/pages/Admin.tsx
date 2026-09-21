@@ -40,7 +40,105 @@ export function Admin() {
   });
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
-  const [announcementDuration, setAnnouncementDuration] = useState('24h');
+  const [announcementAmount, setAnnouncementAmount] = useState<number>(24);
+  const [announcementUnit, setAnnouncementUnit] = useState<'secs' | 'hours' | 'days' | 'months' | 'years' | 'never'>('hours');
+
+  // Temp Ban Modal State
+  const [tempBanModal, setTempBanModal] = useState<{ isOpen: boolean; user: User | null }>({ isOpen: false, user: null });
+  const [tempBanAmount, setTempBanAmount] = useState<number>(7);
+  const [tempBanUnit, setTempBanUnit] = useState<'secs' | 'hours' | 'days' | 'months' | 'years'>('days');
+  const [tempBanReason, setTempBanReason] = useState<string>('');
+  const [tempBanLoading, setTempBanLoading] = useState<boolean>(false);
+
+  // Rename Modal State
+  const [renameModal, setRenameModal] = useState<{ isOpen: boolean; user: User | null }>({ isOpen: false, user: null });
+  const [renameUsername, setRenameUsername] = useState('');
+  const [renameHandle, setRenameHandle] = useState('');
+  const [renameReason, setRenameReason] = useState('');
+  const [renameLoading, setRenameLoading] = useState(false);
+
+  const handleApplyRename = async () => {
+    if (!renameModal.user || !renameReason.trim() || !renameUsername.trim() || !renameHandle.trim()) return;
+    setRenameLoading(true);
+    try {
+      const allUsers = await getUsers();
+      const idx = allUsers.findIndex(u => u.id === renameModal.user!.id);
+      if (idx !== -1) {
+        const oldUsername = allUsers[idx].username;
+        const oldHandle = allUsers[idx].handle;
+        allUsers[idx].username = renameUsername.trim();
+        allUsers[idx].handle = renameHandle.trim();
+        await saveUsers(allUsers);
+        setUsers(allUsers);
+
+        // Send notification to user activity feed
+        const notifId = `notif_mod_rename_${Date.now()}`;
+        const notifications = await getNotifications();
+        const newNotif: AppNotification = {
+          id: notifId,
+          userId: renameModal.user.id,
+          type: 'moderation',
+          fromUserId: currentUser!.id,
+          title: 'Moderator Action: Renamed',
+          message: `You have been renamed by staff (@${currentUser!.handle}). Old: @${oldHandle} (${oldUsername}) -> New: @${renameHandle.trim()} (${renameUsername.trim()}). Reason: ${renameReason.trim()}`,
+          read: false,
+          timestamp: Date.now()
+        };
+        await saveNotifications([...notifications, newNotif]);
+
+        await logAction('rename_user', renameModal.user.id, `Renamed user from @${oldHandle} to @${renameHandle.trim()} (${renameUsername.trim()}). Reason: ${renameReason.trim()}`);
+      }
+      setRenameModal({ isOpen: false, user: null });
+      setRenameUsername('');
+      setRenameHandle('');
+      setRenameReason('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRenameLoading(false);
+    }
+  };
+
+  const calculateDurationMs = (amount: number, unit: string) => {
+    if (unit === 'never') return 0;
+    switch (unit) {
+      case 'secs': return amount * 1000;
+      case 'hours': return amount * 60 * 60 * 1000;
+      case 'days': return amount * 24 * 60 * 60 * 1000;
+      case 'months': return amount * 30 * 24 * 60 * 60 * 1000;
+      case 'years': return amount * 365 * 24 * 60 * 60 * 1000;
+      default: return amount * 24 * 60 * 60 * 1000;
+    }
+  };
+
+  const handleApplyTempBan = async () => {
+    if (!tempBanModal.user || !tempBanReason.trim()) return;
+    setTempBanLoading(true);
+    try {
+      const durationMs = calculateDurationMs(tempBanAmount, tempBanUnit);
+      const until = Date.now() + durationMs;
+      const allUsers = await getUsers();
+      const idx = allUsers.findIndex(u => u.id === tempBanModal.user!.id);
+      if (idx !== -1) {
+        allUsers[idx].banStatus = {
+          type: 'temp',
+          until,
+          reason: tempBanReason.trim(),
+          bannedBy: currentUser!.id,
+          bannedAt: Date.now()
+        };
+        await saveUsers(allUsers);
+        setUsers(allUsers);
+        await logAction('ban_user', tempBanModal.user.id, `Banned user (temp) for ${tempBanAmount} ${tempBanUnit}. Reason: ${tempBanReason.trim()}`);
+      }
+      setTempBanModal({ isOpen: false, user: null });
+      setTempBanReason('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTempBanLoading(false);
+    }
+  };
 
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -96,10 +194,7 @@ export function Admin() {
     
     setConfirmModal(prev => ({ ...prev, loading: true }));
     try {
-      const durationMs = announcementDuration === '1h' ? 60 * 60 * 1000 :
-                         announcementDuration === '24h' ? 24 * 60 * 60 * 1000 :
-                         announcementDuration === '7d' ? 7 * 24 * 60 * 60 * 1000 :
-                         announcementDuration === '30d' ? 30 * 24 * 60 * 60 * 1000 : 0;
+      const durationMs = calculateDurationMs(announcementAmount, announcementUnit);
       
       let scheduledAt = 0;
       if (scheduledDate && scheduledTime) {
@@ -670,9 +765,22 @@ export function Admin() {
                               <CheckCircle size={13} /> Unban User
                             </button>
                           )}
+                          {u.role !== 'owner' && (
+                            <button 
+                              onClick={() => { 
+                                setRenameModal({ isOpen: true, user: u }); 
+                                setRenameUsername(u.username); 
+                                setRenameHandle(u.handle); 
+                                setRenameReason(''); 
+                              }} 
+                              className="px-2 py-1 bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-semibold rounded text-xs hover:bg-indigo-500/30 flex items-center gap-1"
+                            >
+                              Rename
+                            </button>
+                          )}
                           {!u.banStatus && u.role !== 'owner' && (
                             <>
-                              <button onClick={() => applyBan(u, 'temp', 7)} className="px-2 py-1 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-semibold rounded text-xs hover:bg-yellow-500/30">
+                              <button onClick={() => { setTempBanModal({ isOpen: true, user: u }); setTempBanAmount(7); setTempBanUnit('days'); setTempBanReason(''); }} className="px-2 py-1 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-semibold rounded text-xs hover:bg-yellow-500/30">
                                 7d Ban
                               </button>
                               <button onClick={() => applyBan(u, 'perm')} className="px-2 py-1 bg-red-500/20 text-red-600 dark:text-red-400 font-semibold rounded text-xs hover:bg-red-500/30">
@@ -936,17 +1044,28 @@ export function Admin() {
                         <label className="block text-sm font-semibold mb-2 flex items-center gap-1">
                           <Calendar size={14} /> Duration
                         </label>
-                        <select
-                          value={announcementDuration}
-                          onChange={e => setAnnouncementDuration(e.target.value)}
-                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
-                        >
-                          <option value="1h">1 Hour</option>
-                          <option value="24h">24 Hours</option>
-                          <option value="7d">7 Days</option>
-                          <option value="30d">30 Days</option>
-                          <option value="never">Permanent</option>
-                        </select>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input 
+                            type="number"
+                            min="1"
+                            disabled={announcementUnit === 'never'}
+                            value={announcementAmount}
+                            onChange={e => setAnnouncementAmount(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500 text-sm disabled:opacity-50"
+                          />
+                          <select
+                            value={announcementUnit}
+                            onChange={e => setAnnouncementUnit(e.target.value as any)}
+                            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500 text-sm"
+                          >
+                            <option value="secs">Seconds</option>
+                            <option value="hours">Hours</option>
+                            <option value="days">Days</option>
+                            <option value="months">Months</option>
+                            <option value="years">Years</option>
+                            <option value="never">Permanent</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
 
@@ -1686,6 +1805,135 @@ export function Admin() {
           </div>
         </div>
       )}
+
+      {/* Temp Ban Duration Modal */}
+      {tempBanModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-md p-6 shadow-xl border border-zinc-200 dark:border-zinc-800">
+            <h3 className="text-xl font-bold mb-4">Temporary Ban: @{tempBanModal.user?.handle}</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2">Duration Amount & Unit</label>
+              <div className="grid grid-cols-2 gap-3">
+                <input 
+                  type="number"
+                  min="1"
+                  value={tempBanAmount}
+                  onChange={e => setTempBanAmount(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 border border-transparent focus:border-pink-500 focus:outline-none"
+                />
+                <select
+                  value={tempBanUnit}
+                  onChange={e => setTempBanUnit(e.target.value as any)}
+                  className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 border border-transparent focus:border-pink-500 focus:outline-none"
+                >
+                  <option value="secs">Seconds</option>
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                  <option value="months">Months</option>
+                  <option value="years">Years</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold mb-2">Reason for Temporary Ban (Required)</label>
+              <textarea 
+                value={tempBanReason}
+                onChange={e => setTempBanReason(e.target.value)}
+                className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 border border-transparent focus:border-pink-500 focus:outline-none resize-none min-h-[100px]"
+                placeholder="Specify the violation or reason for temporary ban..."
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setTempBanModal({ isOpen: false, user: null })}
+                disabled={tempBanLoading}
+                className="flex-1 py-3 font-semibold bg-zinc-200 dark:bg-zinc-800 rounded-xl hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleApplyTempBan}
+                disabled={!tempBanReason.trim() || tempBanLoading}
+                className="flex-1 py-3 font-semibold bg-yellow-600 text-white rounded-xl disabled:opacity-50 hover:bg-yellow-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {tempBanLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Banning...
+                  </>
+                ) : 'Apply Temp Ban'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Modal */}
+      {renameModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-md p-6 shadow-xl border border-zinc-200 dark:border-zinc-800">
+            <h3 className="text-xl font-bold mb-4">Rename User: @{renameModal.user?.handle}</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2">New Display Name</label>
+              <input 
+                type="text"
+                value={renameUsername}
+                onChange={e => setRenameUsername(e.target.value)}
+                className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 border border-transparent focus:border-indigo-500 focus:outline-none"
+                placeholder="New display name..."
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2">New Handle (@)</label>
+              <input 
+                type="text"
+                value={renameHandle}
+                onChange={e => setRenameHandle(e.target.value)}
+                className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 border border-transparent focus:border-indigo-500 focus:outline-none"
+                placeholder="New handle..."
+              />
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold mb-2">Reason for Renaming (Required)</label>
+              <textarea 
+                value={renameReason}
+                onChange={e => setRenameReason(e.target.value)}
+                className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 border border-transparent focus:border-indigo-500 focus:outline-none resize-none min-h-[100px]"
+                placeholder="Specify why this user is being renamed..."
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setRenameModal({ isOpen: false, user: null })}
+                disabled={renameLoading}
+                className="flex-1 py-3 font-semibold bg-zinc-200 dark:bg-zinc-800 rounded-xl hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleApplyRename}
+                disabled={!renameReason.trim() || !renameUsername.trim() || !renameHandle.trim() || renameLoading}
+                className="flex-1 py-3 font-semibold bg-indigo-600 text-white rounded-xl disabled:opacity-50 hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {renameLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Renaming...
+                  </>
+                ) : 'Apply Rename'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Image Zoom Modal */}
       <AnimatePresence>
         {zoomedImage && (

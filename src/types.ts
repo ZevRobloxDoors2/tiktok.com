@@ -242,7 +242,7 @@ export type UserStatus = {
 export type AppNotification = {
   id: string;
   userId: string; // The user receiving the notification
-  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward' | 'support_resolved' | 'call' | 'verification_update';
+  type: 'like' | 'mention' | 'message' | 'follow' | 'forum_announcement' | 'tradient_reward' | 'support_resolved' | 'call' | 'verification_update' | 'moderation';
   fromUserId: string;
   videoId?: string;
   forumPostId?: string;
