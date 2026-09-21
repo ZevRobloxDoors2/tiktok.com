@@ -1,5 +1,5 @@
 
-export async function compressImage(base64Str: string, maxWidth = 400, maxHeight = 400, quality = 0.7): Promise<string> {
+export async function compressImage(base64Str: string, maxWidth = 600, maxHeight = 600, quality = 0.5): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.src = base64Str;
@@ -23,8 +23,14 @@ export async function compressImage(base64Str: string, maxWidth = 400, maxHeight
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0, width, height);
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+      }
       resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => {
+      resolve(base64Str);
     };
   });
 }
+

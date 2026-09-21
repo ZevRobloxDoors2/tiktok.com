@@ -52,13 +52,13 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
   const snapPhoto = async () => {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
+    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.height = videoRef.current.videoHeight || 480;
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      const compressed = await compressImage(dataUrl, 800, 600, 0.7);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      const compressed = await compressImage(dataUrl, 600, 600, 0.45);
       if (showCamera === 'id') setSchoolIdPhoto(compressed);
       else setSelfiePhoto(compressed);
     }
@@ -68,10 +68,14 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'id' | 'selfie') => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 20 * 1024 * 1024) {
+        alert("This image file is very large (>20MB). Please choose a smaller image or crop it before uploading.");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = async (ev) => {
         if (ev.target?.result) {
-          const compressed = await compressImage(ev.target.result as string, 800, 600, 0.7);
+          const compressed = await compressImage(ev.target.result as string, 600, 600, 0.45);
           if (target === 'id') setSchoolIdPhoto(compressed);
           else setSelfiePhoto(compressed);
         }
@@ -99,9 +103,13 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
       await submitVerificationRequest(request);
       setIsSuccess(true);
       setTimeout(onClose, 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Submission failed. Image might be too large.");
+      if (err?.message?.includes('exceeds the maximum allowed size') || err?.code === 'resource-exhausted') {
+        alert("Submission failed: The uploaded images are still too large for database storage. Please try uploading smaller photos or compress them further.");
+      } else {
+        alert("Submission failed. Image might be too large or network error occurred.");
+      }
     } finally {
       setIsSubmitting(false);
     }
