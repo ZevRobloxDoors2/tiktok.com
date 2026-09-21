@@ -57,8 +57,8 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      const compressed = await compressImage(dataUrl, 600, 600, 0.45);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      const compressed = await compressImage(dataUrl, 300, 300, 0.3);
       if (showCamera === 'id') setSchoolIdPhoto(compressed);
       else setSelfiePhoto(compressed);
     }
@@ -75,7 +75,7 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         if (ev.target?.result) {
-          const compressed = await compressImage(ev.target.result as string, 600, 600, 0.45);
+          const compressed = await compressImage(ev.target.result as string, 300, 300, 0.3);
           if (target === 'id') setSchoolIdPhoto(compressed);
           else setSelfiePhoto(compressed);
         }
