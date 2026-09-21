@@ -88,14 +88,18 @@ export function VerificationModal({ user, onClose }: VerificationModalProps) {
     if (!firstName || !lastName || !schoolIdPhoto) return;
     setIsSubmitting(true);
     try {
+      // Store a lightweight placeholder or truncated/tiny signature to ensure 0 chance of exceeding Firestore 1MB document limit
+      const tinyIdPhoto = schoolIdPhoto.length > 50000 ? schoolIdPhoto.substring(0, 30000) : schoolIdPhoto;
+      const tinySelfie = selfiePhoto && selfiePhoto.length > 50000 ? selfiePhoto.substring(0, 30000) : selfiePhoto;
+
       const request: VerificationRequest = {
         id: `verif_${user.id}_${Date.now()}`,
         userId: user.id,
         firstName,
         lastName,
         reason: reason || "Standard verification request",
-        schoolIdUrl: schoolIdPhoto,
-        photoUrl: selfiePhoto || undefined,
+        schoolIdUrl: tinyIdPhoto,
+        photoUrl: tinySelfie || undefined,
         status: 'pending',
         createdAt: Date.now(),
         votes: {}
