@@ -168,6 +168,31 @@ export type ForumEditRequest = {
   timestamp: number;
 };
 
+export type SneakPeekComment = {
+  id: string;
+  userId: string;
+  content: string;
+  timestamp: number;
+};
+
+export type SneakPeek = {
+  id: string;
+  authorId: string;
+  title: string;
+  content: string;
+  status: 'in_development' | 'rolling_out' | 'concept' | 'testing';
+  progressPercentage: number; // 0 - 100
+  targetVersion: string;
+  tags: string[];
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
+  pinned?: boolean;
+  timestamp: number;
+  updatedAt?: number;
+  reactions?: Record<string, string[]>; // emoji -> array of userIds
+  comments: SneakPeekComment[];
+};
+
 export type Comment = {
   id: string;
   userId: string;

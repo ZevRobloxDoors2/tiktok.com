@@ -1,6 +1,6 @@
 {
   "name": "AuraFlix",
-  "description": "A premium cinematic streaming experience with advanced unblock technology and safety shielding.",
+  "description": "A video and media sharing platform with community forums, announcements, and exclusive sneak peeks.",
   "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

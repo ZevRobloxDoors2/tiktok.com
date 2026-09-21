@@ -1,7 +1,7 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 export { db, doc, updateDoc };
-import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement, Call, VerificationRequest, AppSuggestion } from '../types';
+import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement, Call, VerificationRequest, AppSuggestion, SneakPeek } from '../types';
 
 export const submitSuggestion = async (suggestion: AppSuggestion) => {
   try {
@@ -579,6 +579,24 @@ export const deleteForumEditRequestFromDB = async (reqId: string) => {
   } catch (err) {
     console.error("Error deleting forum edit request:", err);
   }
+};
+
+export const getSneakPeeks = () => fetchCollection<SneakPeek>('sneak_peeks');
+export const saveSneakPeeks = (peeks: SneakPeek[]) => saveCollection('sneak_peeks', peeks);
+export const deleteSneakPeekFromDB = async (peekId: string) => {
+  try {
+    const docRef = doc(db, 'sneak_peeks', peekId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Error deleting sneak peek:", err);
+  }
+};
+export const subscribeToSneakPeeks = (callback: (peeks: SneakPeek[]) => void) => {
+  return onSnapshot(collection(db, 'sneak_peeks'), (snapshot) => {
+    callback(snapshot.docs.map(doc => doc.data() as SneakPeek));
+  }, (err) => {
+    console.warn("Sneak peeks subscription warning:", err);
+  });
 };
 
 export const getAppSettings = async () => {

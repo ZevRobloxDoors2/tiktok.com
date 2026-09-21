@@ -109,9 +109,30 @@
         "createdAt": { "type": "number" }
       },
       "required": ["id", "userId", "firstName", "lastName", "schoolIdUrl", "status", "createdAt"]
+    },
+    "SneakPeek": {
+      "title": "Sneak Peek",
+      "description": "Exclusive preview of an upcoming feature or roadmap drop.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "status": { "type": "string", "enum": ["rolling_out", "in_development", "testing", "concept"] },
+        "progressPercentage": { "type": "number" },
+        "targetVersion": { "type": "string" },
+        "tags": { "type": "array" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "authorId", "title", "content", "status", "progressPercentage", "targetVersion", "timestamp"]
     }
   },
   "firestore": {
+    "sneak_peeks/{peekId}": {
+      "schema": "SneakPeek",
+      "description": "Sneak peeks and dev roadmap drops."
+    },
     "calls/{callId}": {
       "schema": "Call",
       "description": "WebRTC signaling data for calls."

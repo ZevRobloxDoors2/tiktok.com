@@ -274,7 +274,7 @@ export function Inbox() {
                       {n.type === 'forum_announcement' ? (
                         <>
                           <span className="font-bold text-[#5865F2]">📢 Forum Announcement:</span>{' '}
-                          <Link to="/forum" className="font-semibold hover:underline">{n.title || n.message}</Link>
+                          <Link to="/forum/updates" className="font-semibold hover:underline">{n.title || n.message}</Link>
                         </>
                       ) : n.type === 'tradient_reward' ? (
                         <>

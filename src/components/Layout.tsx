@@ -14,6 +14,7 @@ import AnnouncementBanner from './AnnouncementBanner';
 import { IncomingCallModal } from './IncomingCallModal';
 
 import { VerificationModal } from './VerificationModal';
+import { ForumChooserModal } from './ForumChooserModal';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { 
@@ -30,6 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     miniPlayerActive
   } = useAppStore();
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showForumChooser, setShowForumChooser] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
   const [supportType, setSupportType] = useState<'support' | 'bug' | null>(null);
@@ -232,7 +234,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { icon: Compass, label: 'Explore', path: '/explore' },
     { icon: MessageSquare, label: 'Messages', path: '/messages' },
     { icon: User, label: 'Profile', path: currentUser ? `/profile/${currentUser.handle}` : '#' },
-    { icon: HelpCircle, label: 'Forum', path: '/forum' },
+    { icon: HelpCircle, label: 'Forums', path: '/forum' },
     { icon: Gamepad2, label: 'Games & Apps', path: '/games-apps' },
   ];
 
@@ -244,6 +246,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (path === '#' || (['/messages', '/upload'].includes(path) && !currentUser)) {
       e.preventDefault();
       setShowAuthModal(true);
+      return;
+    }
+    if (path === '/forum') {
+      e.preventDefault();
+      setShowForumChooser(true);
+      return;
     }
   };
 
@@ -286,7 +294,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         
         <nav className="flex-1 space-y-2">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || (item.path === '/forum' && location.pathname.startsWith('/forum'));
             const isMessages = item.label === 'Messages';
             return (
               <Link 
@@ -382,7 +390,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   localStorage.setItem(`seen_guest_forum_${forumToast.id}`, 'true');
                 }
                 setForumToast(null);
-                navigate('/forum');
+                navigate('/forum/updates');
               }}
               className="px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white text-[11px] font-black rounded-xl transition-all shadow-lg active:scale-95"
             >
@@ -494,6 +502,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </Link>
+          <Link to="/forum" onClick={(e) => handleNavClick(e, '/forum')} className="p-2.5 relative">
+            <HelpCircle size={26} className={location.pathname.startsWith('/forum') ? 'text-pink-600 fill-current drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]' : 'text-zinc-500'} />
+            {location.pathname.startsWith('/forum') && <motion.div layoutId="mob-nav" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-600 rounded-full" />}
+          </Link>
           <Link to="/messages" onClick={(e) => handleNavClick(e, '/messages')} className="p-2.5 relative">
             <MessageSquare size={26} className={location.pathname === '/messages' ? 'text-pink-600 fill-current drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]' : 'text-zinc-500'} />
             {unreadCount > 0 && (
@@ -515,6 +527,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
       
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      
+      <ForumChooserModal 
+        isOpen={showForumChooser} 
+        onClose={() => setShowForumChooser(false)} 
+      />
       
       {showVerificationModal && currentUser && (
         <VerificationModal 

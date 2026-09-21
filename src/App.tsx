@@ -20,6 +20,8 @@ import { GlobalStoryViewer } from './components/StoriesBar';
 import { CallOverlay } from './components/CallOverlay';
 import { Admin } from './pages/Admin';
 import { Forum } from './pages/Forum';
+import { UpdatesAnnouncements } from './pages/UpdatesAnnouncements';
+import { SneakPeeks } from './pages/SneakPeeks';
 import { GamesApps } from './pages/GamesApps';
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -57,6 +59,11 @@ export default function App() {
               <Route path="/messages/:handle" element={<Chat />} />
               <Route path="/messages/group/:groupId" element={<Chat />} />
               <Route path="/forum" element={<Forum />} />
+              <Route path="/forum/updates" element={<UpdatesAnnouncements />} />
+              <Route path="/forum/announcements" element={<UpdatesAnnouncements />} />
+              <Route path="/forum/sneak-peeks" element={<SneakPeeks />} />
+              <Route path="/forum/sneak-peaks" element={<SneakPeeks />} />
+              <Route path="/sneak-peeks" element={<SneakPeeks />} />
               <Route path="/games-apps" element={<GamesApps />} />
               <Route path="/admin" element={<Admin />} />
             </Routes>
