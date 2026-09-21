@@ -40,7 +40,7 @@
                     return new Promise((resolve) => {
                         const requestId = Math.random().toString(36).substr(2, 9);
                         const handleResponse = (event) => {
-                            if (event.data.type === 'LOAD_GAME_DATA_RESPONSE' && event.data.requestId === requestId) {
+                            if (event.data && event.data.type === 'LOAD_GAME_DATA_RESPONSE' && event.data.requestId === requestId) {
                                 window.removeEventListener('message', handleResponse);
                                 resolve(event.data.data);
                             }
@@ -53,12 +53,13 @@
                         }, '*');
                     });
                 },
-                saveData: (data) => {
+                saveData: (data, cb) => {
                     window.parent.postMessage({
                         type: 'SAVE_GAME_DATA',
                         gameId: 'basketball-frvr',
                         data
                     }, '*');
+                    if (typeof cb === 'function') cb();
                     return Promise.resolve();
                 },
                 firstClick: () => {},
@@ -69,10 +70,15 @@
                 logError: () => {}
             },
             engagement: {
-                score: () => {}
+                score: () => {},
+                sendScore: () => {}
             },
             system: {
-                isPaused: () => false
+                isPaused: () => false,
+                onPause: (cb) => {},
+                onResume: (cb) => {},
+                onAudioEnabledChange: (cb) => {},
+                isAudioEnabled: () => true
             }
         };
       </script>
