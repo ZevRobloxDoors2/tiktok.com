@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { 
-  getSneakPeeks, saveSneakPeeks, deleteSneakPeekFromDB, getUsers 
+  getSneakPeeks, saveSneakPeeks, saveSneakPeek, deleteSneakPeekFromDB, subscribeToSneakPeeks, getUsers 
 } from '../lib/db';
 import { SneakPeek, SneakPeekComment, User } from '../types';
 import { 
@@ -160,18 +160,28 @@ export function SneakPeeks() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isStaffOrOwner = currentUser?.role === 'staff' || currentUser?.role === 'owner';
+  const isStaffOrOwner = 
+    currentUser?.role === 'staff' || 
+    currentUser?.role === 'owner' || 
+    currentUser?.email?.toLowerCase() === 'zaellacruze1@gmail.com';
 
   // Load Data
   const loadData = async () => {
     try {
       const [allUsers, allPeeks] = await Promise.all([getUsers(), getSneakPeeks()]);
       setUsers(allUsers);
-      if (allPeeks.length === 0) {
-        await saveSneakPeeks(SEED_SNEAK_PEEKS);
-        setSneakPeeks(SEED_SNEAK_PEEKS);
+      
+      const deleted = JSON.parse(localStorage.getItem('deleted_sneak_peeks') || '[]');
+      const hasInitialized = localStorage.getItem('sneak_peeks_seeded');
+
+      if (allPeeks.length === 0 && !hasInitialized) {
+        const initial = SEED_SNEAK_PEEKS.filter(p => !deleted.includes(p.id));
+        await saveSneakPeeks(initial);
+        localStorage.setItem('sneak_peeks_seeded', 'true');
+        setSneakPeeks(initial);
       } else {
-        setSneakPeeks(allPeeks);
+        const activePeeks = allPeeks.filter(p => !deleted.includes(p.id));
+        setSneakPeeks(activePeeks);
       }
     } catch (err) {
       console.error("Error loading sneak peeks:", err);
@@ -180,6 +190,19 @@ export function SneakPeeks() {
 
   useEffect(() => {
     loadData();
+
+    // Subscribe to sneak_peeks real-time changes
+    const unsubscribe = subscribeToSneakPeeks((peeks) => {
+      if (peeks && peeks.length > 0) {
+        const deleted = JSON.parse(localStorage.getItem('deleted_sneak_peeks') || '[]');
+        const activePeeks = peeks.filter(p => !deleted.includes(p.id));
+        setSneakPeeks(activePeeks);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const getAuthor = (authorId: string) => users.find(u => u.id === authorId);
@@ -217,6 +240,7 @@ export function SneakPeeks() {
       return;
     }
 
+    let targetPeek: SneakPeek | undefined;
     const updatedPeeks = sneakPeeks.map(peek => {
       if (peek.id !== peekId) return peek;
 
@@ -231,11 +255,14 @@ export function SneakPeeks() {
         reactions[emoji] = [...currentList, currentUser.id];
       }
 
-      return { ...peek, reactions };
+      targetPeek = { ...peek, reactions };
+      return targetPeek;
     });
 
     setSneakPeeks(updatedPeeks);
-    await saveSneakPeeks(updatedPeeks);
+    if (targetPeek) {
+      await saveSneakPeek(targetPeek);
+    }
   };
 
   // Comments Handler
@@ -255,29 +282,37 @@ export function SneakPeeks() {
       timestamp: Date.now()
     };
 
+    let targetPeek: SneakPeek | undefined;
     const updatedPeeks = sneakPeeks.map(peek => {
       if (peek.id !== peekId) return peek;
-      return {
+      targetPeek = {
         ...peek,
         comments: [...(peek.comments || []), newComment]
       };
+      return targetPeek;
     });
 
     setSneakPeeks(updatedPeeks);
-    await saveSneakPeeks(updatedPeeks);
+    if (targetPeek) {
+      await saveSneakPeek(targetPeek);
+    }
     setCommentInputs({ ...commentInputs, [peekId]: '' });
   };
 
   const handleDeleteComment = async (peekId: string, commentId: string) => {
+    let targetPeek: SneakPeek | undefined;
     const updatedPeeks = sneakPeeks.map(peek => {
       if (peek.id !== peekId) return peek;
-      return {
+      targetPeek = {
         ...peek,
         comments: (peek.comments || []).filter(c => c.id !== commentId)
       };
+      return targetPeek;
     });
     setSneakPeeks(updatedPeeks);
-    await saveSneakPeeks(updatedPeeks);
+    if (targetPeek) {
+      await saveSneakPeek(targetPeek);
+    }
   };
 
   // Create Sneak Peek
@@ -310,7 +345,7 @@ export function SneakPeeks() {
 
     const updated = [newPeek, ...sneakPeeks];
     setSneakPeeks(updated);
-    await saveSneakPeeks(updated);
+    await saveSneakPeek(newPeek);
 
     // Reset Form
     setPeekTitle('');
@@ -348,9 +383,10 @@ export function SneakPeeks() {
       .map(t => t.replace(/^#/, '').trim())
       .filter(Boolean);
 
+    let updatedTarget: SneakPeek | null = null;
     const updatedPeeks = sneakPeeks.map(peek => {
       if (peek.id !== editingPeek.id) return peek;
-      return {
+      updatedTarget = {
         ...peek,
         title: peekTitle.trim(),
         content: peekContent.trim(),
@@ -363,10 +399,13 @@ export function SneakPeeks() {
         pinned: peekPinned,
         updatedAt: Date.now()
       };
+      return updatedTarget;
     });
 
     setSneakPeeks(updatedPeeks);
-    await saveSneakPeeks(updatedPeeks);
+    if (updatedTarget) {
+      await saveSneakPeek(updatedTarget);
+    }
     setShowEditModal(false);
     setEditingPeek(null);
   };
@@ -376,9 +415,21 @@ export function SneakPeeks() {
     if (!isStaffOrOwner) return;
     if (!window.confirm("Are you sure you want to delete this sneak peek?")) return;
 
-    await deleteSneakPeekFromDB(peekId);
-    const updated = sneakPeeks.filter(p => p.id !== peekId);
-    setSneakPeeks(updated);
+    // Track in local deletion cache to prevent seed resurrection
+    const deleted = JSON.parse(localStorage.getItem('deleted_sneak_peeks') || '[]');
+    if (!deleted.includes(peekId)) {
+      deleted.push(peekId);
+      localStorage.setItem('deleted_sneak_peeks', JSON.stringify(deleted));
+    }
+
+    // Optimistic UI update
+    setSneakPeeks(prev => prev.filter(p => p.id !== peekId));
+
+    try {
+      await deleteSneakPeekFromDB(peekId);
+    } catch (err) {
+      console.error("Error deleting sneak peek from DB:", err);
+    }
   };
 
   // Handle File Upload

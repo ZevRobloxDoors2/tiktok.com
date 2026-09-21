@@ -18,17 +18,24 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     const users = await getUsers();
     const existingUser = users.find(u => u.email === email);
     const deviceId = getDeviceId();
+    const isOwner = email.toLowerCase() === 'zaellacruze1@gmail.com';
     
     if (existingUser) {
+      const updates: Partial<User> = {};
+      if (isOwner && existingUser.role !== 'owner') {
+        updates.role = 'owner';
+        existingUser.role = 'owner';
+      }
       if (!existingUser.deviceId) {
-        await updateUser(existingUser.id, { deviceId });
+        updates.deviceId = deviceId;
         existingUser.deviceId = deviceId;
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateUser(existingUser.id, updates);
       }
       return existingUser;
     }
 
-    const isOwner = email === 'zaellacruze1@gmail.com';
-    
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       email,

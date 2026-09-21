@@ -582,13 +582,40 @@ export const deleteForumEditRequestFromDB = async (reqId: string) => {
 };
 
 export const getSneakPeeks = () => fetchCollection<SneakPeek>('sneak_peeks');
-export const saveSneakPeeks = (peeks: SneakPeek[]) => saveCollection('sneak_peeks', peeks);
+
+export const saveSneakPeek = async (peek: SneakPeek) => {
+  try {
+    const cleaned = cleanObject(peek);
+    const docRef = doc(db, 'sneak_peeks', peek.id);
+    await setDoc(docRef, cleaned);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `sneak_peeks/${peek.id}`);
+  }
+};
+
+export const saveSneakPeeks = async (peeks: SneakPeek[]) => {
+  if (peeks.length === 0) return;
+  try {
+    const batch = writeBatch(db);
+    peeks.forEach(item => {
+      const docRef = doc(db, 'sneak_peeks', item.id);
+      const cleaned = cleanObject(item);
+      batch.set(docRef, cleaned);
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error("Error saving sneak peeks:", err);
+    handleFirestoreError(err, OperationType.WRITE, 'sneak_peeks');
+  }
+};
+
 export const deleteSneakPeekFromDB = async (peekId: string) => {
   try {
     const docRef = doc(db, 'sneak_peeks', peekId);
     await deleteDoc(docRef);
   } catch (err) {
     console.error("Error deleting sneak peek:", err);
+    handleFirestoreError(err, OperationType.DELETE, `sneak_peeks/${peekId}`);
   }
 };
 export const subscribeToSneakPeeks = (callback: (peeks: SneakPeek[]) => void) => {

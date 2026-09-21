@@ -16,7 +16,7 @@ service cloud.firestore {
         request.auth.token.role == 'owner' || 
         request.auth.token.role == 'staff' ||
         request.auth.token.admin == true ||
-        request.auth.token.email.lower() == 'zaellacruze1@gmail.com'
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'zaellacruze1@gmail.com')
       );
     }
 
