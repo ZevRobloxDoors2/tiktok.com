@@ -426,69 +426,43 @@ export function Home() {
 
   if (introPhase !== 'done') {
     return (
-      <div className="h-full w-full bg-zinc-950 flex flex-col items-center justify-center relative overflow-hidden select-none">
-        {/* Ambient background glow */}
-        <div className="absolute w-96 h-96 bg-gradient-to-tr from-pink-600/25 to-blue-600/25 rounded-full blur-3xl animate-pulse pointer-events-none" />
-
-        {/* Black Hole expansion */}
+      <div className="h-full w-full bg-zinc-900 flex items-center justify-center relative overflow-hidden">
+        {/* Black Hole */}
         {introPhase === 'expanding' && (
           <motion.div 
             initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 120, opacity: 1 }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute z-50 w-16 h-16 bg-black rounded-full"
+            animate={{ scale: 100, opacity: 1 }}
+            transition={{ duration: 1, ease: "easeInOut" }}
+            className="absolute z-50 w-10 h-10 bg-black rounded-full"
             style={{ 
-              boxShadow: '0 0 150px 80px rgba(0,0,0,1)' 
+              boxShadow: '0 0 100px 50px rgba(0,0,0,1)' 
             }}
           />
         )}
 
-        <div className={`relative z-10 flex flex-col items-center justify-center transition-opacity duration-500 ${introPhase === 'expanding' ? 'opacity-0' : 'opacity-100'}`}>
-           {/* Logo Animation */}
-           <div className="relative flex items-center justify-center w-36 h-36 mb-8">
-             <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-pink-500 to-blue-600 opacity-20 blur-xl animate-spin" style={{ animationDuration: '6s' }} />
-             
-             {/* Central C & T */}
-             <div className="flex items-center justify-center gap-1">
-               <motion.div 
-                 animate={introPhase === 'merging' ? { x: 12, scale: 0.8, opacity: 0 } : { scale: [1, 1.05, 1] }}
-                 transition={introPhase === 'merging' ? { duration: 0.6 } : { duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                 className="text-6xl font-black tracking-tighter bg-gradient-to-br from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent drop-shadow-lg"
-               >
-                 C
-               </motion.div>
-               <motion.div 
-                 animate={introPhase === 'merging' ? { x: -12, scale: 0.8, opacity: 0 } : { scale: [1, 1.05, 1] }}
-                 transition={introPhase === 'merging' ? { duration: 0.6 } : { duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
-                 className="text-6xl font-black tracking-tighter bg-gradient-to-br from-pink-400 via-pink-500 to-purple-600 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(236,72,153,0.5)]"
-               >
-                 T
-               </motion.div>
-             </div>
-
-             {/* Orbiting Ring */}
-             <motion.div
-               animate={introPhase === 'loading' ? { rotate: 360 } : { rotate: 0 }}
-               transition={introPhase === 'loading' ? { duration: 2, repeat: Infinity, ease: "linear" } : { duration: 0 }}
-               className="absolute inset-0 rounded-full border-2 border-transparent border-t-pink-500 border-r-blue-500"
-             />
-           </div>
-
-           {/* Brand Title & Status */}
+        <div className={`relative z-10 flex items-center justify-center transition-opacity duration-500 ${introPhase === 'expanding' ? 'opacity-0' : 'opacity-100'}`}>
+           {/* C Icon */}
            <motion.div 
-             initial={{ opacity: 0, y: 10 }}
-             animate={{ opacity: 1, y: 0 }}
-             className="text-center space-y-2"
+             animate={introPhase === 'merging' ? { scale: 0, opacity: 0 } : {}}
+             transition={{ duration: 0.8 }}
+             className="text-6xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"
            >
-             <h2 className="text-xl font-black tracking-widest uppercase bg-gradient-to-r from-white via-zinc-300 to-zinc-500 bg-clip-text text-transparent">
-               CentralTok
-             </h2>
-             <div className="flex items-center justify-center gap-2">
-               <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-ping" />
-               <p className="text-xs font-medium text-zinc-400 tracking-wider uppercase">
-                 {introPhase === 'merging' ? 'Synchronizing Experience...' : 'Preparing Feed...'}
-               </p>
-             </div>
+             C
+           </motion.div>
+           
+           {/* T Icon Circling */}
+           <motion.div
+             animate={introPhase === 'loading' ? { rotate: 360 } : { rotate: 0 }}
+             transition={introPhase === 'loading' ? { duration: 1.5, repeat: Infinity, ease: "linear" } : { duration: 0 }}
+             className="absolute w-32 h-32 flex items-start justify-center"
+           >
+             <motion.div 
+               animate={introPhase === 'merging' ? { y: 64, scale: 0, opacity: 0 } : {}}
+               transition={{ duration: 0.8 }}
+               className="text-5xl font-black text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,0.8)]"
+             >
+               T
+             </motion.div>
            </motion.div>
         </div>
       </div>
