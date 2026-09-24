@@ -43,7 +43,7 @@ let analytics: any = null;
 try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
+  db = getFirestore(app, "ai-studio-centraltok-20b3b741-dd0c-4874-8036-490f35162ac6");
   isSupported().then((supported) => {
     if (supported) {
       analytics = getAnalytics(app);
@@ -56,7 +56,7 @@ try {
     firebaseConfig.apiKey = getFallbackKey();
     app = initializeApp(firebaseConfig, "fallback-app");
     auth = getAuth(app);
-    db = getFirestore(app);
+    db = getFirestore(app, "ai-studio-centraltok-20b3b741-dd0c-4874-8036-490f35162ac6");
   } catch (err2) {
     console.error("Firebase fallback failed:", err2);
   }
