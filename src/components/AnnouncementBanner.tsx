@@ -31,8 +31,9 @@ const AnnouncementBanner: React.FC = () => {
         if (a.type === 'page' && a.targetPage) {
           const currentPath = location.pathname;
           const targetPath = a.targetPage;
-          // Alias /games to /games-apps
+          // Alias /games to /games-apps, and /home to /
           if (targetPath === '/games' && currentPath === '/games-apps') return true;
+          if ((targetPath === '/home' || targetPath === '/') && (currentPath === '/' || currentPath === '/home')) return true;
           return currentPath === targetPath;
         }
         

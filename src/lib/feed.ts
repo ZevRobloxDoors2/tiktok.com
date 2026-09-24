@@ -32,6 +32,11 @@ export function normalizeYoutubeShorts<T extends {
         return false;
       }
 
+      // Filter out outdated years or generic cringe/boring compilations
+      if (/\b(2020|2021|2022|old trend|try not to laugh challenge 2020)\b/i.test(title)) {
+        return false;
+      }
+
       deduped.add(videoId);
       return true;
     })

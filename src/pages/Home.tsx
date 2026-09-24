@@ -144,7 +144,11 @@ export function Home() {
             let fetchUrl = '/api/youtube-shorts';
             if (currentUser?.interests && currentUser.interests.length > 0) {
               const randomInterest = currentUser.interests[Math.floor(Math.random() * currentUser.interests.length)];
-              fetchUrl += `?q=${encodeURIComponent(randomInterest + ' trending')}`;
+              let enhancedQuery = randomInterest + ' viral shorts 2026';
+              if (/funny|comedy|humor|laughs/i.test(randomInterest)) {
+                enhancedQuery = 'top tier clever comedy memes 2026';
+              }
+              fetchUrl += `?q=${encodeURIComponent(enhancedQuery)}`;
             }
             
             const localResponse = await fetch(fetchUrl);

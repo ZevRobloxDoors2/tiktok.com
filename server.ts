@@ -197,7 +197,14 @@ Return ONLY a valid JSON array of these objects. No markdown formatting, no extr
       }
 
       const pageToken = req.query.pageToken as string || '';
-      const fallbackQueries = ['funny clips', 'gaming clips', 'school life', 'viral videos', 'trending dance', 'sports highlights'];
+      const fallbackQueries = [
+        'best viral shorts 2026',
+        'top tier gaming clips',
+        'elite comedy reels 2026',
+        'trending tech moments',
+        'clever humor viral',
+        'high energy entertainment'
+      ];
       const randomFallback = fallbackQueries[Math.floor(Math.random() * fallbackQueries.length)];
       const searchQuery = req.query.q as string || randomFallback;
       const maxResults = req.query.maxResults as string || '8';

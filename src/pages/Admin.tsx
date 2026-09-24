@@ -965,7 +965,7 @@ export function Admin() {
                             className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 outline-none focus:border-pink-500"
                           >
                             <option value="">Select Page</option>
-                            <option value="/home">Home / Feed</option>
+                            <option value="/">For You / Home</option>
                             <option value="/explore">Explore</option>
                             <option value="/inbox">Inbox</option>
                             <option value="/games-apps">Games & Apps</option>
