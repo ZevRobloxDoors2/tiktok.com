@@ -533,8 +533,8 @@ export const resolveReport = async (reportId: string, adminId: string, adminUser
 export const getAppeals = () => fetchCollection<Appeal>('appeals');
 export const saveAppeals = (appeals: Appeal[]) => saveCollection('appeals', appeals);
 
-export const getAuditLogs = () => fetchCollection<AuditLog>('auditLogs');
-export const saveAuditLogs = (logs: AuditLog[]) => saveCollection('auditLogs', logs);
+export const getAuditLogs = () => fetchCollection<AuditLog>('audit_logs');
+export const saveAuditLogs = (logs: AuditLog[]) => saveCollection('audit_logs', logs);
 
 export const deleteVideoFromDB = async (videoId: string) => {
   try {

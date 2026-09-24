@@ -10,95 +10,63 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Helper to check staff or owner role from request claims or document
     function isStaffOrAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'owner' || 
-        request.auth.token.role == 'staff' ||
-        request.auth.token.admin == true ||
-        (request.auth.token.email != null && request.auth.token.email.lower() == 'zaellacruze1@gmail.com')
-      );
+      return true;
     }
 
     // Users collection
     match /users/{userId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if isStaffOrAdmin() || isOwner(userId);
+      allow read, write: if true;
     }
 
     // Videos collection (posts, shorts, photo posts)
     match /videos/{videoId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Stories collection (24-hour ephemeral posts)
     match /stories/{storyId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Messages collection
     match /messages/{messageId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Notifications collection
     match /notifications/{notificationId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Reports collection
     match /reports/{reportId} {
-      allow read: if isStaffOrAdmin();
-      allow create: if isAuthenticated();
-      allow update, delete: if isStaffOrAdmin();
+      allow read, write: if true;
     }
 
     // Appeals collection
     match /appeals/{appealId} {
-      allow read: if isStaffOrAdmin() || isOwner(resource.data.userId);
-      allow create: if isAuthenticated();
-      allow update: if isStaffOrAdmin();
-      allow delete: if isStaffOrAdmin();
+      allow read, write: if true;
     }
 
     // Audit logs collection
     match /audit_logs/{logId} {
-      allow read: if isStaffOrAdmin();
-      allow create: if isStaffOrAdmin();
-      allow update: if isStaffOrAdmin();
-      allow delete: if isStaffOrAdmin();
+      allow read, write: if true;
     }
 
     // FAQ Categories (Discord-like forum)
     match /faq_categories/{categoryId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if true;
     }
 
     // FAQ Posts (Discord-like forum posts)
     match /faq_posts/{postId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if true;
     }
 
     // Sneak Peeks collection
     match /sneak_peeks/{peekId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if true;
     }
 
     // Forum Edit Requests
@@ -108,8 +76,7 @@ service cloud.firestore {
 
     // App Settings (Global configuration)
     match /app_settings/{settingId} {
-      allow read: if true;
-      allow write: if isStaffOrAdmin() || !isAuthenticated(); // Support custom login for owner while testing
+      allow read, write: if true;
     }
 
     // Calls collection (WebRTC signaling)
@@ -139,24 +106,17 @@ service cloud.firestore {
 
     // Announcements
     match /announcements/{announcementId} {
-      allow read: if true;
-      allow write: if isStaffOrAdmin();
+      allow read, write: if true;
     }
 
     // Verification Requests
     match /verification_requests/{requestId} {
-      allow read: if isStaffOrAdmin() || isOwner(resource.data.userId);
-      allow create: if isAuthenticated();
-      allow update: if isStaffOrAdmin();
-      allow delete: if isStaffOrAdmin();
+      allow read, write: if true;
     }
 
     // App Suggestions
     match /app_suggestions/{suggestionId} {
-      allow read: if isStaffOrAdmin();
-      allow create: if isAuthenticated();
-      allow update: if isStaffOrAdmin();
-      allow delete: if isStaffOrAdmin();
+      allow read, write: if true;
     }
   }
 }
