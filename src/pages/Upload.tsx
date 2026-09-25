@@ -436,10 +436,14 @@ export function Upload() {
                         drag
                         dragMomentum={false}
                         onDragEnd={(_, info) => {
-                          const rect = (info as any).target.offsetParent.getBoundingClientRect();
-                          const x = (info.point.x / rect.width) * 100;
-                          const y = (info.point.y / rect.height) * 100;
-                          updateText(overlay.id, { x, y });
+                          const target = (info as any).target;
+                          const container = target?.closest('.relative.rounded-2xl.overflow-hidden') || target?.offsetParent || target?.parentElement;
+                          if (container && typeof container.getBoundingClientRect === 'function') {
+                            const rect = container.getBoundingClientRect();
+                            const x = (info.point.x / rect.width) * 100;
+                            const y = (info.point.y / rect.height) * 100;
+                            updateText(overlay.id, { x, y });
+                          }
                         }}
                         initial={{ opacity: 0, scale: 0.5 }}
                         animate={{ 
