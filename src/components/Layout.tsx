@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store';
 import { AuthModal } from './AuthModal';
 import { MiniPlayer } from './MiniPlayer';
-import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications, saveGameData, getGameData, subscribeToIncomingCalls } from '../lib/db';
+import { saveReports, getMessages, getUsers, getNotifications, markNotificationAsRead, getFAQPosts, subscribeToNotifications, saveGameData, getGameData, subscribeToIncomingCalls, subscribeToMessages } from '../lib/db';
 import { TradientInfoModal } from './TradientInfoModal';
 import { HolographicBadge } from './UIPolish';
 import * as Types from '../types';
@@ -55,15 +55,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeIncomingCall, setActiveIncomingCall] = useState<Types.Call | null>(null);
   const knownMessageIds = useRef<Set<string>>(new Set());
+  const knownCallIds = useRef<Set<string>>(new Set());
   const location = useLocation();
   const navigate = useNavigate();
   const isIntro = location.pathname === '/' && introPhase !== 'done';
 
   useEffect(() => {
     if (!currentUser) return;
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
     let initialized = false;
-    const checkMessages = async () => {
-      const [messages, users] = await Promise.all([getMessages(), getUsers()]);
+
+    const unsubscribe = subscribeToMessages(async (messages) => {
+      const users = await getUsers();
       const incoming = messages.filter(message => message.toUserId === currentUser.id);
       const unread = incoming.filter(m => !m.read).length;
       setUnreadCount(unread);
@@ -80,12 +87,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
       if (!sender) return;
       setMessageToast({username: sender.username, avatarUrl: sender.avatarUrl, handle: sender.handle});
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(sender.username, {body: 'New messages was sent', icon: sender.avatarUrl});
+        try {
+          new Notification(sender.username, {
+            body: fresh.content || 'New message received',
+            icon: sender.avatarUrl
+          });
+        } catch (err) {}
       }
-    };
-    checkMessages();
-    const interval = setInterval(checkMessages, 2000);
-    return () => clearInterval(interval);
+    });
+
+    return () => unsubscribe();
   }, [currentUser?.id]);
 
   useEffect(() => {
@@ -170,9 +181,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const unsubCalls = currentUser ? subscribeToIncomingCalls(currentUser.id, (calls) => {
+    const unsubCalls = currentUser ? subscribeToIncomingCalls(currentUser.id, async (calls) => {
       if (calls.length > 0) {
-        setActiveIncomingCall(calls[0]);
+        const call = calls[0];
+        setActiveIncomingCall(call);
+
+        if (!knownCallIds.current.has(call.id) && call.status === 'offering') {
+          knownCallIds.current.add(call.id);
+          const users = await getUsers();
+          const caller = users.find(u => u.id === call.callerId);
+          const callerName = caller?.username || 'Someone';
+
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              const notif = new Notification(`${callerName} is calling you!`, {
+                body: 'Incoming call on CentralTok. Click to answer.',
+                icon: caller?.avatarUrl,
+                tag: `call_${call.id}`
+              });
+              notif.onclick = () => {
+                window.focus();
+                notif.close();
+              };
+            } catch (err) {}
+          }
+        }
       } else {
         setActiveIncomingCall(null);
       }

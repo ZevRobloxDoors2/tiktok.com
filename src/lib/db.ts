@@ -315,6 +315,13 @@ export const updateVideo = async (videoId: string, update: (video: Video) => Vid
 
 export const getMessages = () => fetchCollection<Message>('messages');
 export const saveMessages = (messages: Message[]) => saveCollection('messages', messages);
+export const subscribeToMessages = (callback: (messages: Message[]) => void) => {
+  return onSnapshot(collection(db, 'messages'), (snapshot) => {
+    callback(snapshot.docs.map(doc => doc.data() as Message));
+  }, (err) => {
+    console.warn("Messages subscription error:", err);
+  });
+};
 export const deleteMessage = async (messageId: string) => {
   const msgs = await getMessages();
   await saveMessages(msgs.filter(m => m.id !== messageId));
