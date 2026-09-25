@@ -3,7 +3,8 @@ import {
   getVideos, getUsers, saveUsers, saveVideos, incrementVideoView, 
   ensureVideoInDB, getMessages, saveMessages, getNotifications, 
   saveNotifications, subscribeToVideo, deleteVideoFromDB, getAppSettings, subscribeToAppSettings,
-  updateUser, createWatchParty, joinWatchParty, subscribeToWatchParty, updateWatchPartyState
+  updateUser, createWatchParty, joinWatchParty, subscribeToWatchParty, updateWatchPartyState,
+  doc, getDoc, db
 } from '../lib/db';
 import { Video, User, WatchParty } from '../types';
 import { useAppStore } from '../store';
@@ -11,7 +12,7 @@ import {
   Heart, MessageCircle, Share2, Music, Bookmark, Eye, Loader2, Flag, 
   User as UserIcon, Sparkles, Trash2, Image as ImageIcon, Users, Lock, AlertCircle, Maximize2, Tv
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Comments } from '../components/Comments';
 import { AIChatPanel } from '../components/AIChatPanel';
@@ -31,6 +32,7 @@ const SONGS = [
 
 export function Home() {
   const { currentUser, introPhase, setIntroPhase, isLoading, setShowAuthModal } = useAppStore();
+  const { videoId } = useParams<{ videoId?: string }>();
   const [videos, setVideos] = useState<(Video & { user: User; feedId: string })[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -303,11 +305,37 @@ export function Home() {
   useEffect(() => {
     if (isLoading) return;
     seenFeedIds.current.clear();
-    setVideos([]);
-    setYtPageToken('');
-    setHasMore(true);
-    fetchBatch(true);
-  }, [currentUser?.id, isLoading]);
+    const loadFeed = async () => {
+      if (videoId) {
+        try {
+          const docRef = doc(db, 'videos', videoId);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            const v = snap.data() as Video;
+            const allUsers = await getUsers();
+            const user = allUsers.find(u => u.id === v.userId) || ({} as User);
+            const enriched = {
+              ...v,
+              videoUrl: v.videoData ? URL.createObjectURL(v.videoData) : v.videoUrl,
+              user,
+              feedId: `db_${v.id}`
+            };
+            seenFeedIds.current.add(`db_${v.id}`);
+            setVideos([enriched]);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.error("Error loading specific video:", err);
+        }
+      }
+      setVideos([]);
+      setYtPageToken('');
+      setHasMore(true);
+      fetchBatch(true);
+    };
+    loadFeed();
+  }, [currentUser?.id, isLoading, videoId]);
 
   // Pull to refresh logic
   const [startY, setStartY] = useState(0);

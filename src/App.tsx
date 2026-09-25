@@ -52,6 +52,8 @@ export default function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/videos/:videoId" element={<Home />} />
+              <Route path="/video/:videoId" element={<Home />} />
               <Route path="/explore" element={<Explore />} />
               <Route path="/upload" element={<Upload />} />
               <Route path="/profile/:handle" element={<Profile />} />

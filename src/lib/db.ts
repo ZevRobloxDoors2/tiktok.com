@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, setDoc, updateDoc, writeBatch, arrayUnion, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
-export { db, doc, updateDoc };
+export { db, doc, updateDoc, getDoc };
 import { User, Video, Message, AppNotification, Report, Appeal, AuditLog, Comment, Story, FAQCategory, FAQPost, ForumEditRequest, GroupChat, UserStatus, GameData, WatchParty, Announcement, Call, VerificationRequest, AppSuggestion, SneakPeek } from '../types';
 
 export const submitSuggestion = async (suggestion: AppSuggestion) => {
