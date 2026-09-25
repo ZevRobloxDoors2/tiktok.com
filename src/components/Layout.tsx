@@ -67,33 +67,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
       Notification.requestPermission().catch(() => {});
     }
 
-    let initialized = false;
-
     const unsubscribe = subscribeToMessages(async (messages) => {
       const users = await getUsers();
       const incoming = messages.filter(message => message.toUserId === currentUser.id);
       const unread = incoming.filter(m => !m.read).length;
       setUnreadCount(unread);
 
-      if (!initialized) {
-        incoming.forEach(message => knownMessageIds.current.add(message.id));
-        initialized = true;
-        return;
-      }
-      const fresh = incoming.find(message => !knownMessageIds.current.has(message.id));
+      const freshUnread = incoming.filter(m => !m.read && !knownMessageIds.current.has(m.id));
+      freshUnread.forEach(m => {
+        knownMessageIds.current.add(m.id);
+        const sender = users.find(user => user.id === m.fromUserId);
+        if (sender) {
+          setMessageToast({username: sender.username, avatarUrl: sender.avatarUrl, handle: sender.handle});
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(`${sender.username} sent you a message`, {
+                body: m.content || 'New message received',
+                icon: sender.avatarUrl,
+                tag: `msg_${m.id}`
+              });
+            } catch (err) {}
+          }
+        }
+      });
       incoming.forEach(message => knownMessageIds.current.add(message.id));
-      if (!fresh) return;
-      const sender = users.find(user => user.id === fresh.fromUserId);
-      if (!sender) return;
-      setMessageToast({username: sender.username, avatarUrl: sender.avatarUrl, handle: sender.handle});
-      if ('Notification' in window && Notification.permission === 'granted') {
-        try {
-          new Notification(sender.username, {
-            body: fresh.content || 'New message received',
-            icon: sender.avatarUrl
-          });
-        } catch (err) {}
-      }
     });
 
     return () => unsubscribe();

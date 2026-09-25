@@ -183,6 +183,7 @@ export function Admin() {
     setLogs(await getAuditLogs());
     setVideos(await getVideos());
     setAnnouncements(await getAnnouncements());
+    setVerificationRequests(await getVerificationRequests());
     if (isOwner) {
       const settings = await getAppSettings();
       setAppSettings(settings);
